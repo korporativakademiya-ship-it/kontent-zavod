@@ -18,6 +18,8 @@ export async function storyboard(draft) {
     prompt: `Post:\n${draft.post_html}\n\nReels ssenariy:\n${draft.reels_script || "yo'q"}
 
 Shu mazmunni 25–45 soniyalik videoga aylantir. ${SCHEMA}
+Dublyaj: har sahnaga (steps da esa har bir qadamga, items ichida) "voice" maydoni qo'sh — diktor aytadigan jonli gap,
+1–2 qisqa gap (≤160 belgi), ekrandagi matnni so'zma-so'z takrorlamaydi, balki tushuntiradi. steps sahnasining o'ziga voice kerak emas.
 Qoidalar: steps da 3–8 ta qadam. Belgi chegaralariga qat'iy amal qil — ekranga sig'ishi shart.
 Faqat oddiy matn (HTML yo'q). O'zbek tili (lotin). Yolg'on raqam yo'q — num postdagi raqamlardan yoki qadamlar sonidan olinadi.
 JSON: {"scenes":[...]}`

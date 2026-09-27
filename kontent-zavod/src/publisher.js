@@ -21,6 +21,33 @@ export function nextSlot() {
   return new Date(Date.now() + H).toISOString();
 }
 
+// Rahbar yozgan vaqtni ISO ga aylantiradi (Toshkent vaqti). Tushunmasa yoki o'tib ketgan bo'lsa — null
+// Qabul qiladi: "18:30", "bugun 18:30", "ertaga 9:00", "indinga 10:00", "28.09 18:30", "28.09.2026 18:30"
+export function parseTime(text, now = Date.now()) {
+  const s = String(text).trim().toLowerCase().replace(/\s+/g, ' ');
+  const tm = s.match(/(\d{1,2})[:.](\d{2})$/);
+  if (!tm) return null;
+  const h = Number(tm[1]), m = Number(tm[2]);
+  if (h > 23 || m > 59) return null;
+  const local = new Date(now + cfg.tzOffsetH * H);
+  let y = local.getUTCFullYear(), mo = local.getUTCMonth(), d = local.getUTCDate();
+  const rest = s.slice(0, tm.index).trim();
+  const date = rest.match(/^(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?$/);
+  let explicitDay = true;
+  if (date) {
+    d = Number(date[1]); mo = Number(date[2]) - 1;
+    if (date[3]) y = Number(date[3].length === 2 ? '20' + date[3] : date[3]);
+    if (mo > 11 || d < 1 || d > 31) return null;
+  } else if (rest === 'ertaga') d += 1;
+  else if (rest === 'indinga') d += 2;
+  else if (rest === '' ) explicitDay = false;
+  else if (rest !== 'bugun') return null;
+  let utc = Date.UTC(y, mo, d, h - cfg.tzOffsetH, m);
+  if (date && !date[3] && utc < now - 60e3) utc = Date.UTC(y + 1, mo, d, h - cfg.tzOffsetH, m); // yil ko'rsatilmagan va o'tgan — keyingi yil
+  if (!explicitDay && utc <= now) utc += 24 * H; // faqat soat yozilgan va bugun o'tgan — ertaga
+  return utc > now ? new Date(utc).toISOString() : null;
+}
+
 export function fmtTime(iso) {
   const d = new Date(new Date(iso).getTime() + cfg.tzOffsetH * H);
   const p = n => String(n).padStart(2, '0');
@@ -43,26 +70,56 @@ export async function sendSafe(api, chatId, text, extra = {}) {
   }
 }
 
-// Video + matn. Telegram izohi (caption) 1024 belgigacha — sig'sa bitta xabar, sig'masa video, keyin post
-export async function sendVideoPost(api, chatId, draft, extra = {}) {
-  const video = { supports_streaming: true, width: 1080, height: 1920, duration: Math.round(draft.video_duration || 0) || undefined };
-  const text = cleanHtml(draft.post_html);
-  if (text.replace(/<[^>]+>/g, '').length <= 1024) {
-    try {
-      return await api.sendVideo(chatId, new InputFile(draft.video_path), { ...video, caption: text, parse_mode: 'HTML', ...extra });
-    } catch { /* HTML xatosi bo'lsa pastdagi yo'l bilan */ }
-  }
-  await api.sendVideo(chatId, new InputFile(draft.video_path), { ...video, ...extra });
-  return sendSafe(api, chatId, draft.post_html, extra);
+const plainLen = (html) => html.replace(/<[^>]+>/g, '').length;
+
+// Har chaqiruvda yangi InputFile (qayta yuborishda ham o'qiladi)
+function mediaItems(draft) {
+  const items = [];
+  if (hasVideo(draft)) items.push({ type: 'video', media: new InputFile(draft.video_path), supports_streaming: true, width: 1080, height: 1920, duration: Math.round(draft.video_duration || 0) || undefined });
+  for (const p of imagePaths(draft)) items.push({ type: 'photo', media: new InputFile(p) });
+  return items.slice(0, 10);
 }
 
+// Media (video, rasmlar, audio) + matn. Izoh (caption) 1024 belgigacha — sig'sa bitta xabar, sig'masa media, keyin matn
+export async function sendMediaPost(api, chatId, draft, extra = {}) {
+  const { reply_markup, ...base } = extra;
+  const text = cleanHtml(draft.post_html);
+  const fits = plainLen(text) <= 1024;
+  const n = mediaItems(draft).length;
+  let msg;
+  const sendMedia = (caption) => {
+    const items = mediaItems(draft);
+    if (n === 1) {
+      const { type, media, ...opts } = items[0];
+      const cap = caption ? { caption, parse_mode: 'HTML', reply_markup } : {};
+      return type === 'video' ? api.sendVideo(chatId, media, { ...opts, ...base, ...cap }) : api.sendPhoto(chatId, media, { ...opts, ...base, ...cap });
+    }
+    if (caption) Object.assign(items[0], { caption, parse_mode: 'HTML' });
+    return api.sendMediaGroup(chatId, items, base);
+  };
+  if (n) {
+    // Albomga tugma qo'yib bo'lmaydi: tugmali xabar kerak bo'lsa (tasdiqlash), matn alohida ketadi
+    const oneMsg = fits && (n === 1 || !reply_markup);
+    if (oneMsg) {
+      try { msg = await sendMedia(text); } catch { /* HTML xatosi — media va matn alohida */ }
+    }
+    if (!msg) { await sendMedia(null); msg = await sendSafe(api, chatId, draft.post_html, extra); }
+  } else {
+    msg = await sendSafe(api, chatId, draft.post_html, extra);
+  }
+  if (hasAudio(draft)) await api.sendVoice(chatId, new InputFile(draft.audio_path), { ...base, duration: Math.round(draft.audio_duration || 0) || undefined });
+  return msg;
+}
+
+export const imagePaths = (d) => (d.image_paths || []).filter(p => fs.existsSync(p));
+export const hasAudio = (d) => !!d.audio_path && fs.existsSync(d.audio_path);
 export const hasVideo = (d) => !!d.video_path && fs.existsSync(d.video_path);
 
 // Qaytaradi: rich format rad etilib oddiy formatda chiqqan bo'lsa — sababi (aks holda undefined)
 export async function publish(api, draft) {
   let fallback;
   if (isRich(draft)) ({ fallback } = await sendRich(api, cfg.channelId, draft));
-  else if (hasVideo(draft)) await sendVideoPost(api, cfg.channelId, draft);
+  else if (hasVideo(draft) || imagePaths(draft).length || hasAudio(draft)) await sendMediaPost(api, cfg.channelId, draft);
   else await sendSafe(api, cfg.channelId, draft.post_html);
   store.update(draft.id, { status: 'published', publishedAt: new Date().toISOString() });
   return fallback;

@@ -136,7 +136,7 @@ async function build() {
     made.push(sl);
   });
   // Sahifa raqami faqat haqiqiy slaydlar soniga qarab
-  made.forEach((sl, i) => { sl.querySelector('.pg').textContent = `${i + 1}/${made.length}`; });
+  made.forEach((sl, i) => { sl.querySelector('.pg').textContent = made.length > 1 ? `${i + 1}/${made.length}` : ''; });
   return made.length;
 }
 

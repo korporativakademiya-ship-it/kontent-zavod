@@ -1,5 +1,5 @@
 import { InputFile } from 'grammy';
-import { sendSafe, sendVideoPost, hasVideo } from './publisher.js';
+import { sendSafe, sendMediaPost, hasVideo, hasAudio, imagePaths } from './publisher.js';
 
 // Telegram "Статья" (Bot API rich message) — maqola va karusel postlari shu orqali chiqadi
 
@@ -55,11 +55,22 @@ export function buildRich(draft, { prefix = '' } = {}) {
     return `<img src="tg://photo?id=s${i + 1}"/>`;
   });
   let block = imgs.length > 1 ? `<tg-slideshow>${imgs.join('')}</tg-slideshow>` : imgs.length ? `<figure>${imgs[0]}</figure>` : '';
+  // Rahbar qo'shgan rasmlar / muqova — sarlavhadan keyin birinchi bo'lib
+  const own = imagePaths(draft).slice(0, 8).map((p, i) => {
+    media.push({ id: `i${i + 1}`, media: { type: 'photo', media: new InputFile(p) } });
+    return `<img src="tg://photo?id=i${i + 1}"/>`;
+  });
+  const cover = own.length > 1 ? `<tg-collage>${own.join('')}</tg-collage>` : own.length ? `<figure>${own[0]}</figure>` : '';
   if (hasVideo(draft)) {
     media.push({ id: 'v1', media: { type: 'video', media: new InputFile(draft.video_path), supports_streaming: true } });
     block += '<figure><video src="tg://video?id=v1"></video></figure>';
   }
+  if (hasAudio(draft)) {
+    media.push({ id: 'a1', media: { type: 'voice_note', media: new InputFile(draft.audio_path) } });
+    block += '<figure><audio src="tg://audio?id=a1"></audio><figcaption>🎙 Audio variant</figcaption></figure>';
+  }
   let body = sanitizeRich(draft.article_html);
+  if (cover) body = /<\/h1>/i.test(body) ? body.replace(/<\/h1>/i, `</h1>${cover}`) : cover + body;
   if (body.includes('<slides/>')) body = body.replace('<slides/>', block).replaceAll('<slides/>', '');
   else if (block) body = /<\/h1>/i.test(body) ? body.replace(/<\/h1>/i, `</h1>${block}`) : block + body;
   return { html: prefix + body, media };
@@ -73,14 +84,9 @@ export async function sendRich(api, chatId, draft, extra = {}, { prefix = '' } =
     const msg = await api.sendRichMessage(chatId, buildRich(draft, { prefix }), extra);
     return { msg };
   } catch (e) {
-    const { reply_markup, ...base } = extra;
-    const photos = (draft.slide_paths || []).slice(0, 10).map(p => ({ type: 'photo', media: new InputFile(p) }));
-    if (photos.length > 1) await api.sendMediaGroup(chatId, photos, base);
-    else if (photos.length) await api.sendPhoto(chatId, photos[0].media, base);
+    // Zaxira: rasmlar (muqova + slaydlar) va video albom bo'lib, keyin qisqa post
     const text = prefix ? prefix.replace(/<\/?(p|hr)\/?>/g, '\n') + draft.post_html : draft.post_html;
-    const msg = hasVideo(draft)
-      ? await sendVideoPost(api, chatId, { ...draft, post_html: text }, extra)
-      : await sendSafe(api, chatId, text, extra);
+    const msg = await sendMediaPost(api, chatId, { ...draft, post_html: text, image_paths: [...(draft.image_paths || []), ...(draft.slide_paths || [])] }, extra);
     return { msg, fallback: e.description || e.message };
   }
 }

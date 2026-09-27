@@ -20,6 +20,16 @@ export const cfg = {
   postTimes: (process.env.POST_TIMES || '09:00,19:00').split(',').map(s => s.trim()),
   dataDir: process.env.DATA_DIR || './data',
   videoFps: Number(process.env.VIDEO_FPS) || 30,
+  // Ovoz (TTS): azure | elevenlabs — bo'sh bo'lsa ovoz o'chiq
+  tts: {
+    provider: (process.env.TTS_PROVIDER || '').toLowerCase(),
+    azureKey: process.env.AZURE_SPEECH_KEY || '',
+    azureRegion: process.env.AZURE_SPEECH_REGION || 'westeurope',
+    azureVoice: process.env.AZURE_VOICE || 'uz-UZ-SardorNeural',
+    elevenKey: process.env.ELEVENLABS_API_KEY || '',
+    elevenVoice: process.env.ELEVENLABS_VOICE_ID || '',
+    elevenModel: process.env.ELEVENLABS_MODEL || 'eleven_v3'
+  },
   tz: 'Asia/Tashkent',
   tzOffsetH: 5
 };
