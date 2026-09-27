@@ -20,6 +20,34 @@ unda video uchun Chromium tayyor o'rnatilgan.
 Volume qo'shing (`/data`) va `DATA_DIR=/data` qiling — qoralamalar va videolar o'chib ketmaydi.
 Video render uchun kamida ~1 GB xotira kerak.
 
+## Maqola va karusel (Telegram "Статья")
+Strateg har g'oyaga format tanlaydi: `post`, `maqola`, `karusel` yoki `reels`.
+- **maqola** — Telegram maqolasi (Bot API rich message): sarlavhalar, ro'yxat, checklist, jadval,
+  iqtibos, yig'iladigan bloklar. Muallif agent: `src/agents/article.js`.
+- **karusel** — brend uslubidagi 1080×1350 slaydlar (`src/video/carousel.html`), maqola ichida slideshow bo'lib chiqadi.
+- Qoralama tasdiqlash topigiga ham xuddi kanaldagidek maqola ko'rinishida keladi.
+- Telegram maqolani rad etsa, bot oddiy formatga o'tadi (slaydlar albom + qisqa post) va logga sababini yozadi.
+- Qoralamaga video yasalsa, u ham maqola ichiga qo'shiladi.
+
+## Vaqt belgilash
+- **✅ Tasdiqlash** — keyingi bo'sh vaqtga (`POST_TIMES`) avtomatik qo'yadi.
+- **🕒 Vaqt belgilash / 🕒 Vaqtni o'zgartirish** — vaqtni o'zingiz yozasiz (reply): `18:30`, `ertaga 09:00`,
+  `indinga 10:00`, `28.09 19:00` (Toshkent vaqti). **↩️ Navbatdan olish** — rejadan chiqaradi.
+- `/navbat` — rejalashtirilganlar ro'yxati; bosib vaqtini o'zgartirasiz.
+
+## Rasm (🖼 Rasm tugmasi)
+- O'z rasmingizni yuboring (so'rovga reply) — postga qo'shiladi; bir nechta bo'lsa albom bo'ladi.
+- `muqova` deb yozsangiz — brend uslubida muqova yasaladi. `o'chir` — rasmlarni olib tashlaydi.
+- Maqolada rasmlar sarlavhadan keyin (bir nechta bo'lsa — kollaj) chiqadi.
+
+## Ovoz (🎙 Ovoz va video dublyaj)
+`.env` da `TTS_PROVIDER` sozlansa:
+- **🎥 Video** avtomatik dublyaj bilan chiqadi: motion agent har sahnaga diktor matnini yozadi, sahnalar
+  ovoz uzunligiga moslanadi.
+- **🎙 Ovoz** — postning audio varianti (ovozli xabar). Tasdiqlansa post bilan birga chiqadi (maqolada — ichida).
+- Provayderlar: **Azure** (tayyor o'zbekcha ovozlar `uz-UZ-SardorNeural`, `uz-UZ-MadinaNeural`) yoki
+  **ElevenLabs** (o'z ovozingizni klonlab, `ELEVENLABS_VOICE_ID` ga qo'yasiz).
+
 ## Reels video (🎥 Video tugmasi)
 Qoralamadagi **🎥 Video** tugmasi bosilganda:
 1. Motion agent (`src/agents/motion.js`) post va ssenariydan sahnalar yozadi (hook, raqam, qadamlar, xulosa, CTA).
@@ -29,11 +57,11 @@ Qoralamadagi **🎥 Video** tugmasi bosilganda:
 
 Pullik video xizmat kerak emas — faqat Claude so'rovi va server. Dizayn (ranglar, shriftlar) shablonda,
 imzo `src/brand.js` dagi `VIDEO_SIGNATURE` da. Shablonni brauzerda ochsangiz, namuna video o'ynaydi.
-Ovoz (dublyaj) hali yo'q — keyingi bosqich.
+Ovoz sozlangan bo'lsa, video dublyaj bilan chiqadi (yuqoriga qarang).
 
 ## Buyruqlar
-Qoralama tugmalari: ✅ Tasdiqlash · ⚡ Hozir · ✏️ Tahrir · 🎬 Ssenariy · 🎥 Video · ❌ Rad
+Qoralama tugmalari: ✅ Tasdiqlash · 🕒 Vaqt belgilash · ⚡ Hozir · ✏️ Tahrir · 🎬 Ssenariy · 🖼 Rasm · 🎥 Video · 🎙 Ovoz · ❌ Rad
 
-`/yangi` — hozir g'oya izlash · `/goya <mavzu>` — mavzu bo'yicha post · `/navbat` — rejalashtirilganlar · `/id`
+`/yangi` — hozir g'oya izlash · `/goya <mavzu>` — mavzu bo'yicha post · `/maqola <mavzu>` · `/karusel <mavzu>` · `/navbat` — rejalashtirilganlar · `/id`
 
 Nisha profili: `src/brand.js` — ohang va auditoriyani shu yerda o'zgartirasiz.

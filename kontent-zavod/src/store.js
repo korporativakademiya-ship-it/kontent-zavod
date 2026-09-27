@@ -5,7 +5,7 @@ import { cfg } from './config.js';
 const file = path.join(cfg.dataDir, 'db.json');
 fs.mkdirSync(cfg.dataDir, { recursive: true });
 
-let db = { drafts: [], usedTitles: [] };
+let db = { drafts: [], usedTitles: [], waits: {} };
 try { db = { ...db, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch {}
 
 function save() {
@@ -26,5 +26,13 @@ export const store = {
   get: (id) => db.drafts.find(d => d.id === id),
   update(id, patch) { const d = this.get(id); if (d) { Object.assign(d, patch); save(); } return d; },
   byStatus: (s) => db.drafts.filter(d => d.status === s),
-  usedTitles: () => db.usedTitles.slice(-60)
+  usedTitles: () => db.usedTitles.slice(-60),
+  // Bot so'ragan savolga javob kutish (xabar id → {kind, id}) — qayta ishga tushsa ham saqlanadi
+  setWait(msgId, w) {
+    db.waits[msgId] = { ...w, at: Date.now() };
+    for (const [k, v] of Object.entries(db.waits)) if (Date.now() - v.at > 7 * 864e5) delete db.waits[k];
+    save();
+  },
+  peekWait: (msgId) => db.waits[msgId],
+  takeWait(msgId) { const w = db.waits[msgId]; if (w) { delete db.waits[msgId]; save(); } return w; }
 };
