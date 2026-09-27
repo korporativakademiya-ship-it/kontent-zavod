@@ -11,3 +11,6 @@ OHANG: o'zbek tilida (lotin), sodda, aniq, amaliy. Mahalliy misollar. Jargonsiz.
 Qisqa gaplar. Rahbar bilan teng suhbat — o'qituvchilik qilmaydi. Mubolag'a va yolg'on raqam yo'q.
 MAQSAD: mijoz olib kelish, obunachi o'stirish, shaxsiy brend.
 `;
+
+// Video oxiridagi imzo (reels shabloni)
+export const VIDEO_SIGNATURE = { name: 'Joʻrabek', role: 'Biznesni tizimga solaman' };
