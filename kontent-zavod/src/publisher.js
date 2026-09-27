@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { InputFile } from 'grammy';
 import { cfg } from './config.js';
 import { store } from './store.js';
+import { isRich, sendRich } from './rich.js';
 
 const H = 3600e3;
 
@@ -57,16 +58,23 @@ export async function sendVideoPost(api, chatId, draft, extra = {}) {
 
 export const hasVideo = (d) => !!d.video_path && fs.existsSync(d.video_path);
 
+// Qaytaradi: rich format rad etilib oddiy formatda chiqqan bo'lsa — sababi (aks holda undefined)
 export async function publish(api, draft) {
-  if (hasVideo(draft)) await sendVideoPost(api, cfg.channelId, draft);
+  let fallback;
+  if (isRich(draft)) ({ fallback } = await sendRich(api, cfg.channelId, draft));
+  else if (hasVideo(draft)) await sendVideoPost(api, cfg.channelId, draft);
   else await sendSafe(api, cfg.channelId, draft.post_html);
   store.update(draft.id, { status: 'published', publishedAt: new Date().toISOString() });
+  return fallback;
 }
 
 export async function publishDue(api, notify) {
   const due = store.byStatus('approved').filter(d => new Date(d.scheduledAt).getTime() <= Date.now());
   for (const d of due) {
-    try { await publish(api, d); await notify(`📢 Kanalga chiqdi: ${d.title}`); }
+    try {
+      const fb = await publish(api, d);
+      await notify(`📢 Kanalga chiqdi: ${d.title}${fb ? `\n⚠️ Maqola formati o'tmadi, oddiy post bo'lib chiqdi: ${fb}` : ''}`);
+    }
     catch (e) { await notify(`⚠️ Chiqmadi (${d.title}): ${e.message}`); }
   }
 }

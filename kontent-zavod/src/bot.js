@@ -1,8 +1,10 @@
 import { Bot, InlineKeyboard, InputFile } from 'grammy';
 import { cfg } from './config.js';
 import { store } from './store.js';
-import { runPipeline } from './pipeline.js';
+import { runPipeline, renderDraftSlides } from './pipeline.js';
 import { revise } from './agents/copywriter.js';
+import { writeArticle } from './agents/article.js';
+import { isRich, sendRich, approvalPrefix } from './rich.js';
 import { nextSlot, fmtTime, sendSafe, publish } from './publisher.js';
 import { makeVideo } from './video/make.js';
 
@@ -22,6 +24,12 @@ export const log = (text) => !cfg.groupId ? Promise.resolve() :
   bot.api.sendMessage(cfg.groupId, text, { message_thread_id: cfg.logTopic }).catch(() => {});
 
 export async function sendForApproval(d) {
+  const extra = { message_thread_id: cfg.approvalTopic, reply_markup: kb(d.id) };
+  if (isRich(d)) {
+    const { fallback } = await sendRich(bot.api, cfg.groupId, d, extra, { prefix: approvalPrefix(d) });
+    if (fallback) await log(`⚠️ "${d.title}" maqola formatida ko'rsatilmadi, oddiy ko'rinishda yuborildi: ${fallback}`);
+    return;
+  }
   const head = `<b>📝 Qoralama</b> | ${d.format} | baho: ${d.score ?? '-'}/10\n<i>${esc(d.notes)}</i>\n${d.source_url ? `Manba: ${esc(d.source_url)}\n` : ''}━━━━━━━━━━\n\n`;
   await sendSafe(bot.api, cfg.groupId, head + d.post_html, { message_thread_id: cfg.approvalTopic, reply_markup: kb(d.id) });
 }
@@ -34,7 +42,7 @@ async function videoRun(d) {
     await reply(`🎥 "${d.title}" — video yasalmoqda (1–3 daqiqa)...`);
     const v = await makeVideo(d);
     const nd = store.update(d.id, { video_path: v.file, video_duration: v.duration, motion: v.data });
-    const cap = `<b>🎥 Video</b> | ${esc(d.title)} | ${Math.round(v.duration)} s\n<i>Tasdiqlansa, kanalga shu video post matni bilan chiqadi.</i>`;
+    const cap = `<b>🎥 Video</b> | ${esc(d.title)} | ${Math.round(v.duration)} s\n<i>${isRich(d) ? 'Tasdiqlansa, video maqola ichida chiqadi.' : 'Tasdiqlansa, kanalga shu video post matni bilan chiqadi.'}</i>`;
     await bot.api.sendVideo(cfg.groupId, new InputFile(v.file), {
       caption: cap, parse_mode: 'HTML', supports_streaming: true, width: 1080, height: 1920,
       duration: Math.round(v.duration), message_thread_id: cfg.approvalTopic, reply_markup: kb(nd.id)
@@ -44,11 +52,11 @@ async function videoRun(d) {
   } finally { videoBusy = false; }
 }
 
-async function startRun(ctx, topic) {
+async function startRun(ctx, topic, format = null) {
   if (busy) return ctx.reply('⏳ Hozir ishlayapman, tugashini kuting.');
   busy = true;
   await ctx.reply('🚀 Boshladim. Jarayonni log topigida kuzating.');
-  runPipeline({ topic, count: topic ? 1 : cfg.dailyPosts, log, onDraft: sendForApproval })
+  runPipeline({ topic, format, count: topic ? 1 : cfg.dailyPosts, log, onDraft: sendForApproval })
     .catch(e => log(`❌ Xato: ${e.message}`))
     .finally(() => { busy = false; });
 }
@@ -65,7 +73,9 @@ export async function dailyRun() {
 bot.command('id', ctx => ctx.reply(`chat_id: ${ctx.chat.id}\ntopic_id: ${ctx.message?.message_thread_id ?? '-'}\nsizning id: ${ctx.from.id}`));
 
 bot.command('start', ctx => ctx.reply(
-  'Kontent zavod ishlayapti.\n/yangi — hozir g\'oya izlash va qoralama yozish\n/goya <mavzu> — berilgan mavzu bo\'yicha post\n/navbat — rejalashtirilgan postlar\n/id — chat va topik ID'));
+  'Kontent zavod ishlayapti.\n/yangi — hozir g\'oya izlash va qoralama yozish\n/goya <mavzu> — berilgan mavzu bo\'yicha post\n' +
+  '/maqola <mavzu> — Telegram maqolasi (sarlavha, ro\'yxat, jadval)\n/karusel <mavzu> — slaydli karusel\n' +
+  '/navbat — rejalashtirilgan postlar\n/id — chat va topik ID'));
 
 bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
 bot.command('goya', ctx => {
@@ -74,6 +84,15 @@ bot.command('goya', ctx => {
   if (!topic) return ctx.reply('Mavzuni yozing: /goya xodimlar kechikishi');
   startRun(ctx, topic);
 });
+
+for (const [cmd, format, example] of [['maqola', 'maqola', 'xodimni ishga olish tartibi'], ['karusel', 'karusel', 'rahbarning 5 ta xatosi']]) {
+  bot.command(cmd, ctx => {
+    if (!isAdmin(ctx)) return;
+    const topic = ctx.match?.trim();
+    if (!topic) return ctx.reply(`Mavzuni yozing: /${cmd} ${example}`);
+    startRun(ctx, topic, format);
+  });
+}
 
 bot.command('navbat', ctx => {
   const q = store.byStatus('approved').sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
@@ -103,8 +122,9 @@ bot.callbackQuery(/^(ok|now|edit|scr|vid|no):(.+)$/, async ctx => {
     return ctx.answerCallbackQuery({ text: `Rejalashtirildi: ${fmtTime(at)}` });
   }
   if (act === 'now') {
-    await publish(bot.api, d);
+    const fb = await publish(bot.api, d);
     await mark('📢 Chiqdi');
+    if (fb) await log(`⚠️ "${d.title}" maqola formatida chiqmadi, oddiy post bo'lib chiqdi: ${fb}`);
     return ctx.answerCallbackQuery({ text: 'Kanalga chiqdi' });
   }
   if (act === 'no') {
@@ -136,8 +156,14 @@ bot.on('message:text', async ctx => {
   try {
     const r = await revise(d, ctx.message.text);
     store.update(id, { status: 'revised' });
-    const { video_path, video_duration, motion, ...rest } = d; // eski video yangi matnga mos emas
-    const nd = store.addDraft({ ...rest, id: undefined, status: 'pending', post_html: r.post_html, reels_script: r.reels_script || d.reels_script, notes: `Tahrir: ${ctx.message.text}`, score: d.score });
+    const { video_path, video_duration, motion, slide_paths, ...rest } = d; // eski video/slaydlar yangi matnga mos emas
+    const art = isRich(d) ? await writeArticle(d.plan || { title: d.title, format: d.format }, { post_html: r.post_html }, ctx.message.text) : null;
+    let nd = store.addDraft({
+      ...rest, id: undefined, status: 'pending', post_html: r.post_html, reels_script: r.reels_script || d.reels_script,
+      ...(art ? { article_html: art.article_html, slides: art.slides } : {}),
+      notes: `Tahrir: ${ctx.message.text}`, score: d.score
+    });
+    if (art) nd = await renderDraftSlides(nd);
     await sendForApproval(nd);
   } catch (e) { await ctx.reply(`⚠️ Xato: ${e.message}`); }
 });

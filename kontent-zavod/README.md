@@ -20,6 +20,15 @@ unda video uchun Chromium tayyor o'rnatilgan.
 Volume qo'shing (`/data`) va `DATA_DIR=/data` qiling — qoralamalar va videolar o'chib ketmaydi.
 Video render uchun kamida ~1 GB xotira kerak.
 
+## Maqola va karusel (Telegram "Статья")
+Strateg har g'oyaga format tanlaydi: `post`, `maqola`, `karusel` yoki `reels`.
+- **maqola** — Telegram maqolasi (Bot API rich message): sarlavhalar, ro'yxat, checklist, jadval,
+  iqtibos, yig'iladigan bloklar. Muallif agent: `src/agents/article.js`.
+- **karusel** — brend uslubidagi 1080×1350 slaydlar (`src/video/carousel.html`), maqola ichida slideshow bo'lib chiqadi.
+- Qoralama tasdiqlash topigiga ham xuddi kanaldagidek maqola ko'rinishida keladi.
+- Telegram maqolani rad etsa, bot oddiy formatga o'tadi (slaydlar albom + qisqa post) va logga sababini yozadi.
+- Qoralamaga video yasalsa, u ham maqola ichiga qo'shiladi.
+
 ## Reels video (🎥 Video tugmasi)
 Qoralamadagi **🎥 Video** tugmasi bosilganda:
 1. Motion agent (`src/agents/motion.js`) post va ssenariydan sahnalar yozadi (hook, raqam, qadamlar, xulosa, CTA).
@@ -34,6 +43,6 @@ Ovoz (dublyaj) hali yo'q — keyingi bosqich.
 ## Buyruqlar
 Qoralama tugmalari: ✅ Tasdiqlash · ⚡ Hozir · ✏️ Tahrir · 🎬 Ssenariy · 🎥 Video · ❌ Rad
 
-`/yangi` — hozir g'oya izlash · `/goya <mavzu>` — mavzu bo'yicha post · `/navbat` — rejalashtirilganlar · `/id`
+`/yangi` — hozir g'oya izlash · `/goya <mavzu>` — mavzu bo'yicha post · `/maqola <mavzu>` · `/karusel <mavzu>` · `/navbat` — rejalashtirilganlar · `/id`
 
 Nisha profili: `src/brand.js` — ohang va auditoriyani shu yerda o'zgartirasiz.
