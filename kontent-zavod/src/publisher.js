@@ -1,0 +1,54 @@
+import { cfg } from './config.js';
+import { store } from './store.js';
+
+const H = 3600e3;
+
+// Keyingi bo'sh vaqt (Toshkent vaqti bo'yicha POST_TIMES dan)
+export function nextSlot() {
+  const taken = new Set(store.byStatus('approved').map(d => d.scheduledAt));
+  const nowT = new Date(Date.now() + cfg.tzOffsetH * H);
+  for (let day = 0; day < 30; day++) {
+    for (const t of cfg.postTimes) {
+      const [h, m] = t.split(':').map(Number);
+      const utc = Date.UTC(nowT.getUTCFullYear(), nowT.getUTCMonth(), nowT.getUTCDate() + day, h - cfg.tzOffsetH, m);
+      const iso = new Date(utc).toISOString();
+      if (utc > Date.now() + 60e3 && !taken.has(iso)) return iso;
+    }
+  }
+  return new Date(Date.now() + H).toISOString();
+}
+
+export function fmtTime(iso) {
+  const d = new Date(new Date(iso).getTime() + cfg.tzOffsetH * H);
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
+
+// Faqat Telegram ruxsat bergan teglarni qoldiradi
+export function cleanHtml(s = '') {
+  return s
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(?!b>|\/b>|i>|\/i>|u>|\/u>|s>|\/s>|a[\s>]|\/a>|blockquote>|\/blockquote>|code>|\/code>)[^>]*>/gi, '')
+    .trim();
+}
+
+export async function sendSafe(api, chatId, text, extra = {}) {
+  try {
+    return await api.sendMessage(chatId, cleanHtml(text), { parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...extra });
+  } catch {
+    return api.sendMessage(chatId, cleanHtml(text).replace(/<[^>]+>/g, ''), { link_preview_options: { is_disabled: true }, ...extra });
+  }
+}
+
+export async function publish(api, draft) {
+  await sendSafe(api, cfg.channelId, draft.post_html);
+  store.update(draft.id, { status: 'published', publishedAt: new Date().toISOString() });
+}
+
+export async function publishDue(api, notify) {
+  const due = store.byStatus('approved').filter(d => new Date(d.scheduledAt).getTime() <= Date.now());
+  for (const d of due) {
+    try { await publish(api, d); await notify(`📢 Kanalga chiqdi: ${d.title}`); }
+    catch (e) { await notify(`⚠️ Chiqmadi (${d.title}): ${e.message}`); }
+  }
+}
