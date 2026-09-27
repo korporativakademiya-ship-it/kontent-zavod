@@ -1,19 +1,22 @@
-import { Bot, InlineKeyboard } from 'grammy';
+import { Bot, InlineKeyboard, InputFile } from 'grammy';
 import { cfg } from './config.js';
 import { store } from './store.js';
 import { runPipeline } from './pipeline.js';
 import { revise } from './agents/copywriter.js';
 import { nextSlot, fmtTime, sendSafe, publish } from './publisher.js';
+import { makeVideo } from './video/make.js';
 
 export const bot = new Bot(cfg.botToken);
 const editWait = new Map(); // bot so'rov xabari id → draft id
 let busy = false;
+let videoBusy = false; // render og'ir (Chromium + ffmpeg) — bir vaqtda bittadan
 
 const esc = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const isAdmin = (ctx) => cfg.admins.includes(ctx.from?.id);
 const kb = (id) => new InlineKeyboard()
   .text('✅ Tasdiqlash', `ok:${id}`).text('⚡ Hozir', `now:${id}`).row()
-  .text('✏️ Tahrir', `edit:${id}`).text('🎬 Ssenariy', `scr:${id}`).text('❌ Rad', `no:${id}`);
+  .text('✏️ Tahrir', `edit:${id}`).text('🎬 Ssenariy', `scr:${id}`).row()
+  .text('🎥 Video', `vid:${id}`).text('❌ Rad', `no:${id}`);
 
 export const log = (text) => !cfg.groupId ? Promise.resolve() :
   bot.api.sendMessage(cfg.groupId, text, { message_thread_id: cfg.logTopic }).catch(() => {});
@@ -21,6 +24,24 @@ export const log = (text) => !cfg.groupId ? Promise.resolve() :
 export async function sendForApproval(d) {
   const head = `<b>📝 Qoralama</b> | ${d.format} | baho: ${d.score ?? '-'}/10\n<i>${esc(d.notes)}</i>\n${d.source_url ? `Manba: ${esc(d.source_url)}\n` : ''}━━━━━━━━━━\n\n`;
   await sendSafe(bot.api, cfg.groupId, head + d.post_html, { message_thread_id: cfg.approvalTopic, reply_markup: kb(d.id) });
+}
+
+// Qoralama uchun reels video yasaydi va tasdiqlash topigiga yuboradi
+async function videoRun(d) {
+  const reply = (t) => bot.api.sendMessage(cfg.groupId, t, { message_thread_id: cfg.approvalTopic }).catch(() => {});
+  videoBusy = true;
+  try {
+    await reply(`🎥 "${d.title}" — video yasalmoqda (1–3 daqiqa)...`);
+    const v = await makeVideo(d);
+    const nd = store.update(d.id, { video_path: v.file, video_duration: v.duration, motion: v.data });
+    const cap = `<b>🎥 Video</b> | ${esc(d.title)} | ${Math.round(v.duration)} s\n<i>Tasdiqlansa, kanalga shu video post matni bilan chiqadi.</i>`;
+    await bot.api.sendVideo(cfg.groupId, new InputFile(v.file), {
+      caption: cap, parse_mode: 'HTML', supports_streaming: true, width: 1080, height: 1920,
+      duration: Math.round(v.duration), message_thread_id: cfg.approvalTopic, reply_markup: kb(nd.id)
+    });
+  } catch (e) {
+    await reply(`⚠️ Video yasalmadi (${d.title}): ${e.message}`);
+  } finally { videoBusy = false; }
 }
 
 async function startRun(ctx, topic) {
@@ -60,13 +81,21 @@ bot.command('navbat', ctx => {
 });
 
 // Tugmalar
-bot.callbackQuery(/^(ok|now|edit|scr|no):(.+)$/, async ctx => {
+bot.callbackQuery(/^(ok|now|edit|scr|vid|no):(.+)$/, async ctx => {
   if (!isAdmin(ctx)) return ctx.answerCallbackQuery({ text: 'Faqat rahbar tasdiqlaydi' });
   const [, act, id] = ctx.match;
   const d = store.get(id);
   if (!d) return ctx.answerCallbackQuery({ text: 'Qoralama topilmadi' });
   const mark = (t) => ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text(t, 'noop') }).catch(() => {});
 
+  if (d.status === 'published' && act !== 'scr') return ctx.answerCallbackQuery({ text: 'Bu post allaqachon chiqqan' });
+
+  if (act === 'vid') {
+    if (videoBusy) return ctx.answerCallbackQuery({ text: 'Boshqa video yasalmoqda, biroz kuting' });
+    await ctx.answerCallbackQuery({ text: 'Video yasash boshlandi' });
+    videoRun(d); // fonda — bot bloklanmaydi
+    return;
+  }
   if (act === 'ok') {
     const at = nextSlot();
     store.update(id, { status: 'approved', scheduledAt: at });
@@ -107,7 +136,8 @@ bot.on('message:text', async ctx => {
   try {
     const r = await revise(d, ctx.message.text);
     store.update(id, { status: 'revised' });
-    const nd = store.addDraft({ ...d, id: undefined, status: 'pending', post_html: r.post_html, reels_script: r.reels_script || d.reels_script, notes: `Tahrir: ${ctx.message.text}`, score: d.score });
+    const { video_path, video_duration, motion, ...rest } = d; // eski video yangi matnga mos emas
+    const nd = store.addDraft({ ...rest, id: undefined, status: 'pending', post_html: r.post_html, reels_script: r.reels_script || d.reels_script, notes: `Tahrir: ${ctx.message.text}`, score: d.score });
     await sendForApproval(nd);
   } catch (e) { await ctx.reply(`⚠️ Xato: ${e.message}`); }
 });

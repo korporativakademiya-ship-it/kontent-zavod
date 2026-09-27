@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import { InputFile } from 'grammy';
 import { cfg } from './config.js';
 import { store } from './store.js';
 
@@ -40,8 +42,24 @@ export async function sendSafe(api, chatId, text, extra = {}) {
   }
 }
 
+// Video + matn. Telegram izohi (caption) 1024 belgigacha — sig'sa bitta xabar, sig'masa video, keyin post
+export async function sendVideoPost(api, chatId, draft, extra = {}) {
+  const video = { supports_streaming: true, width: 1080, height: 1920, duration: Math.round(draft.video_duration || 0) || undefined };
+  const text = cleanHtml(draft.post_html);
+  if (text.replace(/<[^>]+>/g, '').length <= 1024) {
+    try {
+      return await api.sendVideo(chatId, new InputFile(draft.video_path), { ...video, caption: text, parse_mode: 'HTML', ...extra });
+    } catch { /* HTML xatosi bo'lsa pastdagi yo'l bilan */ }
+  }
+  await api.sendVideo(chatId, new InputFile(draft.video_path), { ...video, ...extra });
+  return sendSafe(api, chatId, draft.post_html, extra);
+}
+
+export const hasVideo = (d) => !!d.video_path && fs.existsSync(d.video_path);
+
 export async function publish(api, draft) {
-  await sendSafe(api, cfg.channelId, draft.post_html);
+  if (hasVideo(draft)) await sendVideoPost(api, cfg.channelId, draft);
+  else await sendSafe(api, cfg.channelId, draft.post_html);
   store.update(draft.id, { status: 'published', publishedAt: new Date().toISOString() });
 }
 

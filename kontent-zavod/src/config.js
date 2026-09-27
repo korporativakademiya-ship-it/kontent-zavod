@@ -19,6 +19,7 @@ export const cfg = {
   dailyPosts: Number(process.env.DAILY_POSTS) || 3,
   postTimes: (process.env.POST_TIMES || '09:00,19:00').split(',').map(s => s.trim()),
   dataDir: process.env.DATA_DIR || './data',
+  videoFps: Number(process.env.VIDEO_FPS) || 30,
   tz: 'Asia/Tashkent',
   tzOffsetH: 5
 };
