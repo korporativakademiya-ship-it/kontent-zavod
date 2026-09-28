@@ -20,16 +20,13 @@ unda video uchun Chromium tayyor o'rnatilgan.
 Volume qo'shing (`/data`) va `DATA_DIR=/data` qiling — qoralamalar va videolar o'chib ketmaydi.
 Video render uchun kamida ~1 GB xotira kerak.
 
-## Natijalar: lidlar va haftalik hisobot
+## Natijalar: CTA kodlari va haftalik hisobot
 - Strateg postlarning kamida yarmiga **direkt CTA** qo'yadi va har biriga noyob kod so'z beriladi:
-  "Direktga <b>KPI</b> deb yozing". Kod post, maqola, karusel va videoda bir xil bo'ladi.
-- Lid shaxsiy akkauntingizga shu so'z bilan yozadi → **Kotibim** uni CRM'ga yozadi → Kontent zavod
-  birinchi xabardagi kodni topib, mijozga manba qo'yadi (`post: KPI`). Manba Kotibim CRM va oylik hisobotda ko'rinadi.
+  "Direktga <b>KPI</b> deb yozing". Kod post, maqola, karusel va videoda bir xil — direktga kim qaysi
+  postdan yozganini kod so'zidan bilasiz.
 - Kanal reaksiyalari yig'iladi (bot kanal admini bo'lishi kerak).
-- **Haftalik hisobot** (dushanba 09:00, `REPORT_CRON`) va `/hisobot [kun]`: har post — reaksiya, yozganlar,
-  lidlar, sotuv va summa; formatlar bo'yicha o'rtacha; qisqa xulosa.
-- Sozlash: `KOTIBIM_URL` va `KONTENT_API_KALIT` (Kotibim'da ham xuddi shu kalit). Sozlanmasa hisobot
-  faqat reaksiyalar bilan chiqadi. Ko'rishlar soni Bot API'da yo'q.
+- **Haftalik hisobot** (dushanba 09:00, `REPORT_CRON`) va `/hisobot [kun]`: har post reaksiyalari,
+  formatlar bo'yicha o'rtacha va qisqa xulosa. Ko'rishlar soni Bot API'da yo'q.
 
 ## Uslubingizni o'rgatish
 - **Namuna postlar:** eng yaxshi 15–30 ta postingizni botga **shaxsiy chatda forward** qiling, keyin
