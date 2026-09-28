@@ -1,5 +1,5 @@
 import { askJSON } from '../llm.js';
-import { BRAND } from '../brand.js';
+import { brand, examples } from '../style.js';
 
 // Maqola muallifi: Telegram "Статья" (rich message) formatida ko'p formatli matn va karusel slaydlarini yozadi
 const TAGS = `
@@ -34,7 +34,7 @@ export async function writeArticle(plan, copy, feedback = '') {
   const mode = MODES[plan.format] || MODES.maqola;
   const data = await askJSON({
     maxTokens: 8000,
-    system: `Sen Telegram uchun kreativ muharrirsan. ${BRAND}\n${TAGS}\n${SLIDES}`,
+    system: `Sen Telegram uchun kreativ muharrirsan. ${brand()}\n${TAGS}\n${SLIDES}${examples(plan.title, 2)}`,
     prompt: `Reja:\n${JSON.stringify(plan, null, 1)}\n\nQisqa post (asos):\n${copy.post_html}
 ${feedback ? `\nRahbarning izohi (qat'iy amal qil): "${feedback}"\n` : ''}
 ${mode}

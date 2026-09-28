@@ -20,6 +20,14 @@ unda video uchun Chromium tayyor o'rnatilgan.
 Volume qo'shing (`/data`) va `DATA_DIR=/data` qiling — qoralamalar va videolar o'chib ketmaydi.
 Video render uchun kamida ~1 GB xotira kerak.
 
+## Uslubingizni o'rgatish
+- **Namuna postlar:** eng yaxshi 15–30 ta postingizni botga **shaxsiy chatda forward** qiling, keyin
+  `/uslub_yangila` — bot uslubingizni (ohang, hook, gap uzunligi, sevimli iboralar, CTA) tavsiflab saqlaydi.
+  Kopirayter har safar mavzuga eng yaqin 3 ta namunangizni ham ko'radi.
+- **Tahrirlardan o'rganish:** ✏️ Tahrir izohlaringiz yig'iladi; har 5 tasidan umumiy **doimiy qoidalar**
+  chiqariladi (bir martalik tuzatishlar emas). Rahbar agent qoidalar buzilmaganini tekshiradi.
+- Buyruqlar: `/uslub`, `/uslub_yangila`, `/uslub_tozala`, `/qoidalar`, `/qoidalar_yangila`, `/qoidalar_ochir N`.
+
 ## Maqola va karusel (Telegram "Статья")
 Strateg har g'oyaga format tanlaydi: `post`, `maqola`, `karusel` yoki `reels`.
 - **maqola** — Telegram maqolasi (Bot API rich message): sarlavhalar, ro'yxat, checklist, jadval,

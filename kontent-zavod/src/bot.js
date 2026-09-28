@@ -12,6 +12,8 @@ import { makeVideo } from './video/make.js';
 import { renderSlides } from './video/slides.js';
 import { VIDEO_SIGNATURE } from './brand.js';
 import { ttsEnabled, TTS_SETUP, synth, speechText, toVoiceNote } from './tts.js';
+import { addSample, addFeedback } from './style.js';
+import { analyzeStyle, distillRules } from './agents/stylist.js';
 
 // TELEGRAM_API_ROOT — ixtiyoriy (lokal Bot API server yoki sinov uchun)
 const API_ROOT = process.env.TELEGRAM_API_ROOT || 'https://api.telegram.org';
@@ -114,7 +116,7 @@ bot.command('id', ctx => ctx.reply(`chat_id: ${ctx.chat.id}\ntopic_id: ${ctx.mes
 bot.command('start', ctx => ctx.reply(
   'Kontent zavod ishlayapti.\n/yangi — hozir g\'oya izlash va qoralama yozish\n/goya <mavzu> — berilgan mavzu bo\'yicha post\n' +
   '/maqola <mavzu> — Telegram maqolasi (sarlavha, ro\'yxat, jadval)\n/karusel <mavzu> — slaydli karusel\n' +
-  '/navbat — rejalashtirilgan postlar\n/id — chat va topik ID'));
+  '/navbat — rejalashtirilgan postlar\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
 
 bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
 bot.command('goya', ctx => {
@@ -132,6 +134,80 @@ for (const [cmd, format, example] of [['maqola', 'maqola', 'xodimni ishga olish 
     startRun(ctx, topic, format);
   });
 }
+
+// ---------- Uslub: namuna postlar va doimiy qoidalar ----------
+const RULES_BATCH = 5; // shuncha yangi tahrir izohi yig'ilsa — qoidalar avtomatik yangilanadi
+let rulesBusy = false;
+
+async function refreshRules() {
+  if (rulesBusy) return null;
+  const st = store.style();
+  const fresh = st.feedback.filter(f => !f.used);
+  if (!fresh.length) return null;
+  rulesBusy = true;
+  try {
+    const { rules, added } = await distillRules(st.rules, fresh);
+    store.saveStyle({ rules, feedback: st.feedback.map(f => ({ ...f, used: true })) });
+    return { rules, added };
+  } finally { rulesBusy = false; }
+}
+
+bot.command('uslub', ctx => {
+  if (!isAdmin(ctx)) return;
+  const st = store.style();
+  ctx.reply(
+    `✍️ Uslub xotirasi\nNamuna postlar: ${st.samples.length} ta · Qoidalar: ${st.rules.length} ta\n\n` +
+    (st.guide ? `Hozirgi uslub tavsifi:\n${st.guide}\n\n` : "Uslub tavsifi hali yo'q.\n\n") +
+    `Qanday o'rgatasiz:\n1) Eng yaxshi 15–30 ta postingizni botga SHAXSIY CHATDA forward qiling (kanaldan yoki istalgan joydan).\n` +
+    `2) /uslub_yangila — bot ulardan uslubingizni o'rganadi.\n\n` +
+    `/qoidalar — tahrirlaringizdan yig'ilgan qoidalar · /uslub_tozala — namunalar va tavsifni o'chirish`);
+});
+
+bot.command('uslub_yangila', async ctx => {
+  if (!isAdmin(ctx)) return;
+  const st = store.style();
+  if (st.samples.length < 5) return ctx.reply(`Kamida 5 ta namuna kerak (hozir ${st.samples.length} ta). Postlaringizni botga shaxsiy chatda forward qiling.`);
+  await ctx.reply(`🔍 ${st.samples.length} ta postdan uslubingizni o'rganyapman...`);
+  try {
+    const guide = await analyzeStyle(st.samples.slice(-30));
+    store.saveStyle({ guide });
+    await ctx.reply(`✅ Uslub saqlandi. Endi hamma agentlar shunga qarab yozadi:\n\n${guide}`.slice(0, 4000));
+  } catch (e) { await ctx.reply(`⚠️ Xato: ${e.message}`); }
+});
+
+bot.command('uslub_tozala', ctx => {
+  if (!isAdmin(ctx)) return;
+  store.saveStyle({ samples: [], guide: '' });
+  ctx.reply("🗑 Namunalar va uslub tavsifi o'chirildi. Qoidalar saqlanib qoldi (/qoidalar).");
+});
+
+bot.command('qoidalar', ctx => {
+  if (!isAdmin(ctx)) return;
+  const st = store.style();
+  const wait = st.feedback.filter(f => !f.used).length;
+  ctx.reply((st.rules.length ? `📏 Doimiy qoidalar:\n${st.rules.map((r, i) => `${i + 1}. ${r}`).join('\n')}` : "📏 Doimiy qoidalar hali yo'q.") +
+    `\n\nTahrir (✏️) izohlaringizdan avtomatik yig'iladi: har ${RULES_BATCH} ta izohda yangilanadi (hozir navbatda: ${wait}).\n` +
+    `/qoidalar_yangila — hozir yangilash · /qoidalar_ochir 3 — 3-qoidani o'chirish`);
+});
+
+bot.command('qoidalar_yangila', async ctx => {
+  if (!isAdmin(ctx)) return;
+  try {
+    const r = await refreshRules();
+    if (!r) return ctx.reply("Yangi tahrir izohi yo'q.");
+    await ctx.reply(`✅ Qoidalar yangilandi (${r.rules.length} ta).${r.added.length ? `\nYangi:\n• ${r.added.join('\n• ')}` : ''}`);
+  } catch (e) { await ctx.reply(`⚠️ Xato: ${e.message}`); }
+});
+
+bot.command('qoidalar_ochir', ctx => {
+  if (!isAdmin(ctx)) return;
+  const n = Number(ctx.match?.trim());
+  const rules = [...store.style().rules];
+  if (!n || n < 1 || n > rules.length) return ctx.reply(`Raqamni yozing: /qoidalar_ochir 1 … ${rules.length || 1}`);
+  const [gone] = rules.splice(n - 1, 1);
+  store.saveStyle({ rules });
+  ctx.reply(`🗑 O'chirildi: ${gone}`);
+});
 
 bot.command('navbat', ctx => {
   const q = store.byStatus('approved').sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
@@ -227,6 +303,17 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
 });
 bot.callbackQuery('noop', ctx => ctx.answerCallbackQuery());
 
+// Shaxsiy chatda forward qilingan postlar — uslub namunasi (javob kutish handleridan oldin turishi shart)
+bot.on('message', async (ctx, next) => {
+  if (ctx.chat.type !== 'private' || !ctx.message.forward_origin || !isAdmin(ctx)) return next();
+  const text = ctx.message.text || ctx.message.caption || '';
+  const n = addSample(text);
+  if (n == null) return ctx.reply("Bu xabar juda qisqa — uslub uchun kamida 80 belgili post yuboring.");
+  const st = store.style();
+  const hint = st.samples.length >= 5 ? ' · /uslub_yangila — uslubni o\'rganish' : ` · yana ${5 - st.samples.length} ta kerak`;
+  await ctx.reply(`✅ Namuna saqlandi (${n} ta)${hint}`);
+});
+
 // Rahbarning javoblari (reply): vaqt, tahrir izohi
 bot.on('message:text', async ctx => {
   const replyTo = ctx.message.reply_to_message?.message_id;
@@ -265,6 +352,12 @@ bot.on('message:text', async ctx => {
   }
   if (w.kind !== 'edit') return;
   store.takeWait(replyTo);
+  // Izoh uslub xotirasiga: yetarlicha yig'ilsa — doimiy qoidalarga aylanadi (fonda)
+  if (addFeedback(ctx.message.text, d) >= RULES_BATCH) {
+    refreshRules()
+      .then(r => r && log(`📏 Qoidalar tahrirlaringizdan yangilandi (${r.rules.length} ta).${r.added.length ? `\nYangi:\n• ${r.added.join('\n• ')}` : ''}\n/qoidalar — ko'rish`))
+      .catch(e => log(`⚠️ Qoidalar yangilanmadi: ${e.message}`));
+  }
   const id = d.id;
   await ctx.reply('🔄 Qayta yozyapman...', { message_thread_id: cfg.approvalTopic });
   try {

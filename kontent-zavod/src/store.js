@@ -5,7 +5,7 @@ import { cfg } from './config.js';
 const file = path.join(cfg.dataDir, 'db.json');
 fs.mkdirSync(cfg.dataDir, { recursive: true });
 
-let db = { drafts: [], usedTitles: [], waits: {} };
+let db = { drafts: [], usedTitles: [], waits: {}, style: {} };
 try { db = { ...db, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch {}
 
 function save() {
@@ -34,5 +34,11 @@ export const store = {
     save();
   },
   peekWait: (msgId) => db.waits[msgId],
+  // Uslub xotirasi: namuna postlar, uslub tavsifi, tahrirlardan chiqqan qoidalar
+  style() {
+    db.style = { samples: [], guide: '', rules: [], feedback: [], ...db.style };
+    return db.style;
+  },
+  saveStyle(patch = {}) { Object.assign(this.style(), patch); save(); return db.style; },
   takeWait(msgId) { const w = db.waits[msgId]; if (w) { delete db.waits[msgId]; save(); } return w; }
 };

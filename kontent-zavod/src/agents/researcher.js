@@ -1,5 +1,5 @@
 import { askJSON } from '../llm.js';
-import { BRAND } from '../brand.js';
+import { brand } from '../style.js';
 
 // Tadqiqotchi: internetdan dolzarb g'oyalar topadi
 export async function research({ count = 8, topic = null, used = [] }) {
@@ -7,7 +7,7 @@ export async function research({ count = 8, topic = null, used = [] }) {
   return askJSON({
     search: true,
     maxTokens: 5000,
-    system: `Sen kontent tadqiqotchisisan. ${BRAND}`,
+    system: `Sen kontent tadqiqotchisisan. ${brand()}`,
     prompt: `Bugun: ${today}.
 ${topic ? `Mavzu berilgan: "${topic}". Shu mavzu atrofida izla.` : `Biznes egalari uchun dolzarb mavzularni izla.`}
 Manbalar: o'zbek, rus va ingliz tilidagi biznes saytlari, yangiliklar, Telegram/Instagram trendlari, keyslar, tadqiqotlar.

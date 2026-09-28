@@ -1,5 +1,6 @@
 import { askJSON } from '../llm.js';
-import { BRAND, VIDEO_SIGNATURE } from '../brand.js';
+import { VIDEO_SIGNATURE } from '../brand.js';
+import { brand } from '../style.js';
 
 // Motion-dizayner: ssenariyni reels shablonining sahnalariga aylantiradi (src/video/template.html)
 const SCHEMA = `
@@ -14,7 +15,7 @@ Sahna turlari (ketma-ketlik: hook → number (ixtiyoriy) → steps → statement
 export async function storyboard(draft) {
   const data = await askJSON({
     maxTokens: 2500,
-    system: `Sen reels uchun motion-dizaynersan. Matnli animatsiya (kinetik tipografiya) sahnalarini yozasan. ${BRAND}`,
+    system: `Sen reels uchun motion-dizaynersan. Matnli animatsiya (kinetik tipografiya) sahnalarini yozasan. ${brand()}`,
     prompt: `Post:\n${draft.post_html}\n\nReels ssenariy:\n${draft.reels_script || "yo'q"}
 
 Shu mazmunni 25–45 soniyalik videoga aylantir. ${SCHEMA}
