@@ -1,10 +1,10 @@
 import { askJSON } from '../llm.js';
-import { BRAND } from '../brand.js';
+import { brand } from '../style.js';
 
 // Strateg: eng kuchli g'oyalarni tanlab, nishaga moslaydi
 export async function plan(ideas, pick) {
   return askJSON({
-    system: `Sen kontent strategisan. ${BRAND}`,
+    system: `Sen kontent strategisan. ${brand()}`,
     prompt: `G'oyalar:
 ${JSON.stringify(ideas, null, 1)}
 

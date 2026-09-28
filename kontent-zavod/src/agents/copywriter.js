@@ -1,5 +1,5 @@
 import { askJSON } from '../llm.js';
-import { BRAND } from '../brand.js';
+import { brand, examples } from '../style.js';
 
 const RULES = `
 QOIDALAR:
@@ -13,7 +13,7 @@ QOIDALAR:
 export async function write(plan) {
   return askJSON({
     maxTokens: 3000,
-    system: `Sen kuchli kopirayterisan. ${BRAND}\n${RULES}`,
+    system: `Sen kuchli kopirayterisan. ${brand()}\n${RULES}${examples(`${plan.title} ${plan.angle || ''} ${plan.pain || ''}`)}`,
     prompt: `Reja:\n${JSON.stringify(plan, null, 1)}
 
 JSON: {"post_html":"Telegram post","reels_script":"30–45 soniyalik reels ssenariy"}`
@@ -23,7 +23,7 @@ JSON: {"post_html":"Telegram post","reels_script":"30–45 soniyalik reels ssena
 export async function revise(draft, feedback) {
   return askJSON({
     maxTokens: 3000,
-    system: `Sen kuchli kopirayterisan. ${BRAND}\n${RULES}`,
+    system: `Sen kuchli kopirayterisan. ${brand()}\n${RULES}${examples(draft.title)}`,
     prompt: `Joriy post:\n${draft.post_html}\n\nJoriy ssenariy:\n${draft.reels_script || ''}
 
 Rahbarning izohi: "${feedback}"
