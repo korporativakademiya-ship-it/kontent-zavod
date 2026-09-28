@@ -1,5 +1,5 @@
 import { InputFile } from 'grammy';
-import { sendSafe, sendMediaPost, hasVideo, hasAudio, imagePaths } from './publisher.js';
+import { sendSafe, sendMediaPost, hasVideo, hasAudio, imagePaths, fmtTime } from './publisher.js';
 
 // Telegram "Статья" (Bot API rich message) — maqola va karusel postlari shu orqali chiqadi
 
@@ -93,6 +93,7 @@ export async function sendRich(api, chatId, draft, extra = {}, { prefix = '' } =
 
 export function approvalPrefix(d) {
   return `<p><b>📝 Qoralama</b> | ${esc(d.format)} | baho: ${d.score ?? '-'}/10</p>` +
+    (d.plannedAt ? `<p>🗓 Reja: ${esc(fmtTime(d.plannedAt))}${d.rubric ? ` · ${esc(d.rubric)}` : ''}</p>` : '') +
     (d.notes ? `<p><i>${esc(d.notes)}</i></p>` : '') +
     (d.source_url ? `<p>Manba: ${esc(d.source_url)}</p>` : '') + '<hr/>';
 }

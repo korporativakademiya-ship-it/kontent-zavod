@@ -20,6 +20,34 @@ export async function renderDraftSlides(draft) {
   return store.update(draft.id, { slide_paths: files });
 }
 
+// Bitta reja bandidan qoralama: kopirayting → tekshiruv → (maqola/karusel) → slaydlar.
+// extra — qoralamaga qo'shimcha maydonlar (masalan reja vaqti)
+export async function produceDraft(p, { log = async () => {}, extra = {} } = {}) {
+  p.format = String(p.format || 'post').toLowerCase();
+  // Direkt CTA'li postga noyob kod: kim qaysi postdan yozgani kod so'zidan bilinadi
+  p.cta_kod = String(p.cta_goal || '').toLowerCase() === 'direkt' ? uniqueCode(p.cta_kod || p.title) : '';
+  await log(`✍️ Kopirayter yozmoqda: ${p.title}`);
+  const copy = await write(p);
+  const rev = await review(p, copy);
+  const post_html = ensureCode(rev.post_html || copy.post_html, p.cta_kod);
+  let art = null;
+  if (RICH_FORMATS.includes(p.format)) {
+    await log(`📰 Maqola/karusel yozilmoqda: ${p.title}`);
+    art = await writeArticle(p, { post_html });
+  }
+  let draft = store.addDraft({
+    title: p.title, format: p.format, source_url: p.source_url || '', plan: p, cta_kod: p.cta_kod,
+    post_html, reels_script: copy.reels_script || '',
+    article_html: art?.article_html || '', slides: art?.slides || [],
+    score: rev.score, notes: rev.notes, ...extra
+  });
+  if (art) {
+    try { draft = await renderDraftSlides(draft); }
+    catch (e) { await log(`⚠️ Slaydlar chizilmadi (${p.title}): ${e.message}`); }
+  }
+  return draft;
+}
+
 // Rahbar agent boshqaradigan to'liq zanjir: tadqiqot → strategiya → kopirayting → tekshiruv
 export async function runPipeline({ topic = null, format = null, count = cfg.dailyPosts, log = async () => {}, onDraft }) {
   await log(`🔎 Tadqiqotchi: ${topic ? `"${topic}" bo'yicha` : 'dolzarb mavzular'} izlanmoqda...`);
@@ -28,30 +56,9 @@ export async function runPipeline({ topic = null, format = null, count = cfg.dai
 
   const plans = await plan(ideas, count);
   for (const p of plans) {
-    p.format = format || String(p.format || 'post').toLowerCase();
-    // Direkt CTA'li postga noyob kod: lid shu so'z bilan yozsa, qaysi postdan kelgani ma'lum bo'ladi
-    p.cta_kod = String(p.cta_goal || '').toLowerCase() === 'direkt' ? uniqueCode(p.cta_kod || p.title) : '';
+    if (format) p.format = format;
     try {
-      await log(`✍️ Kopirayter yozmoqda: ${p.title}`);
-      const copy = await write(p);
-      const rev = await review(p, copy);
-      const post_html = ensureCode(rev.post_html || copy.post_html, p.cta_kod);
-      let art = null;
-      if (RICH_FORMATS.includes(p.format)) {
-        await log(`📰 Maqola/karusel yozilmoqda: ${p.title}`);
-        art = await writeArticle(p, { post_html });
-      }
-      let draft = store.addDraft({
-        title: p.title, format: p.format, source_url: p.source_url || '', plan: p, cta_kod: p.cta_kod,
-        post_html, reels_script: copy.reels_script || '',
-        article_html: art?.article_html || '', slides: art?.slides || [],
-        score: rev.score, notes: rev.notes
-      });
-      if (art) {
-        try { draft = await renderDraftSlides(draft); }
-        catch (e) { await log(`⚠️ Slaydlar chizilmadi (${p.title}): ${e.message}`); }
-      }
-      await onDraft(draft);
+      await onDraft(await produceDraft(p, { log }));
     } catch (e) {
       await log(`⚠️ "${p.title}" da xato: ${e.message}`);
     }

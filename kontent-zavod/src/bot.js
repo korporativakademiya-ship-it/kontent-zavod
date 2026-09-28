@@ -15,6 +15,7 @@ import { ttsEnabled, TTS_SETUP, synth, speechText, toVoiceNote } from './tts.js'
 import { addSample, addFeedback } from './style.js';
 import { ensureCode } from './cta.js';
 import { buildReport } from './report.js';
+import * as weekly from './weekly.js';
 import { analyzeStyle, distillRules } from './agents/stylist.js';
 
 // TELEGRAM_API_ROOT — ixtiyoriy (lokal Bot API server yoki sinov uchun)
@@ -54,7 +55,7 @@ export async function sendForApproval(d) {
     if (fallback) await log(`⚠️ "${d.title}" maqola formatida ko'rsatilmadi, oddiy ko'rinishda yuborildi: ${fallback}`);
     return;
   }
-  const head = `<b>📝 Qoralama</b> | ${d.format} | baho: ${d.score ?? '-'}/10\n<i>${esc(d.notes)}</i>\n${d.source_url ? `Manba: ${esc(d.source_url)}\n` : ''}━━━━━━━━━━\n\n`;
+  const head = `<b>📝 Qoralama</b> | ${d.format} | baho: ${d.score ?? '-'}/10\n${d.plannedAt ? `🗓 Reja: ${fmtTime(d.plannedAt)}${d.rubric ? ` · ${esc(d.rubric)}` : ''}\n` : ''}<i>${esc(d.notes)}</i>\n${d.source_url ? `Manba: ${esc(d.source_url)}\n` : ''}━━━━━━━━━━\n\n`;
   await sendMediaPost(bot.api, cfg.groupId, { ...d, post_html: head + d.post_html }, extra);
 }
 
@@ -107,7 +108,13 @@ async function startRun(ctx, topic, format = null) {
 export async function dailyRun() {
   if (busy) return;
   busy = true;
-  try { await runPipeline({ log, onDraft: sendForApproval }); }
+  try {
+    // Tasdiqlangan haftalik reja bo'lsa — rejadagi yaqin postlar yoziladi, aks holda erkin izlanish
+    if (weekly.currentPlan()) {
+      const n = await weekly.produceDue({ log, onDraft: sendForApproval });
+      if (n) await log(`🗓 Rejadan ${n} ta post yozildi.`);
+    } else await runPipeline({ log, onDraft: sendForApproval });
+  }
   catch (e) { await log(`❌ Xato: ${e.message}`); }
   finally { busy = false; }
 }
@@ -118,7 +125,7 @@ bot.command('id', ctx => ctx.reply(`chat_id: ${ctx.chat.id}\ntopic_id: ${ctx.mes
 bot.command('start', ctx => ctx.reply(
   'Kontent zavod ishlayapti.\n/yangi — hozir g\'oya izlash va qoralama yozish\n/goya <mavzu> — berilgan mavzu bo\'yicha post\n' +
   '/maqola <mavzu> — Telegram maqolasi (sarlavha, ro\'yxat, jadval)\n/karusel <mavzu> — slaydli karusel\n' +
-  '/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
+  '/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
 
 bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
 bot.command('goya', ctx => {
@@ -211,6 +218,107 @@ bot.command('qoidalar_ochir', ctx => {
   ctx.reply(`🗑 O'chirildi: ${gone}`);
 });
 
+// ---------- Haftalik reja va rubrikalar ----------
+const planKb = (id) => new InlineKeyboard()
+  .text('✅ Rejani tasdiqlash', `pok:${id}`).row()
+  .text('✏️ O\'zgartirish', `pedit:${id}`).text('🔄 Qayta tuzish', `pnew:${id}`);
+
+async function sendPlan(p, chatId = cfg.groupId, extra = { message_thread_id: cfg.approvalTopic }) {
+  await sendLong(chatId, weekly.formatPlan(p), extra);
+  if (p.status !== 'approved') await sendSafe(bot.api, chatId, `Rejani ko'rib chiqing. Tasdiqlasangiz, har post chiqishidan ~1 kun oldin yoziladi${weekly.autoMode() ? ' va o\'zi chiqadi (avto rejim)' : ' va tasdiqlashga keladi'}.`, { ...extra, reply_markup: planKb(p.id) });
+}
+
+export async function weeklyPlanRun() {
+  if (busy) return log('⏳ Haftalik reja keyinroq: hozir boshqa ish bajarilyapti. /reja_yangi bilan qayta urinib ko\'ring.');
+  busy = true;
+  try { await sendPlan(await weekly.buildPlan(log)); }
+  catch (e) { await log(`⚠️ Haftalik reja tuzilmadi: ${e.message}`); }
+  finally { busy = false; }
+}
+
+async function producePlanned() {
+  if (busy) return;
+  busy = true;
+  try {
+    const n = await weekly.produceDue({ log, onDraft: sendForApproval });
+    await log(n ? `🗓 Rejadan ${n} ta post yozildi.` : '🗓 Yaqin 36 soatda yoziladigan post yo\'q — keyingilari har kuni ertalab yoziladi.');
+  } finally { busy = false; }
+}
+
+bot.command('reja', async ctx => {
+  if (!isAdmin(ctx)) return;
+  const p = weekly.lastDraftPlan() || weekly.currentPlan();
+  if (!p) return ctx.reply(`Hali reja yo'q. Har yakshanba 18:00 da o'zi tuziladi yoki hozir: /reja_yangi\nRubrikalar: /rubrikalar`);
+  await sendPlan(p, ctx.chat.id, ctx.message?.message_thread_id ? { message_thread_id: ctx.message.message_thread_id } : {});
+});
+
+bot.command('reja_yangi', async ctx => {
+  if (!isAdmin(ctx)) return;
+  if (busy) return ctx.reply('⏳ Hozir ishlayapman, tugashini kuting.');
+  await ctx.reply('🗓 Ertadan boshlab 7 kunlik reja tuzilmoqda (1–3 daqiqa)...');
+  weeklyPlanRun();
+});
+
+bot.command('rubrikalar', ctx => {
+  if (!isAdmin(ctx)) return;
+  return ctx.reply(`🔁 <b>Rubrikalar</b> (har kunning birinchi posti):\n${weekly.formatRubrics() || "yo'q"}\n\n` +
+    `Qo'shish/almashtirish: <code>/rubrika_qosh Du karusel Xato va yechim — rahbar xatosi va tuzatish</code>\n` +
+    `O'chirish: <code>/rubrika_ochir 2</code> · Standartga qaytarish: <code>/rubrika_ochir hammasi</code>\n` +
+    `Kunlar: Du Se Chor Pay Ju Sha Ya · Formatlar: post maqola karusel reels`, { parse_mode: 'HTML' });
+});
+
+bot.command('rubrika_qosh', ctx => {
+  if (!isAdmin(ctx)) return;
+  const m = (ctx.match || '').trim().match(/^(\S+)\s+(post|maqola|karusel|reels)\s+(.+?)(?:\s+[—-]\s+(.+))?$/i);
+  const day = m ? weekly.DAYS.findIndex(d => d.toLowerCase() === m[1].toLowerCase()) : -1;
+  if (!m || day < 0) return ctx.reply('Namuna: /rubrika_qosh Du karusel Xato va yechim — rahbar xatosi va tuzatish');
+  const r = { day, format: m[2].toLowerCase(), name: m[3].trim(), desc: (m[4] || m[3]).trim() };
+  store.setRubrics([...weekly.rubrics().filter(x => x.day !== day), r]);
+  return ctx.reply(`✅ ${weekly.DAYS[day]}: ${r.name} (${r.format}). Keyingi rejadan kuchga kiradi.`);
+});
+
+bot.command('rubrika_ochir', ctx => {
+  if (!isAdmin(ctx)) return;
+  const arg = (ctx.match || '').trim().toLowerCase();
+  if (arg === 'hammasi') { store.setRubrics(null); return ctx.reply('↩️ Standart rubrikalar qaytarildi. /rubrikalar'); }
+  const list = weekly.sortedRubrics(), n = Number(arg);
+  if (!n || n < 1 || n > list.length) return ctx.reply(`Raqamni yozing: /rubrika_ochir 1 … ${list.length}`);
+  const gone = list[n - 1];
+  store.setRubrics(weekly.rubrics().filter(r => r !== gone));
+  return ctx.reply(`🗑 ${weekly.DAYS[gone.day]} — ${gone.name} o'chirildi. U kun erkin mavzu bo'ladi.`);
+});
+
+bot.command('avto', ctx => {
+  if (!isAdmin(ctx)) return;
+  const arg = (ctx.match || '').trim().toLowerCase();
+  if (['on', 'yoq', 'yoqish', '1'].includes(arg)) store.setSetting('avto', true);
+  else if (['off', "o'chir", 'ochir', '0'].includes(arg)) store.setSetting('avto', false);
+  const on = weekly.autoMode();
+  return ctx.reply(on
+    ? '🤖 Avto rejim YOQILGAN: rejadagi postlar yozilgach tasdiqlashsiz o\'z vaqtida chiqadi (tasdiqlash topigida ko\'rinadi — vaqtini o\'zgartirish yoki navbatdan olish mumkin).\nO\'chirish: /avto off'
+    : '✋ Avto rejim O\'CHIQ: rejadagi har post tasdiqlashga keladi (✅ bosilsa reja vaqtida chiqadi).\nYoqish: /avto on');
+});
+
+bot.callbackQuery(/^(pok|pnew|pedit):(.+)$/, async ctx => {
+  if (!isAdmin(ctx)) return ctx.answerCallbackQuery({ text: 'Faqat rahbar' });
+  const [, act, id] = ctx.match;
+  if (!store.plans().find(p => p.id === id)) return ctx.answerCallbackQuery({ text: 'Reja topilmadi' });
+  if (act === 'pok') {
+    weekly.approve(id);
+    await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text('✅ Reja tasdiqlandi', 'noop') }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: 'Reja tasdiqlandi' });
+    return producePlanned().catch(e => log(`⚠️ Rejadan yozishda xato: ${e.message}`));
+  }
+  if (act === 'pnew') {
+    if (busy) return ctx.answerCallbackQuery({ text: 'Hozir band, biroz kuting' });
+    await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text('🔄 Qayta tuzilmoqda...', 'noop') }).catch(() => {});
+    await ctx.answerCallbackQuery();
+    return weeklyPlanRun();
+  }
+  await ctx.answerCallbackQuery();
+  return ask(ctx, "✏️ Rejada nimani o'zgartiramiz? Masalan: <i>chorshanbadagi keysni xodim motivatsiyasiga almashtir, reels kamroq bo'lsin</i>. Shu xabarga reply qilib yozing.", { kind: 'plan', id });
+});
+
 // ---------- Hisobot va reaksiyalar ----------
 // Telegram xabari 4096 belgigacha — uzun hisobot bo'limlarga bo'linib ketadi
 async function sendLong(chatId, text, extra = {}) {
@@ -289,7 +397,8 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     return;
   }
   if (act === 'ok') {
-    const nd = store.update(id, { status: 'approved', scheduledAt: d.status === 'approved' ? d.scheduledAt : nextSlot() });
+    const planned = d.plannedAt && new Date(d.plannedAt).getTime() > Date.now() + 60e3 ? d.plannedAt : null;
+    const nd = store.update(id, { status: 'approved', scheduledAt: d.status === 'approved' ? d.scheduledAt : planned || nextSlot() });
     await ctx.editMessageReplyMarkup({ reply_markup: schedKb(nd) }).catch(() => {});
     return ctx.answerCallbackQuery({ text: `Rejalashtirildi: ${fmtTime(nd.scheduledAt)}` });
   }
@@ -354,9 +463,15 @@ bot.on('message:text', async ctx => {
   const replyTo = ctx.message.reply_to_message?.message_id;
   const w = replyTo && store.peekWait(replyTo);
   if (!w || !isAdmin(ctx)) return;
+  const opt = { message_thread_id: cfg.approvalTopic };
+  if (w.kind === 'plan') {
+    store.takeWait(replyTo);
+    await ctx.reply('🔄 Rejani qayta yozyapman...', opt);
+    try { return await sendPlan(await weekly.revise(w.id, ctx.message.text)); }
+    catch (e) { return ctx.reply(`⚠️ Xato: ${e.message}`, opt); }
+  }
   const d = store.get(w.id);
   if (!d) return store.takeWait(replyTo);
-  const opt = { message_thread_id: cfg.approvalTopic };
 
   if (w.kind === 'time') {
     const at = parseTime(ctx.message.text);
