@@ -9,6 +9,7 @@ import { writeArticle } from './agents/article.js';
 import { renderSlides } from './video/slides.js';
 import { VIDEO_SIGNATURE } from './brand.js';
 import { uniqueCode, ensureCode } from './cta.js';
+import { factCheck, applyFixes, factSummary } from './agents/factcheck.js';
 
 export const RICH_FORMATS = ['maqola', 'karusel'];
 
@@ -35,11 +36,24 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
     await log(`📰 Maqola/karusel yozilmoqda: ${p.title}`);
     art = await writeArticle(p, { post_html });
   }
+  // Fakt tekshiruvi: raqam va da'volar internetdan tekshiriladi, noto'g'risi tuzatiladi
+  let texts = { post_html, article_html: art?.article_html || '' }, fact = '';
+  if (cfg.factCheck) {
+    try {
+      await log(`🔎 Fakt tekshiruvchi: ${p.title}`);
+      const fc = await factCheck({ title: p.title, source_url: p.source_url, ...texts });
+      // Matnda aynan topilgan tuzatishlar soni (post yoki maqolada)
+      const fixed = fc.replacements.filter(r => texts.post_html.includes(r.find) || texts.article_html.includes(r.find)).length;
+      texts = { post_html: applyFixes(texts.post_html, fc.replacements).html, article_html: applyFixes(texts.article_html, fc.replacements).html };
+      fact = factSummary(fc, fixed);
+    } catch (e) { fact = `🔎 Fakt tekshiruvi bajarilmadi: ${e.message}`; }
+  }
+  if (p.idea_id) store.markIdeas([String(p.idea_id)]); // rahbar g'oyasi ishlatildi
   let draft = store.addDraft({
     title: p.title, format: p.format, source_url: p.source_url || '', plan: p, cta_kod: p.cta_kod,
-    post_html, reels_script: copy.reels_script || '',
-    article_html: art?.article_html || '', slides: art?.slides || [],
-    score: rev.score, notes: rev.notes, ...extra
+    post_html: texts.post_html, reels_script: copy.reels_script || '',
+    article_html: texts.article_html, slides: art?.slides || [],
+    score: rev.score, notes: [rev.notes, fact].filter(Boolean).join('\n'), ...extra
   });
   if (art) {
     try { draft = await renderDraftSlides(draft); }

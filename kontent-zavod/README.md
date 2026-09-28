@@ -20,6 +20,15 @@ unda video uchun Chromium tayyor o'rnatilgan.
 Volume qo'shing (`/data`) va `DATA_DIR=/data` qiling — qoralamalar va videolar o'chib ketmaydi.
 Video render uchun kamida ~1 GB xotira kerak.
 
+## Sifat: fakt tekshiruvi, g'oyalar banki, natijadan o'rganish
+- **Fakt tekshiruvchi** — har postdagi raqam, foiz, tadqiqot va qonun da'volarini internetdan tekshiradi;
+  noto'g'ri yoki manbasizini tuzatadi/yumshatadi. Qoralamada: `🔎 Fakt: 3 ta tasdiqlandi · 1 ta tuzatildi`
+  yoki `⚠️ qo'lda tekshiring`. O'chirish: `FACT_CHECK=0`.
+- **G'oyalar banki** — istalgan chatda `g'oya: ...` deb yozing; reja va strategiya ularni birinchi navbatda
+  ishlatadi (rejada 💡 belgisi). `/goyalar`, `/goya_ochir N`.
+- **Natijadan o'rganish** — kamida 5 ta kuzatilgan postdan keyin rejalashtiruvchi va strateg oxirgi 60 kunlik
+  natijani ko'radi (format va rubrika bo'yicha o'rtacha reaksiya, eng yaxshi/sust postlar) va rejani shunga moslaydi.
+
 ## Haftalik reja va rubrikalar
 - **Rubrikalar** — hafta kunlariga bog'langan doimiy ruknlar (standart: Du xato va yechim, Se qo'llanma,
   Chor keys, Pay AI vosita, Ju shablon, Sha savol-javob). Har kunning birinchi posti rubrika bo'ladi.

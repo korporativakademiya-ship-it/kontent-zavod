@@ -125,7 +125,7 @@ bot.command('id', ctx => ctx.reply(`chat_id: ${ctx.chat.id}\ntopic_id: ${ctx.mes
 bot.command('start', ctx => ctx.reply(
   'Kontent zavod ishlayapti.\n/yangi — hozir g\'oya izlash va qoralama yozish\n/goya <mavzu> — berilgan mavzu bo\'yicha post\n' +
   '/maqola <mavzu> — Telegram maqolasi (sarlavha, ro\'yxat, jadval)\n/karusel <mavzu> — slaydli karusel\n' +
-  '/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
+  '/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n\"g\'oya: ...\" — g\'oyalar bankiga · /goyalar\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
 
 bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
 bot.command('goya', ctx => {
@@ -319,6 +319,23 @@ bot.callbackQuery(/^(pok|pnew|pedit):(.+)$/, async ctx => {
   return ask(ctx, "✏️ Rejada nimani o'zgartiramiz? Masalan: <i>chorshanbadagi keysni xodim motivatsiyasiga almashtir, reels kamroq bo'lsin</i>. Shu xabarga reply qilib yozing.", { kind: 'plan', id });
 });
 
+bot.command('goyalar', ctx => {
+  if (!isAdmin(ctx)) return;
+  const list = store.ideas().filter(i => !i.used);
+  if (!list.length) return ctx.reply("💡 G'oyalar banki bo'sh.\nQo'shish: istalgan chatda yozing — g'oya: mavzu yoki fikringiz");
+  return ctx.reply(`💡 G'oyalar banki (${list.length} ta, rejada birinchi navbatda):\n` +
+    list.map((i, k) => `${k + 1}. ${i.text.slice(0, 150)}`).join('\n') +
+    `\n\nQo'shish: g'oya: ... · O'chirish: /goya_ochir 2 · Darhol post: /goya <mavzu>`);
+});
+
+bot.command('goya_ochir', ctx => {
+  if (!isAdmin(ctx)) return;
+  const list = store.ideas().filter(i => !i.used), n = Number((ctx.match || '').trim());
+  if (!n || n < 1 || n > list.length) return ctx.reply(`Raqamni yozing: /goya_ochir 1 … ${list.length || 1}`);
+  store.removeIdea(list[n - 1].id);
+  return ctx.reply(`🗑 O'chirildi: ${list[n - 1].text.slice(0, 100)}`);
+});
+
 // ---------- Hisobot va reaksiyalar ----------
 // Telegram xabari 4096 belgigacha — uzun hisobot bo'limlarga bo'linib ketadi
 async function sendLong(chatId, text, extra = {}) {
@@ -446,6 +463,17 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
   }
 });
 bot.callbackQuery('noop', ctx => ctx.answerCallbackQuery());
+
+// "g'oya: ..." — g'oyalar bankiga (istalgan chatda, rahbar yozsa). Javob kutish handleridan oldin turishi shart
+const IDEA_RE = /^\s*(g['ʻ‘’`]?oya|goya|idea)\s*[:\-—]\s*/i;
+bot.on('message:text', async (ctx, next) => {
+  if (!IDEA_RE.test(ctx.message.text) || ctx.message.reply_to_message?.from?.is_bot || !isAdmin(ctx)) return next();
+  const text = ctx.message.text.replace(IDEA_RE, '').trim();
+  if (text.length < 5) return ctx.reply("G'oyani to'liqroq yozing: g'oya: xodimlar nega ishdan ketadi — 3 ta sabab");
+  store.addIdea(text);
+  const n = store.ideas().filter(i => !i.used).length;
+  await ctx.reply(`💡 G'oya saqlandi (bankda ${n} ta). Keyingi haftalik rejada birinchi navbatda ishlatiladi. /goyalar`);
+});
 
 // Shaxsiy chatda forward qilingan postlar — uslub namunasi (javob kutish handleridan oldin turishi shart)
 bot.on('message', async (ctx, next) => {
