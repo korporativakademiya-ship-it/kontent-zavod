@@ -22,6 +22,7 @@ export const cfg = {
   videoFps: Number(process.env.VIDEO_FPS) || 30,
   // Haftalik hisobot vaqti
   reportCron: process.env.REPORT_CRON || '0 9 * * 1',
+  planCron: process.env.PLAN_CRON || '0 18 * * 0',  // haftalik reja (yakshanba 18:00)
   // Ovoz (TTS): azure | elevenlabs — bo'sh bo'lsa ovoz o'chiq
   tts: {
     provider: (process.env.TTS_PROVIDER || '').toLowerCase(),

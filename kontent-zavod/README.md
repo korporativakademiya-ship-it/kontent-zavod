@@ -20,6 +20,18 @@ unda video uchun Chromium tayyor o'rnatilgan.
 Volume qo'shing (`/data`) va `DATA_DIR=/data` qiling — qoralamalar va videolar o'chib ketmaydi.
 Video render uchun kamida ~1 GB xotira kerak.
 
+## Haftalik reja va rubrikalar
+- **Rubrikalar** — hafta kunlariga bog'langan doimiy ruknlar (standart: Du xato va yechim, Se qo'llanma,
+  Chor keys, Pay AI vosita, Ju shablon, Sha savol-javob). Har kunning birinchi posti rubrika bo'ladi.
+  `/rubrikalar`, `/rubrika_qosh Du karusel Nom — tavsif`, `/rubrika_ochir N` (`hammasi` — standartga qaytarish).
+- **Reja** — har yakshanba 18:00 (`PLAN_CRON`) bot ertadan boshlab 7 kunlik reja yuboradi: kun, vaqt
+  (`POST_TIMES`), rubrika, format, mavzu. ✅ Tasdiqlash · ✏️ O'zgartirish (izoh bilan) · 🔄 Qayta tuzish.
+  Qo'lda: `/reja_yangi`, ko'rish: `/reja`. Reja kunlari: `PLAN_DAYS`.
+- Tasdiqlangan rejadagi postlar chiqishidan ~1 kun oldin (har kuni `DAILY_CRON` da) yoziladi va reja
+  vaqtiga qo'yiladi; ✅ bosilsa aynan shu vaqtda chiqadi. Reja bo'lmasa bot avvalgidek erkin g'oya izlaydi.
+- **`/avto on`** — rejadagi postlar tasdiqlashsiz o'z vaqtida chiqadi (topikda ko'rinadi, vaqtini
+  o'zgartirish yoki navbatdan olish mumkin). `/avto off` — har postni o'zingiz tasdiqlaysiz.
+
 ## Natijalar: CTA kodlari va haftalik hisobot
 - Strateg postlarning kamida yarmiga **direkt CTA** qo'yadi va har biriga noyob kod so'z beriladi:
   "Direktga <b>KPI</b> deb yozing". Kod post, maqola, karusel va videoda bir xil — direktga kim qaysi

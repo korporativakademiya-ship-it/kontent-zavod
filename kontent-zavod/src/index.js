@@ -1,10 +1,12 @@
 import cron from 'node-cron';
 import { cfg } from './config.js';
-import { bot, dailyRun, log, weeklyReport } from './bot.js';
+import { bot, dailyRun, log, weeklyReport, weeklyPlanRun } from './bot.js';
 import { publishDue } from './publisher.js';
 
 // Har kuni g'oya izlash
 cron.schedule(cfg.dailyCron, dailyRun, { timezone: cfg.tz });
+// Haftalik reja (standart: yakshanba 18:00) — tasdiqlangach har kuni ertalab (DAILY_CRON) rejadagi postlar yoziladi
+cron.schedule(cfg.planCron, weeklyPlanRun, { timezone: cfg.tz });
 // Haftalik hisobot (standart: dushanba 09:00)
 cron.schedule(cfg.reportCron, () => weeklyReport(7).catch(e => log(`⚠️ Hisobot xatosi: ${e.message}`)), { timezone: cfg.tz });
 // Har daqiqada vaqti kelgan postlarni kanalga chiqarish
