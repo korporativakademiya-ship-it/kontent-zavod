@@ -8,6 +8,7 @@ import { review } from './agents/director.js';
 import { writeArticle } from './agents/article.js';
 import { renderSlides } from './video/slides.js';
 import { VIDEO_SIGNATURE } from './brand.js';
+import { uniqueCode, ensureCode } from './cta.js';
 
 export const RICH_FORMATS = ['maqola', 'karusel'];
 
@@ -28,18 +29,20 @@ export async function runPipeline({ topic = null, format = null, count = cfg.dai
   const plans = await plan(ideas, count);
   for (const p of plans) {
     p.format = format || String(p.format || 'post').toLowerCase();
+    // Direkt CTA'li postga noyob kod: lid shu so'z bilan yozsa, qaysi postdan kelgani ma'lum bo'ladi
+    p.cta_kod = String(p.cta_goal || '').toLowerCase() === 'direkt' ? uniqueCode(p.cta_kod || p.title) : '';
     try {
       await log(`✍️ Kopirayter yozmoqda: ${p.title}`);
       const copy = await write(p);
       const rev = await review(p, copy);
-      const post_html = rev.post_html || copy.post_html;
+      const post_html = ensureCode(rev.post_html || copy.post_html, p.cta_kod);
       let art = null;
       if (RICH_FORMATS.includes(p.format)) {
         await log(`📰 Maqola/karusel yozilmoqda: ${p.title}`);
         art = await writeArticle(p, { post_html });
       }
       let draft = store.addDraft({
-        title: p.title, format: p.format, source_url: p.source_url || '', plan: p,
+        title: p.title, format: p.format, source_url: p.source_url || '', plan: p, cta_kod: p.cta_kod,
         post_html, reels_script: copy.reels_script || '',
         article_html: art?.article_html || '', slides: art?.slides || [],
         score: rev.score, notes: rev.notes

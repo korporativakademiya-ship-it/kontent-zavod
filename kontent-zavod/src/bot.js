@@ -7,12 +7,14 @@ import { runPipeline, renderDraftSlides } from './pipeline.js';
 import { revise } from './agents/copywriter.js';
 import { writeArticle } from './agents/article.js';
 import { isRich, sendRich, approvalPrefix } from './rich.js';
-import { nextSlot, fmtTime, parseTime, publish, sendMediaPost, imagePaths } from './publisher.js';
+import { nextSlot, fmtTime, parseTime, publish, sendMediaPost, sendSafe, imagePaths } from './publisher.js';
 import { makeVideo } from './video/make.js';
 import { renderSlides } from './video/slides.js';
 import { VIDEO_SIGNATURE } from './brand.js';
 import { ttsEnabled, TTS_SETUP, synth, speechText, toVoiceNote } from './tts.js';
 import { addSample, addFeedback } from './style.js';
+import { ensureCode } from './cta.js';
+import { buildReport } from './report.js';
 import { analyzeStyle, distillRules } from './agents/stylist.js';
 
 // TELEGRAM_API_ROOT — ixtiyoriy (lokal Bot API server yoki sinov uchun)
@@ -116,7 +118,7 @@ bot.command('id', ctx => ctx.reply(`chat_id: ${ctx.chat.id}\ntopic_id: ${ctx.mes
 bot.command('start', ctx => ctx.reply(
   'Kontent zavod ishlayapti.\n/yangi — hozir g\'oya izlash va qoralama yozish\n/goya <mavzu> — berilgan mavzu bo\'yicha post\n' +
   '/maqola <mavzu> — Telegram maqolasi (sarlavha, ro\'yxat, jadval)\n/karusel <mavzu> — slaydli karusel\n' +
-  '/navbat — rejalashtirilgan postlar\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
+  '/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiya, lid, sotuv)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
 
 bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
 bot.command('goya', ctx => {
@@ -207,6 +209,39 @@ bot.command('qoidalar_ochir', ctx => {
   const [gone] = rules.splice(n - 1, 1);
   store.saveStyle({ rules });
   ctx.reply(`🗑 O'chirildi: ${gone}`);
+});
+
+// ---------- Hisobot va reaksiyalar ----------
+// Telegram xabari 4096 belgigacha — uzun hisobot bo'limlarga bo'linib ketadi
+async function sendLong(chatId, text, extra = {}) {
+  const parts = [];
+  let cur = '';
+  for (const block of text.split('\n')) {
+    if ((cur + '\n' + block).length > 3800) { parts.push(cur); cur = block; } else cur = cur ? cur + '\n' + block : block;
+  }
+  if (cur) parts.push(cur);
+  for (const p of parts) await sendSafe(bot.api, chatId, p, extra);
+}
+
+export async function weeklyReport(days = 7) {
+  await sendLong(cfg.groupId, await buildReport(days), { message_thread_id: cfg.logTopic });
+}
+
+bot.command('hisobot', async ctx => {
+  if (!isAdmin(ctx)) return;
+  const days = Math.min(90, Math.max(1, Number(ctx.match?.trim()) || 7));
+  await ctx.reply('📊 Hisobot tayyorlanmoqda...');
+  try { await sendLong(ctx.chat.id, await buildReport(days), ctx.message?.message_thread_id ? { message_thread_id: ctx.message.message_thread_id } : {}); }
+  catch (e) { await ctx.reply(`⚠️ Xato: ${e.message}`); }
+});
+
+// Kanal postlaridagi reaksiyalar soni (bot kanal admini bo'lishi shart)
+bot.on('message_reaction_count', ctx => {
+  const r = ctx.messageReactionCount;
+  const d = store.byStatus('published').find(x => x.channel_msg_ids?.includes(r.message_id) && (!x.channel_chat || x.channel_chat === r.chat.id));
+  if (!d) return;
+  const total = r.reactions.reduce((a, x) => a + (x.total_count || 0), 0);
+  store.update(d.id, { reactions: { ...(d.reactions || {}), [r.message_id]: total } });
 });
 
 bot.command('navbat', ctx => {
@@ -362,6 +397,7 @@ bot.on('message:text', async ctx => {
   await ctx.reply('🔄 Qayta yozyapman...', { message_thread_id: cfg.approvalTopic });
   try {
     const r = await revise(d, ctx.message.text);
+    r.post_html = ensureCode(r.post_html, d.cta_kod);
     store.update(id, { status: 'revised' });
     // Eski video/slaydlar/ovoz yangi matnga mos emas (rahbar qo'shgan rasmlar qoladi)
     const { video_path, video_duration, motion, slide_paths, audio_path, audio_duration, scheduledAt, ...rest } = d;
