@@ -42,7 +42,7 @@ export const store = {
   // G'oyalar banki (rahbarning o'z g'oyalari)
   ideas: () => db.ideas,
   addIdea(text) {
-    const idea = { id: Date.now().toString(36), text: String(text).slice(0, 1000), at: new Date().toISOString(), used: false };
+    const idea = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text: String(text).slice(0, 1000), at: new Date().toISOString(), used: false };
     db.ideas.push(idea); db.ideas = db.ideas.slice(-200); save(); return idea;
   },
   markIdeas(ids) { let n = 0; for (const i of db.ideas) if (ids.includes(i.id) && !i.used) { i.used = true; n++; } if (n) save(); return n; },

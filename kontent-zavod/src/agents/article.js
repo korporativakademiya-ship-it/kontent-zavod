@@ -35,7 +35,7 @@ export async function writeArticle(plan, copy, feedback = '') {
   const mode = MODES[plan.format] || MODES.maqola;
   const data = await askJSON({
     maxTokens: 8000,
-    system: `Sen Telegram uchun kreativ muharrirsan. ${brand()}\n${TAGS}\n${SLIDES}${ctaRule(plan.cta_kod)}${plan.cta_kod ? ` Karuselning "cta" slaydida keyword = "${plan.cta_kod}".` : ''}${examples(plan.title, 2)}`,
+    system: `Sen Telegram uchun kreativ muharrirsan. ${brand()}\n${TAGS}\n${SLIDES}${ctaRule(plan.cta_kod, plan.cta_havola, plan.cta_matn)}${plan.cta_kod ? ` Karuselning "cta" slaydida keyword = "${plan.cta_kod}".` : ''}${examples(plan.title, 2)}`,
     prompt: `Reja:\n${JSON.stringify(plan, null, 1)}\n\nQisqa post (asos):\n${copy.post_html}
 ${feedback ? `\nRahbarning izohi (qat'iy amal qil): "${feedback}"\n` : ''}
 ${mode}

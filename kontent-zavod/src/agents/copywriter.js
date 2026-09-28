@@ -14,7 +14,7 @@ QOIDALAR:
 export async function write(plan) {
   return askJSON({
     maxTokens: 3000,
-    system: `Sen kuchli kopirayterisan. ${brand()}\n${RULES}${ctaRule(plan.cta_kod)}${examples(`${plan.title} ${plan.angle || ''} ${plan.pain || ''}`)}`,
+    system: `Sen kuchli kopirayterisan. ${brand()}\n${RULES}${ctaRule(plan.cta_kod, plan.cta_havola, plan.cta_matn)}${examples(`${plan.title} ${plan.angle || ''} ${plan.pain || ''}`)}`,
     prompt: `Reja:\n${JSON.stringify(plan, null, 1)}
 
 JSON: {"post_html":"Telegram post","reels_script":"30–45 soniyalik reels ssenariy"}`
@@ -24,7 +24,7 @@ JSON: {"post_html":"Telegram post","reels_script":"30–45 soniyalik reels ssena
 export async function revise(draft, feedback) {
   return askJSON({
     maxTokens: 3000,
-    system: `Sen kuchli kopirayterisan. ${brand()}\n${RULES}${ctaRule(draft.cta_kod)}${examples(draft.title)}`,
+    system: `Sen kuchli kopirayterisan. ${brand()}\n${RULES}${ctaRule(draft.cta_kod, draft.plan?.cta_havola, draft.plan?.cta_matn)}${examples(draft.title)}`,
     prompt: `Joriy post:\n${draft.post_html}\n\nJoriy ssenariy:\n${draft.reels_script || ''}
 
 Rahbarning izohi: "${feedback}"

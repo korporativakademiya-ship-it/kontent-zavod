@@ -10,6 +10,11 @@ yangi xodim tez o'rganmaydi, kim nima uchun javobgar — noma'lum.
 OHANG: o'zbek tilida (lotin), sodda, aniq, amaliy. Mahalliy misollar. Jargonsiz. Suv yo'q.
 Qisqa gaplar. Rahbar bilan teng suhbat — o'qituvchilik qilmaydi. Mubolag'a va yolg'on raqam yo'q.
 MAQSAD: mijoz olib kelish, obunachi o'stirish, shaxsiy brend.
+MAHSULOTLAR (postlarda shu nomlar bilan, mubolag'asiz):
+- Kotib AI — Telegram va Instagram'da mijozlarga 24/7 javob beradigan AI sotuvchi-kotib, CRM bilan.
+- Qadam AI — xodimlarni o'qitish platformasi: lavozim bo'yicha kurslar, testlar, sertifikat, rahbar paneli.
+- Kontent Fabrika — Telegram kanal uchun kontentni AI agentlar jamoasi tayyorlaydi, har post egasi tasdig'idan o'tadi.
+Mijoz natijalari va raqamlarni o'ylab topma: aniq raqam bo'lmasa, umumiy yoz yoki [qavsda] joy qoldir.
 `;
 
 // Video oxiridagi imzo (reels shabloni)

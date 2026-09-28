@@ -17,9 +17,17 @@ export function uniqueCode(wanted, fallback = 'TIZIM') {
   return base.slice(0, 8) + Date.now().toString(36).slice(-4).toUpperCase();
 }
 
-export const ctaRule = (kod) => kod
+export const ctaRule = (kod, havola = '', matn = '') => havola
+  ? `\nCTA HAVOLASI: post oxiridagi CTA shu mazmunda bo'lsin: "${matn}" va aynan shu havolaga olib borsin: <a href="${havola}">…</a>. Havolani o'zgartirma, boshqa kod so'z yoki havola ishlatma.`
+  : kod
   ? `\nCTA KODI: postning CTA qismi aynan shunday bo'lsin: "Direktga <b>${kod}</b> deb yozing" (+ nima olishini qisqa ayt). Kod so'zini o'zgartirma va boshqa kod ishlatma.`
   : '';
+
+// Reja havolasi postda yo'q bo'lsa — oxiriga qo'shadi
+export function ensureLink(html, havola, matn = '') {
+  if (!havola || !html || html.includes(havola)) return html;
+  return `${html.trim()}\n\n👉 <a href="${havola}">${matn || 'Batafsil — botga yozing'}</a>`;
+}
 
 // Model kodni tushirib qoldirsa — oxiriga qo'shadi
 export function ensureCode(html, kod) {

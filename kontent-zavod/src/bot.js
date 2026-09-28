@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Bot, InlineKeyboard, InputFile } from 'grammy';
 import { cfg } from './config.js';
 import { store } from './store.js';
-import { runPipeline, renderDraftSlides } from './pipeline.js';
+import { runPipeline, renderDraftSlides, produceDraft } from './pipeline.js';
 import { revise } from './agents/copywriter.js';
 import { writeArticle } from './agents/article.js';
 import { isRich, sendRich, approvalPrefix } from './rich.js';
@@ -13,7 +13,8 @@ import { renderSlides } from './video/slides.js';
 import { VIDEO_SIGNATURE } from './brand.js';
 import { ttsEnabled, TTS_SETUP, synth, speechText, toVoiceNote } from './tts.js';
 import { addSample, addFeedback } from './style.js';
-import { ensureCode } from './cta.js';
+import { ensureCode, ensureLink } from './cta.js';
+import { topish, royxat, royxatMatni, rejaPlan, goyaMatni, MAHSULOTLAR } from './kontentReja.js';
 import { buildReport } from './report.js';
 import * as weekly from './weekly.js';
 import { analyzeStyle, distillRules } from './agents/stylist.js';
@@ -119,12 +120,53 @@ export async function dailyRun() {
   finally { busy = false; }
 }
 
+// ---------- Tayyor kontent reja (Kotib AI, Qadam AI, Kontent Fabrika) ----------
+// /rejalar [ka|qa|kf] [sahifa] — ro'yxat · /reja_post qa07 [format] — shu banddan qoralama
+// /reja_bankka [ka|qa|kf] — g'oyalar bankiga yuklash (haftalik reja ulardan oladi)
+bot.command('rejalar', ctx => {
+  if (!isAdmin(ctx)) return;
+  const [a, b] = (ctx.match || '').trim().split(/\s+/);
+  const prefiks = MAHSULOTLAR[a?.toLowerCase()] ? a.toLowerCase() : '';
+  const sahifa = Number(prefiks ? b : a) || 1;
+  return ctx.reply(royxatMatni(prefiks, sahifa), { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
+});
+
+bot.command('reja_post', async ctx => {
+  if (!isAdmin(ctx)) return;
+  const [kod, fmt] = (ctx.match || '').trim().split(/\s+/);
+  const r = topish(kod);
+  if (!r) return ctx.reply("Kodni yozing: /reja_post qa07 (ro'yxat: /rejalar qa). Format ixtiyoriy: post, karusel, maqola, reels.");
+  const format = ['post', 'karusel', 'maqola', 'reels'].includes(fmt?.toLowerCase()) ? fmt.toLowerCase() : null;
+  if (busy) return ctx.reply('⏳ Hozir ishlayapman, tugashini kuting.');
+  busy = true;
+  await ctx.reply(`🚀 ${r.kod} · ${r.mahsulot}: "${r.sarlavha}" — yozishni boshladim. Jarayon log topigida.`);
+  produceDraft(rejaPlan(r, format), { log })
+    .then(d => sendForApproval(d))
+    .catch(e => log(`❌ ${r.kod}: ${e.message}`))
+    .finally(() => { busy = false; });
+});
+
+bot.command('reja_bankka', ctx => {
+  if (!isAdmin(ctx)) return;
+  const a = (ctx.match || '').trim().toLowerCase();
+  const bor = new Set(store.ideas().map(i => (/^\[([a-z]{2}\d{2})\]/.exec(i.text) || [])[1]).filter(Boolean));
+  let n = 0;
+  for (const r of royxat(MAHSULOTLAR[a] ? a : '')) {
+    if (bor.has(r.kod)) continue;
+    store.addIdea(goyaMatni(r));
+    n++;
+  }
+  const qoldi = store.ideas().filter(i => !i.used).length;
+  return ctx.reply(`💡 G'oyalar bankiga ${n} ta reja qo'shildi (bankda ${qoldi} ta). Haftalik reja ulardan birinchi navbatda oladi. /goyalar`);
+});
+
 // Sozlash uchun: chat va topik ID'sini ko'rsatadi
 bot.command('id', ctx => ctx.reply(`chat_id: ${ctx.chat.id}\ntopic_id: ${ctx.message?.message_thread_id ?? '-'}\nsizning id: ${ctx.from.id}`));
 
 bot.command('start', ctx => ctx.reply(
   'Kontent zavod ishlayapti.\n/yangi — hozir g\'oya izlash va qoralama yozish\n/goya <mavzu> — berilgan mavzu bo\'yicha post\n' +
   '/maqola <mavzu> — Telegram maqolasi (sarlavha, ro\'yxat, jadval)\n/karusel <mavzu> — slaydli karusel\n' +
+  '/rejalar [ka|qa|kf] — tayyor kontent reja (150 ta) · /reja_post qa07 — shu bo\'yicha post · /reja_bankka — g\'oyalar bankiga\n' +
   '/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n\"g\'oya: ...\" — g\'oyalar bankiga · /goyalar\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
 
 bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
@@ -540,7 +582,7 @@ bot.on('message:text', async ctx => {
   await ctx.reply('🔄 Qayta yozyapman...', { message_thread_id: cfg.approvalTopic });
   try {
     const r = await revise(d, ctx.message.text);
-    r.post_html = ensureCode(r.post_html, d.cta_kod);
+    r.post_html = ensureLink(ensureCode(r.post_html, d.cta_kod), d.plan?.cta_havola, d.plan?.cta_matn);
     store.update(id, { status: 'revised' });
     // Eski video/slaydlar/ovoz yangi matnga mos emas (rahbar qo'shgan rasmlar qoladi)
     const { video_path, video_duration, motion, slide_paths, audio_path, audio_duration, scheduledAt, ...rest } = d;

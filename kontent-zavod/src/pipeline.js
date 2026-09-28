@@ -8,7 +8,8 @@ import { review } from './agents/director.js';
 import { writeArticle } from './agents/article.js';
 import { renderSlides } from './video/slides.js';
 import { VIDEO_SIGNATURE } from './brand.js';
-import { uniqueCode, ensureCode } from './cta.js';
+import { uniqueCode, ensureCode, ensureLink } from './cta.js';
+import { topish } from './kontentReja.js';
 import { factCheck, applyFixes, factSummary } from './agents/factcheck.js';
 
 export const RICH_FORMATS = ['maqola', 'karusel'];
@@ -25,12 +26,18 @@ export async function renderDraftSlides(draft) {
 // extra — qoralamaga qo'shimcha maydonlar (masalan reja vaqti)
 export async function produceDraft(p, { log = async () => {}, extra = {} } = {}) {
   p.format = String(p.format || 'post').toLowerCase();
+  // Tayyor rejadagi g'oya ("[qa07] ...") bo'lsa — CTA o'sha rejaning havolasiga olib boradi
+  if (p.idea_id && !p.cta_havola) {
+    const kod = (/^\[([a-z]{2}\d{2})\]/.exec(store.ideas().find(i => i.id === String(p.idea_id))?.text || '') || [])[1];
+    const r = kod && topish(kod);
+    if (r) Object.assign(p, { cta_goal: 'havola', cta_kod: '', cta_havola: r.havola, cta_matn: r.cta, reja_kod: r.kod });
+  }
   // Direkt CTA'li postga noyob kod: kim qaysi postdan yozgani kod so'zidan bilinadi
   p.cta_kod = String(p.cta_goal || '').toLowerCase() === 'direkt' ? uniqueCode(p.cta_kod || p.title) : '';
   await log(`✍️ Kopirayter yozmoqda: ${p.title}`);
   const copy = await write(p);
   const rev = await review(p, copy);
-  const post_html = ensureCode(rev.post_html || copy.post_html, p.cta_kod);
+  const post_html = ensureLink(ensureCode(rev.post_html || copy.post_html, p.cta_kod), p.cta_havola, p.cta_matn);
   let art = null;
   if (RICH_FORMATS.includes(p.format)) {
     await log(`📰 Maqola/karusel yozilmoqda: ${p.title}`);

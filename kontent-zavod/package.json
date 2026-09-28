@@ -4,7 +4,8 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "BOT_TOKEN=test DATA_DIR=/tmp/kz-test node --test test/*.test.js"
   },
   "engines": {
     "node": ">=20"
