@@ -20,6 +20,7 @@ export const cfg = {
   postTimes: (process.env.POST_TIMES || '09:00,19:00').split(',').map(s => s.trim()),
   dataDir: process.env.DATA_DIR || './data',
   videoFps: Number(process.env.VIDEO_FPS) || 30,
+  factCheck: process.env.FACT_CHECK !== '0',   // fakt tekshiruvi (internet qidiruvi bilan)
   // Haftalik hisobot vaqti
   reportCron: process.env.REPORT_CRON || '0 9 * * 1',
   planCron: process.env.PLAN_CRON || '0 18 * * 0',  // haftalik reja (yakshanba 18:00)

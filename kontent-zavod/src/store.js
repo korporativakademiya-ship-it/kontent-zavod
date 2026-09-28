@@ -5,7 +5,7 @@ import { cfg } from './config.js';
 const file = path.join(cfg.dataDir, 'db.json');
 fs.mkdirSync(cfg.dataDir, { recursive: true });
 
-let db = { drafts: [], usedTitles: [], waits: {}, style: {}, plans: [], rubrics: null, settings: {} };
+let db = { drafts: [], usedTitles: [], waits: {}, style: {}, plans: [], rubrics: null, settings: {}, ideas: [] };
 try { db = { ...db, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch {}
 
 function save() {
@@ -39,6 +39,14 @@ export const store = {
     db.style = { samples: [], guide: '', rules: [], feedback: [], ...db.style };
     return db.style;
   },
+  // G'oyalar banki (rahbarning o'z g'oyalari)
+  ideas: () => db.ideas,
+  addIdea(text) {
+    const idea = { id: Date.now().toString(36), text: String(text).slice(0, 1000), at: new Date().toISOString(), used: false };
+    db.ideas.push(idea); db.ideas = db.ideas.slice(-200); save(); return idea;
+  },
+  markIdeas(ids) { let n = 0; for (const i of db.ideas) if (ids.includes(i.id) && !i.used) { i.used = true; n++; } if (n) save(); return n; },
+  removeIdea(id) { db.ideas = db.ideas.filter(i => i.id !== id); save(); },
   // Haftalik rejalar, rubrikalar va sozlamalar
   plans: () => db.plans,
   addPlan(p) { db.plans.push(p); db.plans = db.plans.slice(-20); save(); return p; },

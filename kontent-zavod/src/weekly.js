@@ -86,6 +86,8 @@ export function approve(planId) {
   for (const o of store.plans()) if (o !== p && o.status === 'approved') { o.items = o.items.filter(i => i.draftId || i.at < p.items[0]?.at); }
   p.status = 'approved';
   store.savePlans();
+  // Rejaga kirgan rahbar g'oyalari keyingi rejalarda takrorlanmasin
+  store.markIdeas(p.items.map(i => String(i.idea_id || '')).filter(Boolean));
   return p;
 }
 
@@ -116,10 +118,11 @@ export async function produceDue({ hours = 36, log = async () => {}, onDraft }) 
 export function formatPlan(p) {
   const esc = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   let out = `🗓 <b>Haftalik reja: ${short(p.from)}–${short(p.to)}</b>${p.status === 'approved' ? ' · ✅ tasdiqlangan' : ''}\n`;
+  if (p.items.some(i => i.idea_id)) out += `💡 — sizning g'oyangiz\n`;
   let day = '';
   for (const it of p.items) {
     if (it.date !== day) { day = it.date; out += `\n<b>${it.dayName} ${short(it.date)}</b>\n`; }
-    out += `${it.time} · ${it.rubric ? `🔁 ${esc(it.rubric)} · ` : ''}${esc(it.format)} — <b>${esc(it.title)}</b>${it.draftId ? ' ✍️' : ''}\n` +
+    out += `${it.time} · ${it.idea_id ? '💡 ' : ''}${it.rubric ? `🔁 ${esc(it.rubric)} · ` : ''}${esc(it.format)} — <b>${esc(it.title)}</b>${it.draftId ? ' ✍️' : ''}\n` +
       (it.angle ? `   <i>${esc(String(it.angle).slice(0, 90))}</i>\n` : '');
   }
   return out;
