@@ -20,6 +20,8 @@ export const cfg = {
   postTimes: (process.env.POST_TIMES || '09:00,19:00').split(',').map(s => s.trim()),
   dataDir: process.env.DATA_DIR || './data',
   videoFps: Number(process.env.VIDEO_FPS) || 30,
+  // Haftalik hisobot vaqti
+  reportCron: process.env.REPORT_CRON || '0 9 * * 1',
   // Ovoz (TTS): azure | elevenlabs — bo'sh bo'lsa ovoz o'chiq
   tts: {
     provider: (process.env.TTS_PROVIDER || '').toLowerCase(),

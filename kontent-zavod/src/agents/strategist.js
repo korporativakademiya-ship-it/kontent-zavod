@@ -16,6 +16,7 @@ Auditoriya uchun eng foydali va qiziq ${pick} tasini tanla. Har birini tizimlash
 - "reels" — qisqa video (hook kuchli, hissiy mavzu)
 JSON massiv:
 [{"title":"...","angle":"qaysi burchakdan yoritamiz","pain":"qaysi og'riqqa tegadi","format":"post|maqola|karusel|reels",
-"key_points":["3-5 ta asosiy fikr"],"cta_goal":"izoh|direkt|saqlash|ulashish","source_url":"..."}]`
+"key_points":["3-5 ta asosiy fikr"],"cta_goal":"izoh|direkt|saqlash|ulashish","cta_kod":"direkt bo'lsa — mavzuga mos 1 ta qisqa so'z, lotin katta harf (masalan KPI, JARAYON)","source_url":"..."}]
+Kamida yarmida cta_goal "direkt" bo'lsin — bu mijoz olib keladi.`
   });
 }

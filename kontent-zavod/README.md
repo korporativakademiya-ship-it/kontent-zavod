@@ -20,6 +20,14 @@ unda video uchun Chromium tayyor o'rnatilgan.
 Volume qo'shing (`/data`) va `DATA_DIR=/data` qiling — qoralamalar va videolar o'chib ketmaydi.
 Video render uchun kamida ~1 GB xotira kerak.
 
+## Natijalar: CTA kodlari va haftalik hisobot
+- Strateg postlarning kamida yarmiga **direkt CTA** qo'yadi va har biriga noyob kod so'z beriladi:
+  "Direktga <b>KPI</b> deb yozing". Kod post, maqola, karusel va videoda bir xil — direktga kim qaysi
+  postdan yozganini kod so'zidan bilasiz.
+- Kanal reaksiyalari yig'iladi (bot kanal admini bo'lishi kerak).
+- **Haftalik hisobot** (dushanba 09:00, `REPORT_CRON`) va `/hisobot [kun]`: har post reaksiyalari,
+  formatlar bo'yicha o'rtacha va qisqa xulosa. Ko'rishlar soni Bot API'da yo'q.
+
 ## Uslubingizni o'rgatish
 - **Namuna postlar:** eng yaxshi 15–30 ta postingizni botga **shaxsiy chatda forward** qiling, keyin
   `/uslub_yangila` — bot uslubingizni (ohang, hook, gap uzunligi, sevimli iboralar, CTA) tavsiflab saqlaydi.

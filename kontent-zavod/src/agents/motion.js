@@ -27,5 +27,7 @@ JSON: {"scenes":[...]}`
   });
   const scenes = (data.scenes || []).filter(s => s && typeof s.type === 'string');
   if (!scenes.length) throw new Error("Motion agent sahna qaytarmadi");
+  // Videodagi "Direktga yozing" kodi post kodi bilan bir xil bo'lsin
+  if (draft.cta_kod) scenes.filter(x => x.type === 'cta').forEach(x => { x.keyword = draft.cta_kod; });
   return { signature: VIDEO_SIGNATURE, scenes };
 }

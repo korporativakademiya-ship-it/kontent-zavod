@@ -117,11 +117,13 @@ export const hasVideo = (d) => !!d.video_path && fs.existsSync(d.video_path);
 
 // Qaytaradi: rich format rad etilib oddiy formatda chiqqan bo'lsa — sababi (aks holda undefined)
 export async function publish(api, draft) {
-  let fallback;
-  if (isRich(draft)) ({ fallback } = await sendRich(api, cfg.channelId, draft));
-  else if (hasVideo(draft) || imagePaths(draft).length || hasAudio(draft)) await sendMediaPost(api, cfg.channelId, draft);
-  else await sendSafe(api, cfg.channelId, draft.post_html);
-  store.update(draft.id, { status: 'published', publishedAt: new Date().toISOString() });
+  let fallback, msg;
+  if (isRich(draft)) ({ fallback, msg } = await sendRich(api, cfg.channelId, draft));
+  else if (hasVideo(draft) || imagePaths(draft).length || hasAudio(draft)) msg = await sendMediaPost(api, cfg.channelId, draft);
+  else msg = await sendSafe(api, cfg.channelId, draft.post_html);
+  // Kanaldagi xabar ID'lari — reaksiyalarni postga bog'lash uchun
+  const channel_msg_ids = [msg].flat().map(m => m?.message_id).filter(Boolean);
+  store.update(draft.id, { status: 'published', publishedAt: new Date().toISOString(), channel_msg_ids, channel_chat: msg ? [msg].flat()[0]?.chat?.id : undefined });
   return fallback;
 }
 

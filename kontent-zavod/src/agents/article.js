@@ -1,5 +1,6 @@
 import { askJSON } from '../llm.js';
 import { brand, examples } from '../style.js';
+import { ctaRule } from '../cta.js';
 
 // Maqola muallifi: Telegram "Статья" (rich message) formatida ko'p formatli matn va karusel slaydlarini yozadi
 const TAGS = `
@@ -34,7 +35,7 @@ export async function writeArticle(plan, copy, feedback = '') {
   const mode = MODES[plan.format] || MODES.maqola;
   const data = await askJSON({
     maxTokens: 8000,
-    system: `Sen Telegram uchun kreativ muharrirsan. ${brand()}\n${TAGS}\n${SLIDES}${examples(plan.title, 2)}`,
+    system: `Sen Telegram uchun kreativ muharrirsan. ${brand()}\n${TAGS}\n${SLIDES}${ctaRule(plan.cta_kod)}${plan.cta_kod ? ` Karuselning "cta" slaydida keyword = "${plan.cta_kod}".` : ''}${examples(plan.title, 2)}`,
     prompt: `Reja:\n${JSON.stringify(plan, null, 1)}\n\nQisqa post (asos):\n${copy.post_html}
 ${feedback ? `\nRahbarning izohi (qat'iy amal qil): "${feedback}"\n` : ''}
 ${mode}
@@ -42,5 +43,7 @@ Qoidalar: o'zbek tili (lotin), qisqa abzaslar, suv yo'q, yolg'on raqam yo'q. Emo
 JSON: {"article_html":"...","slides":[...]}`
   });
   if (!data.article_html) throw new Error('Maqola matni qaytmadi');
-  return { article_html: data.article_html, slides: Array.isArray(data.slides) ? data.slides : [] };
+  const slides = Array.isArray(data.slides) ? data.slides : [];
+  if (plan.cta_kod) slides.filter(x => x?.type === 'cta').forEach(x => { x.keyword = plan.cta_kod; });
+  return { article_html: data.article_html, slides };
 }
