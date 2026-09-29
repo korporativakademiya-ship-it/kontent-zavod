@@ -96,7 +96,7 @@ export function approve(planId) {
   const p = store.plans().find(x => x.id === planId);
   if (!p) throw new Error('Reja topilmadi');
   // Eski tasdiqlangan rejaning hali yozilmagan bandlari bekor
-  for (const o of store.plans()) if (o !== p && o.status === 'approved') { o.items = o.items.filter(i => i.draftId || i.at < p.items[0]?.at); }
+  for (const o of store.plans()) if (o !== p && o.status === 'approved' && !o.qolda) { o.items = o.items.filter(i => i.draftId || i.at < p.items[0]?.at); }
   p.status = 'approved';
   store.savePlans();
   // Rejaga kirgan rahbar g'oyalari keyingi rejalarda takrorlanmasin
@@ -104,14 +104,21 @@ export function approve(planId) {
   return p;
 }
 
-export const currentPlan = () => [...store.plans()].reverse().find(p => p.status === 'approved' && p.to >= tashDay(0).date);
+// Haftalik reja (CRM kalendaridan qo'lda joylangan bandlar — "qolda" — hisobga kirmaydi)
+export const currentPlan = () => [...store.plans()].reverse().find(p => p.status === 'approved' && !p.qolda && p.to >= tashDay(0).date);
+
+// CRM kalendaridan joylangan, yaqin 36 soatda chiqadigan, hali yozilmagan band bormi (mahsulotdan qat'i nazar)
+export function hasDueManual(hours = 36) {
+  const now = new Date().toISOString(), until = new Date(Date.now() + hours * H).toISOString();
+  return store.allPlans().some(p => p.qolda && p.status === 'approved' && p.items.some(it => !it.draftId && it.at > now && it.at <= until));
+}
 export const lastDraftPlan = () => [...store.plans()].reverse().find(p => p.status === 'draft');
 
 // Kelgusi `hours` soat ichidagi, hali yozilmagan bandlar → qoralama (reja vaqtida)
-export async function produceDue({ hours = 36, log = async () => {}, onDraft }) {
+export async function produceDue({ hours = 36, log = async () => {}, onDraft, faqat = null }) {
   const until = new Date(Date.now() + hours * H).toISOString(), now = new Date().toISOString();
   let n = 0;
-  for (const p of store.plans().filter(x => x.status === 'approved')) {
+  for (const p of store.plans().filter(x => x.status === 'approved' && (!faqat || faqat(x)))) {
     for (const it of p.items) {
       if (it.draftId || it.at <= now || it.at > until) continue;
       try {

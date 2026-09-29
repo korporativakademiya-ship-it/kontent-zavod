@@ -112,3 +112,12 @@ Qoralama tugmalari: ✅ Tasdiqlash · 🕒 Vaqt belgilash · ⚡ Hozir · ✏️
 `/yangi` — hozir g'oya izlash · `/goya <mavzu>` — mavzu bo'yicha post · `/maqola <mavzu>` · `/karusel <mavzu>` · `/navbat` — rejalashtirilganlar · `/id`
 
 Nisha profili: `src/brand.js` — ohang va auditoriyani shu yerda o'zgartirasiz.
+
+## Kotibim CRM'dagi kontent kalendari
+`KOTIBIM_URL` va `KONTENT_API_KALIT` (Kotibim'dagi bilan bir xil) berilsa, bot har daqiqada Kotibim CRM'ga
+kalendar holatini yuboradi: chiqqan, rejalashtirilgan, tasdiq kutayotgan postlar, rejadagi bandlar va g'oyalar banki
+(faqat kontent, mijoz ma'lumoti yo'q). CRM → «Kontent kalendar» sahifasida egasi:
+- g'oyani kun va soatga **joylaydi** → bot uni qo'lda joylangan reja bandi qiladi va ~1 kun oldin (kun yaqin bo'lsa
+  darhol) postni yozib, o'sha mahsulot xonasiga tasdiqlashga yuboradi;
+- postni **ko'chiradi** yoki kalendardan **olib tashlaydi**.
+Amallar bir marta bajariladi, natija CRM'da ko'rinadi. Aloqa uzilsa, "Jarayon"ga bir marta ogohlantirish keladi.
