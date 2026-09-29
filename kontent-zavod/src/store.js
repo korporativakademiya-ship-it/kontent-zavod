@@ -25,6 +25,8 @@ export const store = {
     return draft;
   },
   get: (id) => db.drafts.find(d => d.id === id),
+  allDrafts: () => db.drafts,
+  allIdeas: () => db.ideas,
   update(id, patch) { const d = this.get(id); if (d) { Object.assign(d, patch); save(); } return d; },
   byStatus: (s) => db.drafts.filter(d => d.status === s),
   usedTitles: () => db.usedTitles.slice(-60),

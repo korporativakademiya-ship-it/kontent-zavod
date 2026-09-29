@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { cfg } from './config.js';
-import { bot, dailyRun, log, weeklyReport, weeklyPlanRun, salomlash, zaxira } from './bot.js';
+import { bot, dailyRun, log, weeklyReport, weeklyPlanRun, salomlash, zaxira, kalendarYoz } from './bot.js';
+import { kalendarEnabled, syncKalendar } from './kalendar.js';
 import { publishDue } from './publisher.js';
 
 // Har kuni g'oya izlash
@@ -11,6 +12,18 @@ cron.schedule(cfg.planCron, weeklyPlanRun, { timezone: cfg.tz });
 cron.schedule(cfg.reportCron, () => weeklyReport(7).catch(e => log(`⚠️ Hisobot xatosi: ${e.message}`)), { timezone: cfg.tz });
 // Kunlik zaxira (Toshkent 03:15) — egasiga shaxsiy chatda jim fayl
 cron.schedule(process.env.BACKUP_CRON || '15 3 * * *', () => zaxira().catch(e => log(`⚠️ Zaxira yuborilmadi: ${e.message}`)), { timezone: cfg.tz });
+// Kotibim CRM kontent kalendari: har daqiqada sinxron; CRM'da joylangan yaqin g'oyalar darhol yoziladi
+let kalendarXato = false;
+if (kalendarEnabled()) cron.schedule('* * * * *', async () => {
+  try {
+    await syncKalendar();
+    if (kalendarXato) { kalendarXato = false; log('📅 Kotibim kalendari bilan aloqa tiklandi.'); }
+    await kalendarYoz();
+  } catch (e) {
+    console.error('Kalendar:', e.message);
+    if (!kalendarXato) { kalendarXato = true; log(`⚠️ Kotibim kalendari bilan aloqa yo'q: ${e.message}`); }
+  }
+}, { timezone: cfg.tz });
 // Har daqiqada vaqti kelgan postlarni kanalga chiqarish
 cron.schedule('* * * * *', () => publishDue(bot.api, log), { timezone: cfg.tz });
 

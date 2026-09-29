@@ -11,6 +11,8 @@ export function nextSlot() {
   const taken = new Set(store.byStatus('approved').map(d => d.scheduledAt));
   // Tasdiqlangan haftalik rejadagi hali yozilmagan postlar vaqti ham band
   for (const p of store.allPlans().filter(x => x.status === 'approved')) for (const it of p.items) if (!it.draftId) taken.add(it.at);
+  // Rejadan yozilgan, lekin hali tasdiqlanmagan qoralamalarning reja vaqti ham band
+  for (const d of store.byStatus('pending')) if (d.plannedAt) taken.add(d.plannedAt);
   const nowT = new Date(Date.now() + cfg.tzOffsetH * H);
   for (let day = 0; day < 30; day++) {
     for (const t of cfg.postTimes) {

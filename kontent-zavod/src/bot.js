@@ -329,6 +329,19 @@ export async function weeklyPlanRun(mlar = rejim() ? (joriy() ? [joriy()] : kodl
   } finally { busy = false; }
 }
 
+// CRM kalendaridan joylangan, yaqin 36 soatda chiqadigan g'oyalar — darhol yoziladi (har mahsulot o'z xonasida)
+export async function kalendarYoz() {
+  if (busy || !weekly.hasDueManual()) return;
+  busy = true;
+  try {
+    for (const m of rejim() ? kodlar() : [null]) await bilan(m, async () => {
+      const n = await weekly.produceDue({ log, onDraft: sendForApproval, faqat: p => p.qolda });
+      if (n) await log(`📅 Kalendardan ${n} ta post yozildi.`);
+    });
+  } catch (e) { await log(`⚠️ Kalendar bandi yozilmadi: ${e.message}`); }
+  finally { busy = false; }
+}
+
 async function producePlanned() {
   if (busy) return;
   busy = true;
