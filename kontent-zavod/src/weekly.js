@@ -3,6 +3,7 @@ import { store } from './store.js';
 import { research } from './agents/researcher.js';
 import { planWeek, revisePlan } from './agents/planner.js';
 import { produceDraft } from './pipeline.js';
+import { joriy, STANDART_JADVAL } from './mahsulot.js';
 
 // Haftalik reja: rubrikalar (hafta kunlari bo'yicha) → slotlar → rahbar tasdiqlaydi →
 // har post chiqishidan ~1 kun oldin yoziladi va reja vaqtiga qo'yiladi
@@ -20,7 +21,10 @@ export const DEFAULT_RUBRICS = [
   { day: 6, name: 'Savol-javob', format: 'post', desc: "obunachilar savoliga javob yoki muhokama" }
 ];
 
-export const rubrics = () => store.rubrics() || DEFAULT_RUBRICS;
+// Mahsulot topigida standart rubrika yo'q (umumiy rubrikalar tizimlashtirish haqida) — /rubrika_qosh bilan qo'shiladi
+export const rubrics = () => store.rubrics() || (joriy() ? [] : DEFAULT_RUBRICS);
+// Mahsulotning haftalik chiqish jadvali
+export const jadval = () => store.mSetting('jadval', STANDART_JADVAL[joriy()] || []);
 export const autoMode = () => store.setting('avto', false);
 const planDays = () => (process.env.PLAN_DAYS || '1,2,3,4,5,6').split(',').map(Number).filter(n => n >= 0 && n <= 6);
 
@@ -37,6 +41,15 @@ const short = (date) => `${date.slice(8, 10)}.${date.slice(5, 7)}`;
 
 // Ertadan 7 kun: har reja kuni × POST_TIMES. Rubrika shu kunning birinchi slotiga
 export function weekSlots() {
+  if (joriy()) {
+    const rs = rubrics(), slots = [], j = jadval();
+    for (let i = 1; i <= 7; i++) {
+      const { date, dow } = tashDay(i);
+      j.filter(x => x.day === dow).sort((a, b) => a.time.localeCompare(b.time)).forEach((x, k) =>
+        slots.push({ date, time: x.time, dow, dayName: DAYS[dow], rubric: k === 0 ? rs.find(r => r.day === dow) || null : null }));
+    }
+    return slots;
+  }
   const days = planDays(), rs = rubrics(), slots = [];
   for (let i = 1; i <= 7; i++) {
     const { date, dow } = tashDay(i);
@@ -60,7 +73,7 @@ function toItems(slots, raw) {
 
 export async function buildPlan(log = async () => {}) {
   const slots = weekSlots();
-  if (!slots.length) throw new Error("Reja kunlari yo'q (PLAN_DAYS)");
+  if (!slots.length) throw new Error(joriy() ? "Chiqish jadvali bo'sh — /jadval bilan kunlarni belgilang" : "Reja kunlari yo'q (PLAN_DAYS)");
   await log(`🗓 Haftalik reja: ${slots.length} ta slot uchun g'oyalar izlanmoqda...`);
   const ideas = await research({ count: Math.min(slots.length * 2, 20), used: store.usedTitles() });
   const items = toItems(slots, await planWeek(slots, ideas, store.usedTitles()));
@@ -127,6 +140,23 @@ export function formatPlan(p) {
   }
   return out;
 }
+
+// "/jadval Du 09:00, Chor 19:00" → [{day, time}]
+export function parseJadval(text) {
+  const out = [];
+  for (const q of String(text).split(/[,;\n]+/)) {
+    const m = q.trim().match(/^(\S+)\s+(\d{1,2})[:.](\d{2})$/);
+    if (!m) continue;
+    const day = DAYS.findIndex(d => d.toLowerCase() === m[1].toLowerCase());
+    const h = Number(m[2]), mi = Number(m[3]);
+    if (day < 0 || h > 23 || mi > 59) continue;
+    out.push({ day, time: `${String(h).padStart(2, '0')}:${m[3]}` });
+  }
+  return out;
+}
+export const formatJadval = (j = jadval()) => j.length
+  ? [...j].sort((a, b) => ((a.day + 6) % 7) - ((b.day + 6) % 7) || a.time.localeCompare(b.time)).map(x => `${DAYS[x.day]} ${x.time}`).join(', ')
+  : "bo'sh";
 
 // Dushanbadan boshlab tartiblangan (ro'yxat raqamlari shu tartibda)
 export const sortedRubrics = () => rubrics().slice().sort((a, b) => ((a.day + 6) % 7) - ((b.day + 6) % 7));

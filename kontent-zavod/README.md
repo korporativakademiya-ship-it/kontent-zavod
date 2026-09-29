@@ -9,6 +9,16 @@ Tadqiqot → strategiya → kopirayting → rahbar tekshiruvi → Telegram'da ta
 4. `.env.example` → `.env` qilib to'ldiring.
 5. `npm install` → `npm start`
 
+## Ofis guruhi: har mahsulot o'z xonasida
+`PRODUCT_TOPICS=ka:867,qa:869,kf:871` va `GROUP_ID` (ofis guruhi) berilsa, bot mahsulot rejimida ishlaydi:
+- Har mahsulot topigi o'z g'oyalar banki, haftalik rejasi, chiqish jadvali (`/jadval`) va hisoboti bilan —
+  Qadam AI xonasida faqat Qadam AI haqida yoziladi.
+- Qoralama, tasdiqlash va jarayon shu topikning o'zida (alohida "Tasdiqlash"/"Jarayon" topiklari kerak emas);
+  jarayon bitta yangilanib boradigan xabarda.
+- Muallif ovozi, uslub va doimiy qoidalar uchala mahsulot uchun umumiy; kanal bitta.
+- Rahbar tanlovlari (✅/❌ va rad sababi) eslab qolinadi — agentlar shunga moslashadi.
+- Mahsulot profillari: `src/mahsulot.js`.
+
 ## Max obuna bilan ishlatish
 Kompyuteringizda (Claude Code o'rnatilgan): `claude setup-token` → chiqqan tokenni `.env` dagi
 `CLAUDE_CODE_OAUTH_TOKEN` ga qo'ying, `LLM_MODE=max`. API'ga o'tish: `LLM_MODE=api` + `ANTHROPIC_API_KEY`.

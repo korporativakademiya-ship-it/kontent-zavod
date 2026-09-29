@@ -10,7 +10,7 @@ const H = 3600e3;
 export function nextSlot() {
   const taken = new Set(store.byStatus('approved').map(d => d.scheduledAt));
   // Tasdiqlangan haftalik rejadagi hali yozilmagan postlar vaqti ham band
-  for (const p of store.plans().filter(x => x.status === 'approved')) for (const it of p.items) if (!it.draftId) taken.add(it.at);
+  for (const p of store.allPlans().filter(x => x.status === 'approved')) for (const it of p.items) if (!it.draftId) taken.add(it.at);
   const nowT = new Date(Date.now() + cfg.tzOffsetH * H);
   for (let day = 0; day < 30; day++) {
     for (const t of cfg.postTimes) {

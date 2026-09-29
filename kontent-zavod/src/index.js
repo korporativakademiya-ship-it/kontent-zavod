@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { cfg } from './config.js';
-import { bot, dailyRun, log, weeklyReport, weeklyPlanRun } from './bot.js';
+import { bot, dailyRun, log, weeklyReport, weeklyPlanRun, salomlash } from './bot.js';
 import { publishDue } from './publisher.js';
 
 // Har kuni g'oya izlash
@@ -15,6 +15,6 @@ cron.schedule('* * * * *', () => publishDue(bot.api, log), { timezone: cfg.tz })
 bot.start({
   // Kanal reaksiyalari standart yangilanishlarga kirmaydi — alohida so'raladi
   allowed_updates: ['message', 'callback_query', 'message_reaction_count'],
-  onStart: () => { console.log('Kontent zavod ishga tushdi'); log('🟢 Kontent zavod ishga tushdi'); } });
+  onStart: () => { console.log('Kontent zavod ishga tushdi'); if (!process.env.PRODUCT_TOPICS) log('🟢 Kontent zavod ishga tushdi'); salomlash().catch(e => console.error('Salom:', e.message)); } });
 process.once('SIGTERM', () => bot.stop());
 process.once('SIGINT', () => bot.stop());

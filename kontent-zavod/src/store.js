@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { cfg } from './config.js';
+import { joriy, prefiksdan } from './mahsulot.js';
 
 const file = path.join(cfg.dataDir, 'db.json');
 fs.mkdirSync(cfg.dataDir, { recursive: true });
 
-let db = { drafts: [], usedTitles: [], waits: {}, style: {}, plans: [], rubrics: null, settings: {}, ideas: [] };
+let db = { drafts: [], usedTitles: [], waits: {}, style: {}, plans: [], rubrics: null, settings: {}, ideas: [], mahsulot: {} };
 try { db = { ...db, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch {}
 
 function save() {
@@ -16,7 +17,7 @@ function save() {
 
 export const store = {
   addDraft(d) {
-    const draft = { status: 'pending', ...d, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), createdAt: new Date().toISOString() };
+    const draft = { status: 'pending', ...(joriy() ? { mahsulot: joriy() } : {}), ...d, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), createdAt: new Date().toISOString() };
     db.drafts.push(draft);
     db.usedTitles.push(d.title);
     db.usedTitles = db.usedTitles.slice(-150);
@@ -40,21 +41,34 @@ export const store = {
     return db.style;
   },
   // G'oyalar banki (rahbarning o'z g'oyalari)
-  ideas: () => db.ideas,
+  // Mahsulot topigida — faqat shu mahsulot g'oyalari ("[qa07] ..." prefiksi ham hisobga olinadi)
+  ideas: () => (joriy() ? db.ideas.filter(i => (i.mahsulot || prefiksdan(i.text)) === joriy()) : db.ideas),
   addIdea(text) {
-    const idea = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text: String(text).slice(0, 1000), at: new Date().toISOString(), used: false };
+    const m = joriy() || prefiksdan(text);
+    const idea = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text: String(text).slice(0, 1000), at: new Date().toISOString(), used: false, ...(m ? { mahsulot: m } : {}) };
     db.ideas.push(idea); db.ideas = db.ideas.slice(-200); save(); return idea;
   },
   markIdeas(ids) { let n = 0; for (const i of db.ideas) if (ids.includes(i.id) && !i.used) { i.used = true; n++; } if (n) save(); return n; },
   removeIdea(id) { db.ideas = db.ideas.filter(i => i.id !== id); save(); },
   // Haftalik rejalar, rubrikalar va sozlamalar
-  plans: () => db.plans,
-  addPlan(p) { db.plans.push(p); db.plans = db.plans.slice(-20); save(); return p; },
+  // Rejalar ham mahsulot bo'yicha: har topik o'z haftalik rejasi
+  plans: () => (joriy() ? db.plans.filter(p => p.mahsulot === joriy()) : db.plans),
+  allPlans: () => db.plans,
+  addPlan(p) { db.plans.push({ ...(joriy() ? { mahsulot: joriy() } : {}), ...p }); db.plans = db.plans.slice(-30); save(); return db.plans.at(-1); },
   savePlans() { save(); },
-  rubrics: () => db.rubrics,
-  setRubrics(r) { db.rubrics = r; save(); return r; },
+  rubrics: () => (joriy() ? db.mahsulot[joriy()]?.rubrics ?? null : db.rubrics),
+  setRubrics(r) { if (joriy()) (db.mahsulot[joriy()] ||= {}).rubrics = r; else db.rubrics = r; save(); return r; },
+  // Mahsulot sozlamasi (jadval va h.k.)
+  mSetting: (k, def) => db.mahsulot[joriy()]?.[k] ?? def,
+  setMSetting(k, v) { (db.mahsulot[joriy()] ||= {})[k] = v; save(); },
   setting: (k, def) => db.settings[k] ?? def,
   setSetting(k, v) { db.settings[k] = v; save(); },
+  // Rahbar tanlovlari: qaysi postni tasdiqladi / rad etdi (mahsulot bo'yicha) — agentlar shundan o'rganadi
+  addChoice(d, ok, sabab = '') {
+    db.choices = [...(db.choices || []), { mahsulot: d.mahsulot || null, title: d.title, format: d.format, ok, sabab: String(sabab).slice(0, 300), at: new Date().toISOString() }].slice(-300);
+    save();
+  },
+  choices: () => (db.choices || []).filter(c => !joriy() || c.mahsulot === joriy()),
   saveStyle(patch = {}) { Object.assign(this.style(), patch); save(); return db.style; },
   takeWait(msgId) { const w = db.waits[msgId]; if (w) { delete db.waits[msgId]; save(); } return w; }
 };

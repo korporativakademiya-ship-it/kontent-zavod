@@ -18,12 +18,31 @@ import { topish, royxat, royxatMatni, rejaPlan, goyaMatni, MAHSULOTLAR } from '.
 import { buildReport } from './report.js';
 import * as weekly from './weekly.js';
 import { analyzeStyle, distillRules } from './agents/stylist.js';
+import { bilan, joriy, rejim, kodlar, topigi, topikdan, PROFIL } from './mahsulot.js';
 
 // TELEGRAM_API_ROOT — ixtiyoriy (lokal Bot API server yoki sinov uchun)
 const API_ROOT = process.env.TELEGRAM_API_ROOT || 'https://api.telegram.org';
 export const bot = new Bot(cfg.botToken, { client: { apiRoot: API_ROOT } });
 let busy = false;
 let videoBusy = false; // render og'ir (Chromium + ffmpeg) — bir vaqtda bittadan
+
+// ---------- Mahsulot topiklari (ofis guruhi) ----------
+// Xabar qaysi mahsulot topigida bo'lsa — butun ishlov o'sha mahsulot "miyasi" bilan bajariladi.
+bot.use((ctx, next) => {
+  const thr = ctx.msg?.message_thread_id ?? ctx.callbackQuery?.message?.message_thread_id;
+  let m = topikdan(thr);
+  const id = (ctx.callbackQuery?.data || '').split(':')[1];
+  if (!m && id) m = store.get(id)?.mahsulot || store.allPlans().find(p => p.id === id)?.mahsulot || null;
+  return bilan(m, next);
+});
+// Guruhga ketayotgan xabar topiksiz bo'lsa — joriy mahsulot topigiga (ctx.reply ham shu yerga tushadi)
+bot.api.config.use((prev, method, payload, signal) => {
+  if (payload && rejim() && joriy() && String(payload.chat_id) === String(cfg.groupId) && payload.message_thread_id === undefined && /^(send|copy)/.test(method))
+    payload = { ...payload, message_thread_id: topigi(joriy()) };
+  return prev(method, payload, signal);
+});
+// Tasdiqlash va jarayon joyi: mahsulot rejimida — mahsulotning o'z topigi (alohida chat yo'q)
+const tema = (m = joriy()) => (rejim() ? topigi(m) ?? topigi(kodlar()[0]) : cfg.approvalTopic);
 
 const esc = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const isAdmin = (ctx) => cfg.admins.includes(ctx.from?.id);
@@ -41,28 +60,42 @@ const TIME_HELP = 'Masalan: <code>18:30</code>, <code>ertaga 09:00</code>, <code
 
 // Rahbardan javob so'raydi (reply) — javob kelganda message:text/photo handleri ishlaydi
 async function ask(ctx, text, wait) {
-  const m = await ctx.reply(text, { parse_mode: 'HTML', message_thread_id: cfg.approvalTopic, reply_markup: { force_reply: true, selective: true } });
+  const m = await ctx.reply(text, { parse_mode: 'HTML', message_thread_id: tema(), reply_markup: { force_reply: true, selective: true } });
   store.setWait(m.message_id, wait);
 }
 
-export const log = (text) => !cfg.groupId ? Promise.resolve() :
-  bot.api.sendMessage(cfg.groupId, text, { message_thread_id: cfg.logTopic }).catch(() => {});
+// Jarayon: mahsulot rejimida har mahsulot uchun bitta yangilanib boradigan xabar (topik chalkashmasin);
+// xato va ogohlantirishlar — alohida xabar.
+const jarayon = new Map();
+export const log = async (text) => {
+  if (!cfg.groupId) return;
+  if (!rejim()) return bot.api.sendMessage(cfg.groupId, text, { message_thread_id: cfg.logTopic }).catch(() => {});
+  const m = joriy() || kodlar()[0];
+  const muhim = /^(⚠️|❌)/.test(text);
+  const h = jarayon.get(m);
+  if (!muhim && h && Date.now() - h.at < 15 * 60e3) {
+    h.lines = [...h.lines, text].slice(-8); h.at = Date.now();
+    return bot.api.editMessageText(cfg.groupId, h.id, `⚙️ Jarayon\n${h.lines.join('\n')}`).catch(() => {});
+  }
+  const r = await bot.api.sendMessage(cfg.groupId, muhim ? text : `⚙️ Jarayon\n${text}`, { message_thread_id: tema(m), disable_notification: !muhim }).catch(() => null);
+  if (r && !muhim) jarayon.set(m, { id: r.message_id, lines: [text], at: Date.now() });
+};
 
 export async function sendForApproval(d) {
-  const extra = { message_thread_id: cfg.approvalTopic, reply_markup: kb(d.id) };
+  const extra = { message_thread_id: tema(d.mahsulot || joriy()), reply_markup: kb(d.id) };
   if (d.status === 'approved') extra.reply_markup = schedKb(d);
   if (isRich(d)) {
     const { fallback } = await sendRich(bot.api, cfg.groupId, d, extra, { prefix: approvalPrefix(d) });
     if (fallback) await log(`⚠️ "${d.title}" maqola formatida ko'rsatilmadi, oddiy ko'rinishda yuborildi: ${fallback}`);
     return;
   }
-  const head = `<b>📝 Qoralama</b> | ${d.format} | baho: ${d.score ?? '-'}/10\n${d.plannedAt ? `🗓 Reja: ${fmtTime(d.plannedAt)}${d.rubric ? ` · ${esc(d.rubric)}` : ''}\n` : ''}<i>${esc(d.notes)}</i>\n${d.source_url ? `Manba: ${esc(d.source_url)}\n` : ''}━━━━━━━━━━\n\n`;
+  const head = `<b>📝 Qoralama</b>${PROFIL[d.mahsulot] ? ` · ${PROFIL[d.mahsulot].belgi} ${PROFIL[d.mahsulot].nom}` : ''} | ${d.format} | baho: ${d.score ?? '-'}/10\n${d.plannedAt ? `🗓 Reja: ${fmtTime(d.plannedAt)}${d.rubric ? ` · ${esc(d.rubric)}` : ''}\n` : ''}<i>${esc(d.notes)}</i>\n${d.source_url ? `Manba: ${esc(d.source_url)}\n` : ''}━━━━━━━━━━\n\n`;
   await sendMediaPost(bot.api, cfg.groupId, { ...d, post_html: head + d.post_html }, extra);
 }
 
 // Qoralama uchun reels video yasaydi va tasdiqlash topigiga yuboradi
 async function videoRun(d) {
-  const reply = (t) => bot.api.sendMessage(cfg.groupId, t, { message_thread_id: cfg.approvalTopic }).catch(() => {});
+  const reply = (t) => bot.api.sendMessage(cfg.groupId, t, { message_thread_id: tema(d.mahsulot || joriy()) }).catch(() => {});
   videoBusy = true;
   try {
     await reply(`🎥 "${d.title}" — video yasalmoqda (1–3 daqiqa)...`);
@@ -71,7 +104,7 @@ async function videoRun(d) {
     const cap = `<b>🎥 Video</b> | ${esc(d.title)} | ${Math.round(v.duration)} s${v.voiced ? ' | 🎙 dublyaj' : ''}\n<i>${isRich(d) ? 'Tasdiqlansa, video maqola ichida chiqadi.' : 'Tasdiqlansa, kanalga shu video post matni bilan chiqadi.'}</i>`;
     await bot.api.sendVideo(cfg.groupId, new InputFile(v.file), {
       caption: cap, parse_mode: 'HTML', supports_streaming: true, width: 1080, height: 1920,
-      duration: Math.round(v.duration), message_thread_id: cfg.approvalTopic, reply_markup: nd.status === 'approved' ? schedKb(nd) : kb(nd.id)
+      duration: Math.round(v.duration), message_thread_id: tema(d.mahsulot || joriy()), reply_markup: nd.status === 'approved' ? schedKb(nd) : kb(nd.id)
     });
   } catch (e) {
     await reply(`⚠️ Video yasalmadi (${d.title}): ${e.message}`);
@@ -80,7 +113,7 @@ async function videoRun(d) {
 
 // Postning audio varianti (ovozli xabar) — tasdiqlansa post bilan birga chiqadi
 async function audioRun(d) {
-  const reply = (t) => bot.api.sendMessage(cfg.groupId, t, { message_thread_id: cfg.approvalTopic }).catch(() => {});
+  const reply = (t) => bot.api.sendMessage(cfg.groupId, t, { message_thread_id: tema(d.mahsulot || joriy()) }).catch(() => {});
   try {
     await reply(`🎙 "${d.title}" — ovoz yozilmoqda...`);
     const dir = path.join(cfg.dataDir, 'audio');
@@ -90,7 +123,7 @@ async function audioRun(d) {
     const nd = store.update(d.id, { audio_path: ogg, audio_duration: dur });
     await bot.api.sendVoice(cfg.groupId, new InputFile(ogg), {
       caption: `🎙 Audio variant | ${esc(d.title)} | ${Math.round(dur)} s\n<i>Tasdiqlansa, post bilan birga chiqadi.</i>`,
-      parse_mode: 'HTML', duration: Math.round(dur), message_thread_id: cfg.approvalTopic, reply_markup: nd.status === 'approved' ? schedKb(nd) : kb(nd.id)
+      parse_mode: 'HTML', duration: Math.round(dur), message_thread_id: tema(d.mahsulot || joriy()), reply_markup: nd.status === 'approved' ? schedKb(nd) : kb(nd.id)
     });
   } catch (e) {
     await reply(`⚠️ Ovoz yozilmadi (${d.title}): ${e.message}`);
@@ -100,7 +133,8 @@ async function audioRun(d) {
 async function startRun(ctx, topic, format = null) {
   if (busy) return ctx.reply('⏳ Hozir ishlayapman, tugashini kuting.');
   busy = true;
-  await ctx.reply('🚀 Boshladim. Jarayonni log topigida kuzating.');
+  if (rejim() && !joriy()) { busy = false; return ctx.reply("Qaysi mahsulot uchun? Buyruqni o'sha mahsulot xonasida yozing (🤖 Kotib AI, 🎓 Qadam AI, ✍️ Kontent Fabrika)."); }
+  await ctx.reply(rejim() ? '🚀 Boshladim. Jarayon va qoralama shu yerda chiqadi.' : '🚀 Boshladim. Jarayonni log topigida kuzating.');
   runPipeline({ topic, format, count: topic ? 1 : cfg.dailyPosts, log, onDraft: sendForApproval })
     .catch(e => log(`❌ Xato: ${e.message}`))
     .finally(() => { busy = false; });
@@ -110,6 +144,17 @@ export async function dailyRun() {
   if (busy) return;
   busy = true;
   try {
+    // Mahsulot rejimi: har mahsulot o'z tasdiqlangan rejasidan yozadi (reja yo'q bo'lsa — kutadi)
+    if (rejim()) {
+      for (const m of kodlar()) await bilan(m, async () => {
+        if (!weekly.currentPlan()) return;
+        try {
+          const n = await weekly.produceDue({ log, onDraft: sendForApproval });
+          if (n) await log(`🗓 Rejadan ${n} ta post yozildi.`);
+        } catch (e) { await log(`❌ Xato: ${e.message}`); }
+      });
+      return;
+    }
     // Tasdiqlangan haftalik reja bo'lsa — rejadagi yaqin postlar yoziladi, aks holda erkin izlanish
     if (weekly.currentPlan()) {
       const n = await weekly.produceDue({ log, onDraft: sendForApproval });
@@ -126,8 +171,8 @@ export async function dailyRun() {
 bot.command('rejalar', ctx => {
   if (!isAdmin(ctx)) return;
   const [a, b] = (ctx.match || '').trim().split(/\s+/);
-  const prefiks = MAHSULOTLAR[a?.toLowerCase()] ? a.toLowerCase() : '';
-  const sahifa = Number(prefiks ? b : a) || 1;
+  const prefiks = MAHSULOTLAR[a?.toLowerCase()] ? a.toLowerCase() : (joriy() || '');
+  const sahifa = Number(MAHSULOTLAR[a?.toLowerCase()] ? b : a) || 1;
   return ctx.reply(royxatMatni(prefiks, sahifa), { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
 });
 
@@ -139,10 +184,11 @@ bot.command('reja_post', async ctx => {
   const format = ['post', 'karusel', 'maqola', 'reels'].includes(fmt?.toLowerCase()) ? fmt.toLowerCase() : null;
   if (busy) return ctx.reply('⏳ Hozir ishlayapman, tugashini kuting.');
   busy = true;
-  await ctx.reply(`🚀 ${r.kod} · ${r.mahsulot}: "${r.sarlavha}" — yozishni boshladim. Jarayon log topigida.`);
-  produceDraft(rejaPlan(r, format), { log })
+  await ctx.reply(`🚀 ${r.kod} · ${r.mahsulot}: "${r.sarlavha}" — yozishni boshladim.${rejim() ? '' : ' Jarayon log topigida.'}`);
+  // Reja kodi qaysi mahsulotniki bo'lsa — o'sha mahsulot miyasi va topigi
+  bilan(rejim() ? r.kod.slice(0, 2) : joriy(), () => produceDraft(rejaPlan(r, format), { log })
     .then(d => sendForApproval(d))
-    .catch(e => log(`❌ ${r.kod}: ${e.message}`))
+    .catch(e => log(`❌ ${r.kod}: ${e.message}`)))
     .finally(() => { busy = false; });
 });
 
@@ -151,7 +197,7 @@ bot.command('reja_bankka', ctx => {
   const a = (ctx.match || '').trim().toLowerCase();
   const bor = new Set(store.ideas().map(i => (/^\[([a-z]{2}\d{2})\]/.exec(i.text) || [])[1]).filter(Boolean));
   let n = 0;
-  for (const r of royxat(MAHSULOTLAR[a] ? a : '')) {
+  for (const r of royxat(MAHSULOTLAR[a] ? a : (joriy() || ''))) {
     if (bor.has(r.kod)) continue;
     store.addIdea(goyaMatni(r));
     n++;
@@ -161,12 +207,13 @@ bot.command('reja_bankka', ctx => {
 });
 
 // Sozlash uchun: chat va topik ID'sini ko'rsatadi
-bot.command('id', ctx => ctx.reply(`chat_id: ${ctx.chat.id}\ntopic_id: ${ctx.message?.message_thread_id ?? '-'}\nsizning id: ${ctx.from.id}`));
+bot.command('id', ctx => (rejim() && ctx.chat.type !== 'private') ? undefined : ctx.reply(`chat_id: ${ctx.chat.id}\ntopic_id: ${ctx.message?.message_thread_id ?? '-'}\nsizning id: ${ctx.from.id}`));
 
 bot.command('start', ctx => ctx.reply(
   'Kontent zavod ishlayapti.\n/yangi — hozir g\'oya izlash va qoralama yozish\n/goya <mavzu> — berilgan mavzu bo\'yicha post\n' +
   '/maqola <mavzu> — Telegram maqolasi (sarlavha, ro\'yxat, jadval)\n/karusel <mavzu> — slaydli karusel\n' +
   '/rejalar [ka|qa|kf] — tayyor kontent reja (150 ta) · /reja_post qa07 — shu bo\'yicha post · /reja_bankka — g\'oyalar bankiga\n' +
+  (rejim() ? "Mahsulot rejimi: har mahsulot o'z xonasida — reja, qoralama, jarayon shu yerda. /jadval — chiqish kunlari\n" : '') +
   '/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n\"g\'oya: ...\" — g\'oyalar bankiga · /goyalar\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
 
 bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
@@ -265,17 +312,21 @@ const planKb = (id) => new InlineKeyboard()
   .text('✅ Rejani tasdiqlash', `pok:${id}`).row()
   .text('✏️ O\'zgartirish', `pedit:${id}`).text('🔄 Qayta tuzish', `pnew:${id}`);
 
-async function sendPlan(p, chatId = cfg.groupId, extra = { message_thread_id: cfg.approvalTopic }) {
+async function sendPlan(p, chatId = cfg.groupId, extra = { message_thread_id: tema(p.mahsulot || joriy()) }) {
   await sendLong(chatId, weekly.formatPlan(p), extra);
   if (p.status !== 'approved') await sendSafe(bot.api, chatId, `Rejani ko'rib chiqing. Tasdiqlasangiz, har post chiqishidan ~1 kun oldin yoziladi${weekly.autoMode() ? ' va o\'zi chiqadi (avto rejim)' : ' va tasdiqlashga keladi'}.`, { ...extra, reply_markup: planKb(p.id) });
 }
 
-export async function weeklyPlanRun() {
+// Mahsulot rejimida: topikdan chaqirilsa — shu mahsulot, jadval bo'yicha (cron) — hammasi
+export async function weeklyPlanRun(mlar = rejim() ? (joriy() ? [joriy()] : kodlar()) : [null]) {
   if (busy) return log('⏳ Haftalik reja keyinroq: hozir boshqa ish bajarilyapti. /reja_yangi bilan qayta urinib ko\'ring.');
   busy = true;
-  try { await sendPlan(await weekly.buildPlan(log)); }
-  catch (e) { await log(`⚠️ Haftalik reja tuzilmadi: ${e.message}`); }
-  finally { busy = false; }
+  try {
+    for (const m of mlar) await bilan(m, async () => {
+      try { await sendPlan(await weekly.buildPlan(log)); }
+      catch (e) { await log(`⚠️ Haftalik reja tuzilmadi: ${e.message}`); }
+    });
+  } finally { busy = false; }
 }
 
 async function producePlanned() {
@@ -290,15 +341,56 @@ async function producePlanned() {
 bot.command('reja', async ctx => {
   if (!isAdmin(ctx)) return;
   const p = weekly.lastDraftPlan() || weekly.currentPlan();
-  if (!p) return ctx.reply(`Hali reja yo'q. Har yakshanba 18:00 da o'zi tuziladi yoki hozir: /reja_yangi\nRubrikalar: /rubrikalar`);
+  if (rejim() && !joriy()) return ctx.reply("Rejani mahsulot xonasida so'rang.");
+  if (!p) return ctx.reply(`Hali reja yo'q. Har yakshanba 18:00 da o'zi tuziladi yoki hozir: /reja_yangi${rejim() ? `\nChiqish jadvali: /jadval` : `\nRubrikalar: /rubrikalar`}`);
   await sendPlan(p, ctx.chat.id, ctx.message?.message_thread_id ? { message_thread_id: ctx.message.message_thread_id } : {});
 });
 
 bot.command('reja_yangi', async ctx => {
   if (!isAdmin(ctx)) return;
   if (busy) return ctx.reply('⏳ Hozir ishlayapman, tugashini kuting.');
+  if (rejim() && !joriy()) return ctx.reply("Rejani mahsulot xonasida so'rang: 🤖 Kotib AI, 🎓 Qadam AI yoki ✍️ Kontent Fabrika.");
   await ctx.reply('🗓 Ertadan boshlab 7 kunlik reja tuzilmoqda (1–3 daqiqa)...');
   weeklyPlanRun();
+});
+
+// Mahsulotning kanalga chiqish jadvali: /jadval — ko'rish, /jadval Du 09:00, Chor 19:00 — o'rnatish
+bot.command('jadval', ctx => {
+  if (!isAdmin(ctx)) return;
+  if (!joriy()) return ctx.reply("Jadval har mahsulot uchun alohida — mahsulot xonasida yozing.");
+  const arg = (ctx.match || '').trim();
+  if (arg) {
+    const j = weekly.parseJadval(arg);
+    if (!j.length) return ctx.reply('Namuna: /jadval Du 09:00, Chor 09:00, Ju 19:00\nKunlar: Du Se Chor Pay Ju Sha Ya');
+    store.setMSetting('jadval', j);
+  }
+  return ctx.reply(`🗓 ${PROFIL[joriy()].belgi} ${PROFIL[joriy()].nom} — kanalga chiqish: ${weekly.formatJadval()} (haftasiga ${weekly.jadval().length} ta).\n` +
+    `O'zgartirish: /jadval Du 09:00, Chor 09:00, Ju 19:00\nKeyingi haftalik rejadan kuchga kiradi (hozir qayta tuzish: /reja_yangi).`);
+});
+
+// Birinchi ishga tushishda har mahsulot xonasiga qisqa yo'riqnoma va "Reja tuzish" tugmasi
+export async function salomlash() {
+  if (!rejim() || !cfg.groupId) return;
+  for (const m of kodlar()) await bilan(m, async () => {
+    if (store.mSetting('salom')) return;
+    const r = await bot.api.sendMessage(cfg.groupId,
+      `${PROFIL[m].belgi} <b>Kontent Fabrika endi shu xonada ishlaydi — faqat ${PROFIL[m].nom} uchun.</b>\n\n` +
+      `• Har yakshanba 18:00 da ${PROFIL[m].nom} bo'yicha haftalik reja keladi — ✅ tasdiqlaysiz.\n` +
+      `• Postlar chiqishidan bir kun oldin yoziladi va shu yerga qoralama bo'lib keladi: ✅ / ✏️ / ❌.\n` +
+      `• Jarayon ham shu yerda — bitta yangilanib boradigan xabarda.\n` +
+      `• <code>g'oya: ...</code> — shu mahsulot g'oyalar bankiga. /goyalar — ro'yxat.\n` +
+      `• /goya mavzu — hozir post · /jadval — kanalga chiqish kunlari (${weekly.formatJadval()}) · /hisobot\n\n` +
+      `Uslubingiz va qoidalaringiz uchala mahsulot uchun umumiy — kanal bitta ovozda gapiradi.`,
+      { parse_mode: 'HTML', message_thread_id: tema(m), reply_markup: new InlineKeyboard().text('🗓 Birinchi haftalik rejani tuzish', `mreja:${m}`) }).catch(e => { console.error('Salom:', e.message); return null; });
+    if (r) store.setMSetting('salom', true);
+  });
+}
+bot.callbackQuery(/^mreja:(\w+)$/, async ctx => {
+  if (!isAdmin(ctx)) return ctx.answerCallbackQuery({ text: 'Faqat rahbar' });
+  if (busy) return ctx.answerCallbackQuery({ text: 'Hozir band, biroz kuting' });
+  await ctx.answerCallbackQuery({ text: 'Reja tuzilmoqda (1–3 daqiqa)' });
+  await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text('🗓 Reja tuzilmoqda...', 'noop') }).catch(() => {});
+  return bilan(ctx.match[1], () => weeklyPlanRun([ctx.match[1]]));
 });
 
 bot.command('rubrikalar', ctx => {
@@ -391,7 +483,8 @@ async function sendLong(chatId, text, extra = {}) {
 }
 
 export async function weeklyReport(days = 7) {
-  await sendLong(cfg.groupId, await buildReport(days), { message_thread_id: cfg.logTopic });
+  if (!rejim()) return sendLong(cfg.groupId, await buildReport(days), { message_thread_id: cfg.logTopic });
+  for (const m of kodlar()) await bilan(m, async () => sendLong(cfg.groupId, await buildReport(days), { message_thread_id: tema(m) }));
 }
 
 bot.command('hisobot', async ctx => {
@@ -456,6 +549,7 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     return;
   }
   if (act === 'ok') {
+    if (d.status !== 'approved') store.addChoice(d, true);
     const planned = d.plannedAt && new Date(d.plannedAt).getTime() > Date.now() + 60e3 ? d.plannedAt : null;
     const nd = store.update(id, { status: 'approved', scheduledAt: d.status === 'approved' ? d.scheduledAt : planned || nextSlot() });
     await ctx.editMessageReplyMarkup({ reply_markup: schedKb(nd) }).catch(() => {});
@@ -484,6 +578,7 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     return ctx.answerCallbackQuery({ text: 'Navbatdan olindi' });
   }
   if (act === 'now') {
+    if (d.status !== 'approved') store.addChoice(d, true);
     const fb = await publish(bot.api, d);
     await mark('📢 Chiqdi');
     if (fb) await log(`⚠️ "${d.title}" maqola formatida chiqmadi, oddiy post bo'lib chiqdi: ${fb}`);
@@ -491,13 +586,16 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
   }
   if (act === 'no') {
     store.update(id, { status: 'rejected' });
+    store.addChoice(d, false);
     await mark('❌ Rad etildi');
-    return ctx.answerCallbackQuery();
+    await ctx.answerCallbackQuery();
+    // Sabab ixtiyoriy — yozilsa, tahrir izohi kabi doimiy qoidalarga ham tushadi
+    return ask(ctx, `❌ "${esc(d.title)}" rad etildi. Nega? Bir gap bilan yozing (ixtiyoriy) — keyingi safar shunga qarab yozaman.`, { kind: 'rad', id });
   }
   if (act === 'scr') {
     await ctx.answerCallbackQuery();
     return ctx.reply(`🎬 <b>Reels ssenariy</b>\n\n${esc(d.reels_script || 'Yo\'q')}`,
-      { parse_mode: 'HTML', message_thread_id: cfg.approvalTopic });
+      { parse_mode: 'HTML', message_thread_id: tema() });
   }
   if (act === 'edit') {
     await ctx.answerCallbackQuery();
@@ -533,7 +631,7 @@ bot.on('message:text', async ctx => {
   const replyTo = ctx.message.reply_to_message?.message_id;
   const w = replyTo && store.peekWait(replyTo);
   if (!w || !isAdmin(ctx)) return;
-  const opt = { message_thread_id: cfg.approvalTopic };
+  const opt = { message_thread_id: tema() };
   if (w.kind === 'plan') {
     store.takeWait(replyTo);
     await ctx.reply('🔄 Rejani qayta yozyapman...', opt);
@@ -570,6 +668,13 @@ bot.on('message:text', async ctx => {
       return sendForApproval(nd);
     } catch (e) { return ctx.reply(`⚠️ Muqova yasalmadi: ${e.message}`, opt); }
   }
+  if (w.kind === 'rad') {
+    store.takeWait(replyTo);
+    const c = store.choices().filter(x => x.title === d.title && !x.ok).at(-1);
+    if (c) { c.sabab = ctx.message.text.slice(0, 300); store.savePlans(); }
+    if (addFeedback(`Rad etildi: ${ctx.message.text}`, d) >= RULES_BATCH) refreshRules().catch(() => {});
+    return ctx.reply('👍 Tushundim, hisobga olaman.', opt);
+  }
   if (w.kind !== 'edit') return;
   store.takeWait(replyTo);
   // Izoh uslub xotirasiga: yetarlicha yig'ilsa — doimiy qoidalarga aylanadi (fonda)
@@ -579,7 +684,7 @@ bot.on('message:text', async ctx => {
       .catch(e => log(`⚠️ Qoidalar yangilanmadi: ${e.message}`));
   }
   const id = d.id;
-  await ctx.reply('🔄 Qayta yozyapman...', { message_thread_id: cfg.approvalTopic });
+  await ctx.reply('🔄 Qayta yozyapman...', { message_thread_id: tema() });
   try {
     const r = await revise(d, ctx.message.text);
     r.post_html = ensureLink(ensureCode(r.post_html, d.cta_kod), d.plan?.cta_havola, d.plan?.cta_matn);
@@ -604,7 +709,7 @@ bot.on(['message:photo', 'message:document'], async ctx => {
   if (!w || w.kind !== 'image' || !isAdmin(ctx)) return;
   const d = store.get(w.id);
   if (!d) return store.takeWait(replyTo);
-  const opt = { message_thread_id: cfg.approvalTopic };
+  const opt = { message_thread_id: tema() };
   const doc = ctx.message.document;
   if (doc && !/^image\/(jpeg|png|webp)$/.test(doc.mime_type || '')) return ctx.reply('Faqat rasm (JPG/PNG) yuboring.', opt);
   const fileId = doc ? doc.file_id : ctx.message.photo.at(-1).file_id; // eng katta o'lcham

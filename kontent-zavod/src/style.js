@@ -1,5 +1,6 @@
 import { store } from './store.js';
 import { BRAND } from './brand.js';
+import { mahsulotQatlami } from './mahsulot.js';
 
 // Uslub xotirasi: rahbarning namuna postlari, ulardan chiqarilgan uslub tavsifi
 // va tahrir izohlaridan yig'ilgan doimiy qoidalar. Hamma agentlar brand() orqali oladi.
@@ -29,7 +30,17 @@ export function brand() {
   let out = BRAND;
   if (st.guide) out += `\nMUALLIF USLUBI (namuna postlardan o'rganilgan — shunga qat'iy amal qil):\n${st.guide}\n`;
   if (st.rules.length) out += `\nRAHBARNING DOIMIY QOIDALARI (tahrirlardan yig'ilgan — buzma):\n${st.rules.map((r, i) => `${i + 1}. ${r}`).join('\n')}\n`;
-  return out;
+  return out + mahsulotQatlami() + tanlovlar();
+}
+
+// Rahbar nimani tasdiqlaydi va nimani rad etadi — reja va matn shunga moslashadi
+export function tanlovlar(n = 10) {
+  const c = store.choices();
+  const ok = c.filter(x => x.ok).slice(-n), rad = c.filter(x => !x.ok).slice(-n);
+  if (!ok.length && !rad.length) return '';
+  return `\nRAHBAR TANLOVLARIDAN O'RGAN:` +
+    (ok.length ? `\n- Tasdiqlagan postlari (shu ruhdagi mavzu va formatlarni ko'proq): ${ok.map(x => `"${x.title}" (${x.format})`).join('; ')}` : '') +
+    (rad.length ? `\n- Rad etganlari (bunaqasini takrorlama${rad.some(x => x.sabab) ? ', sababiga e\'tibor ber' : ''}): ${rad.map(x => `"${x.title}"${x.sabab ? ` — ${x.sabab}` : ''}`).join('; ')}` : '') + '\n';
 }
 
 // Mavzuga eng yaqin namuna postlar (so'z mosligi bo'yicha) — kopirayterga "shunday yoz" misoli

@@ -1,4 +1,5 @@
 import { store } from './store.js';
+import { joriy } from './mahsulot.js';
 
 // Rejalashtiruvchi va strateg uchun: o'tgan postlar natijasi (reaksiyalar) va rahbarning g'oyalari
 
@@ -9,7 +10,7 @@ const MIN_POSTS = 5;
 export function performanceSummary(days = 60) {
   const since = Date.now() - days * 864e5;
   const posts = store.byStatus('published')
-    .filter(d => d.channel_msg_ids?.length && new Date(d.publishedAt).getTime() >= since)
+    .filter(d => d.channel_msg_ids?.length && new Date(d.publishedAt).getTime() >= since && (!joriy() || d.mahsulot === joriy()))
     .map(d => ({ d, r: reactions(d) }));
   if (posts.length < MIN_POSTS) return '';
   const avg = (key) => {
