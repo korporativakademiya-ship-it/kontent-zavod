@@ -722,4 +722,41 @@ bot.on(['message:photo', 'message:document'], async ctx => {
   } catch (e) { await ctx.reply(`⚠️ Rasm saqlanmadi: ${e.message}`, opt); }
 });
 
+// ---------- Zaxira ----------
+// Har kuni butun baza egasiga shaxsiy chatda (jim) fayl bo'lib keladi. Tiklash: faylga reply qilib /tiklash.
+const zaxiraNomi = () => `kontent-zaxira-${new Date(Date.now() + cfg.tzOffsetH * 3600e3).toISOString().slice(0, 10)}.json`;
+const zaxiraIzoh = (izoh = '') => `🗄 Kontent Fabrika zaxirasi${izoh}\nUslub, qoidalar, g'oyalar, rejalar, qoralamalar.\nTiklash: shu faylga reply qilib /tiklash yozing (shaxsiy chatda).`;
+export async function zaxira(izoh = '') {
+  const fayl = () => new InputFile(Buffer.from(store.snapshot()), zaxiraNomi());
+  for (const id of cfg.admins.slice(0, 1)) {
+    try { await bot.api.sendDocument(id, fayl(), { caption: zaxiraIzoh(izoh), disable_notification: true }); return true; }
+    catch (e) {
+      // Egasi botga shaxsiy chatda hali /start bosmagan — zaxira Kontent Fabrika xonasiga (jim)
+      if (!cfg.groupId) throw e;
+      await bot.api.sendDocument(cfg.groupId, fayl(), { caption: zaxiraIzoh(izoh) + "\n(Shaxsiy chatga yubora olmadim — botga shaxsiy chatda /start bosing.)", disable_notification: true, message_thread_id: rejim() ? topigi('kf') ?? tema() : cfg.logTopic });
+      return true;
+    }
+  }
+  return false;
+}
+bot.command('zaxira', async ctx => {
+  if (!isAdmin(ctx)) return;
+  try { await zaxira(); if (ctx.chat.type !== 'private') await ctx.reply('🗄 Zaxira yuborildi.'); }
+  catch (e) { await ctx.reply(`⚠️ Zaxira yuborilmadi: ${e.message}`); }
+});
+bot.command('tiklash', async ctx => {
+  if (!isAdmin(ctx) || ctx.chat.type !== 'private') return;
+  const doc = ctx.message.reply_to_message?.document;
+  if (!doc || !/\.json$/i.test(doc.file_name || '')) return ctx.reply("Zaxira fayliga (kontent-zaxira-….json) reply qilib /tiklash yozing.");
+  try {
+    const f = await bot.api.getFile(doc.file_id);
+    const res = await fetch(`${API_ROOT}/file/bot${cfg.botToken}/${f.file_path}`);
+    if (!res.ok) throw new Error(`fayl yuklanmadi (${res.status})`);
+    const obj = JSON.parse(await res.text());
+    await zaxira(' — tiklashdan OLDINGI holat (kerak bo\'lsa qaytarish uchun)');
+    const r = store.restore(obj);
+    await ctx.reply(`✅ Tiklandi: ${r.ideas} ta g'oya, ${r.plans} ta reja, ${r.drafts} ta qoralama, ${r.rules} ta qoida, ${r.samples} ta namuna post.`);
+  } catch (e) { await ctx.reply(`⚠️ Tiklanmadi: ${e.message}`); }
+});
+
 bot.catch(err => console.error('Bot xatosi:', err.error?.message || err));

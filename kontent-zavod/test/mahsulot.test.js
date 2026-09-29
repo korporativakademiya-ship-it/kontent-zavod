@@ -65,3 +65,13 @@ test('owner choices are remembered per product and shown to agents', () => {
   });
   bilan('ka', () => assert.doesNotMatch(brand(), /Onboarding checklist/));
 });
+
+test('backup snapshot restores the whole brain', () => {
+  const snap = JSON.parse(store.snapshot());
+  const n = snap.ideas.length;
+  bilan('qa', () => store.addIdea('Zaxiradan keyin qo‘shilgan'));
+  assert.throws(() => store.restore({ foo: 1 }), /zaxirasi emas/);
+  const r = store.restore(snap);
+  assert.equal(r.ideas, n);
+  assert.ok(!store.ideas().some(i => i.text.includes('Zaxiradan keyin')));
+});

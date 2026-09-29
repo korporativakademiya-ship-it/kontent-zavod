@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { cfg } from './config.js';
-import { bot, dailyRun, log, weeklyReport, weeklyPlanRun, salomlash } from './bot.js';
+import { bot, dailyRun, log, weeklyReport, weeklyPlanRun, salomlash, zaxira } from './bot.js';
 import { publishDue } from './publisher.js';
 
 // Har kuni g'oya izlash
@@ -9,6 +9,8 @@ cron.schedule(cfg.dailyCron, dailyRun, { timezone: cfg.tz });
 cron.schedule(cfg.planCron, weeklyPlanRun, { timezone: cfg.tz });
 // Haftalik hisobot (standart: dushanba 09:00)
 cron.schedule(cfg.reportCron, () => weeklyReport(7).catch(e => log(`⚠️ Hisobot xatosi: ${e.message}`)), { timezone: cfg.tz });
+// Kunlik zaxira (Toshkent 03:15) — egasiga shaxsiy chatda jim fayl
+cron.schedule(process.env.BACKUP_CRON || '15 3 * * *', () => zaxira().catch(e => log(`⚠️ Zaxira yuborilmadi: ${e.message}`)), { timezone: cfg.tz });
 // Har daqiqada vaqti kelgan postlarni kanalga chiqarish
 cron.schedule('* * * * *', () => publishDue(bot.api, log), { timezone: cfg.tz });
 

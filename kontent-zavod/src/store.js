@@ -70,5 +70,14 @@ export const store = {
   },
   choices: () => (db.choices || []).filter(c => !joriy() || c.mahsulot === joriy()),
   saveStyle(patch = {}) { Object.assign(this.style(), patch); save(); return db.style; },
+  // Zaxira: butun baza (uslub, qoidalar, g'oyalar, rejalar, qoralamalar) bitta JSON
+  snapshot: () => JSON.stringify(db, null, 1),
+  restore(obj) {
+    if (!obj || typeof obj !== 'object' || !Array.isArray(obj.drafts) || !Array.isArray(obj.ideas) || typeof obj.style !== 'object')
+      throw new Error("bu Kontent Fabrika zaxirasi emas");
+    db = { drafts: [], usedTitles: [], waits: {}, style: {}, plans: [], rubrics: null, settings: {}, ideas: [], mahsulot: {}, ...obj };
+    save();
+    return { drafts: db.drafts.length, ideas: db.ideas.length, plans: db.plans.length, rules: db.style?.rules?.length || 0, samples: db.style?.samples?.length || 0 };
+  },
   takeWait(msgId) { const w = db.waits[msgId]; if (w) { delete db.waits[msgId]; save(); } return w; }
 };
