@@ -1,5 +1,7 @@
 import { store } from './store.js';
-import { TURLAR } from './agents/kontent.js';
+import { cfg } from './config.js';
+import { topikdan, topiklar as topiklarEnv } from './mahsulot.js';
+import { TURLAR, YONALISHLAR } from './agents/kontent.js';
 
 // Rahbar bilan Telegram suhbati (n8n bot orqali): har chatning bosqichi eslab qolinadi,
 // tasdiqlash — xabardagi tugmalar, tuzatish — oddiy xabar. Forma yo'q.
@@ -9,44 +11,34 @@ import { TURLAR } from './agents/kontent.js';
 // Javob: { xabarlar: [{ matn, klaviatura: null|'tz'|'matn'|'joyla' }], keyingi: null|{ tur, draft_id, ... } }
 
 const BAND_MS = 10 * 60e3;
-const ISHLAB_MS = 25 * 60e3; // rasm/video yasash uzoqroq davom etadi
-const kalit = (chatId) => `suhbat:${chatId}`;
+const ISHLAB_MS = 40 * 60e3; // rasm/video yasash uzoqroq davom etadi (uzun video — 10–20 daqiqa)
+const kalit = (chatId) => `suhbat:${chatId}`; // guruhda chatId = "guruh:topik" — har topikning o'z suhbati
 const holat = (chatId) => store.setting(kalit(chatId), { bosqich: 'bosh' });
 const saqla = (chatId, h) => store.setSetting(kalit(chatId), { ...h, at: Date.now() });
 
 const YORDAM = `Salom! Men kontent bo'limingizman.
 
-• G'oya yozing — prodyuser TZ tayyorlaydi
-• goyalar — hozir 5 ta g'oya · 1–5 — dayjestdan tanlash
-• kanal: @nom — nima uchun · kanallar · kanal o'chir: @nom
-• uslub — @kanalingizdagi postlardan uslubingizni qayta o'rganish
-• bekor — joriy ishni to'xtatish
+• G'oya yozing — TZ tayyorlayman (tur TZ da kelishiladi)
+• goyalar — shu topik uchun yangi g'oyalar · 1, 2… — tanlash
+• topik: ka / qa / kf / brend — topikni yo'nalishga bog'lash
+• kanal: @nom · kanallar · uslub · bekor
 
-Tasdiqlash — xabar ostidagi tugmalar bilan, tuzatish — oddiy xabar bilan.`;
+Tasdiqlash — tugmalar, tuzatish — oddiy xabar.`;
 
 const q = (v) => (Array.isArray(v) ? v.filter(Boolean).join('; ') : v || '—');
 const ro = (v) => (Array.isArray(v) ? v.filter(Boolean).map(x => `  • ${x}`).join('\n') : `  ${v || '—'}`);
 
+const qisqa = (v, n = 140) => { const x = String(q(v)); return x.length > n ? `${x.slice(0, n - 1)}…` : x; };
 export function tzMatni(t) {
-  return `💬 ${t.taklif}
-
-📋 ${t.sarlavha}
-🎯 Strategiya: ${q(t.strategiya)}
-📦 Mahsulot: ${t.mahsulot}
-👥 Auditoriya: ${q(t.auditoriya)}
-🧩 Kontent turi: ${TURLAR[t.kontent_turi]?.nom || t.kontent_turi}
-🗂 Rubrika: ${q(t.rubrika)} · Format: ${q(t.format)}
-🪝 Ilmoq: ${q(t.ilmoq)}${(t.ilmoq_variantlari || []).length ? `\n   muqobil: ${q(t.ilmoq_variantlari)}` : ''}
-🧱 Tuzilma:
-${ro(t.tuzilma)}
-💡 Asosiy fikr: ${q(t.asosiy_fikr)}
-📎 Dalil: ${q(t.dalil)}
-📣 CTA: ${q(t.cta?.matn)}${t.cta?.kod ? ` (kod: ${t.cta.kod})` : ''}
-🚫 Taqiqlar: ${q(t.taqiqlar)}
-⚠️ Xavflar:
-${ro(t.xavflar)}
-
-✅ — tasdiqlash · ✏️ — tuzatish (yoki shunchaki tuzatishingizni yozing)`.slice(0, 4000);
+  const yon = YONALISHLAR[t.mahsulot] || t.mahsulot;
+  return [
+    `💬 ${qisqa(t.taklif, 400)}`,
+    `📋 ${t.sarlavha}\n🧩 ${TURLAR[t.kontent_turi]?.nom || t.kontent_turi} · ${yon} · ${qisqa(t.rubrika, 40)}`,
+    `🎯 ${qisqa(t.strategiya)}\n👥 ${qisqa(t.auditoriya)}\n🪝 ${qisqa(t.ilmoq)}`,
+    `🧱 ${qisqa((t.tuzilma || []).map(x => String(x).replace(/^\d+-qism:\s*/i, '')).join(' → '), 300)}`,
+    `💡 ${qisqa(t.asosiy_fikr)}\n📎 ${qisqa(t.dalil, 100)}\n📣 ${qisqa(t.cta?.matn, 100)}${t.cta?.kod ? ` (${t.cta.kod})` : ''}\n🚫 ${qisqa(t.taqiqlar, 100)}`,
+    (t.xavflar || []).length ? `⚠️ ${qisqa(t.xavflar, 220)}` : '',
+  ].filter(Boolean).join('\n\n').slice(0, 4000);
 }
 
 const tanqidMatni = (t) => `🧐 Tanqidchi: ${t.baho}/10
@@ -75,9 +67,29 @@ export async function suhbat(sorov, k) {
   }
 }
 
-async function ichki({ chatId, text = '', tugma = '', hodisa = '', draft_id = '', xato = '' }, k) {
+const TOPIK_NOM = { ka: 'ka', kotib: 'ka', qa: 'qa', qadam: 'qa', kf: 'kf', fabrika: 'kf', kontent: 'kf', brend: 'umumiy', shaxsiy: 'umumiy', umumiy: 'umumiy' };
+
+// Topik → yo'nalish: "topik: ..." bilan bog'langan, aks holda PRODUCT_TOPICS (ofis guruhi); shaxsiy chat — shaxsiy brend
+function yonalish(guruh, thread) {
+  if (!thread) return 'umumiy';
+  const b = store.setting('suhbat_topiklar', {})[`${guruh}:${thread}`];
+  if (b) return b;
+  return String(guruh) === String(cfg.groupId) ? topikdan(thread) : null;
+}
+
+async function ichki({ chatId: guruh, thread = '', text = '', tugma = '', hodisa = '', draft_id = '', xato = '', kino = false }, k) {
   const t = String(text || '').trim();
   const kichik = t.toLowerCase().replace(/[ʻ‘’`]/g, "'");
+  const chatId = thread ? `${guruh}:${thread}` : guruh;
+  const tk = /^topik\s*:\s*(\S+)/.exec(kichik);
+  if (tk) {
+    const y = TOPIK_NOM[tk[1]];
+    if (!y || !thread) return { xabarlar: [xab(thread ? "Yo'nalish: ka (Kotib AI) · qa (Qadam AI) · kf (Kontent Fabrika) · brend (shaxsiy brend)" : 'Bu buyruq guruh topigida ishlaydi.')] };
+    store.setSetting('suhbat_topiklar', { ...store.setting('suhbat_topiklar', {}), [`${guruh}:${thread}`]: y });
+    return { xabarlar: [xab(`✅ Bu topik — ${YONALISHLAR[y]}. G'oya yozing yoki "goyalar".`)] };
+  }
+  const yon = yonalish(guruh, thread);
+  if (!yon && !hodisa) return { xabarlar: [xab("Bu topik qaysi yo'nalish uchun? Yozing: topik: ka · qa · kf · brend")] };
   let h = holat(chatId);
 
   // Buyruqlar — istalgan bosqichda
@@ -101,7 +113,7 @@ async function ichki({ chatId, text = '', tugma = '', hodisa = '', draft_id = ''
     return { xabarlar: [xab(`✍️ @${r.kanal} dan ${r.qoshildi} ta post o'rganildi (jami namunalar: ${r.jami}).\n\n${r.guide}`)] };
   }
   if (/^(g'?oyalar|goyalar)$/.test(kichik)) {
-    const r = await k.kunlikGoyalar({ soni: 5 });
+    const r = await k.kunlikGoyalar({ soni: thread ? 3 : 5, mahsulot: yon });
     return { xabarlar: [xab(k.dayjestMatni(r))] };
   }
 
@@ -166,15 +178,17 @@ async function ichki({ chatId, text = '', tugma = '', hodisa = '', draft_id = ''
       // Uzun maqola/karusel Telegram xabariga sig'maydi — kesilgan matnni tuzatib yuborsa, oxiri yo'qolardi
       if (matn.length > TAHRIR_MAX) return { xabarlar: [xab(`✏️ Matn juda uzun (${matn.length} belgi) — Telegramda to'liq tuzatib bo'lmaydi. 🔄 bosib nimani o'zgartirishni yozing, men qayta yozaman.`, 'matn')] };
       saqla(chatId, { ...h, bosqich: 'matn_tahrir' });
-      return { xabarlar: [xab("✏️ Matnni nusxa oling, tuzating va to'liq holda yuboring:"), xab(matn)] };
+      const nima = ['reels', 'video'].includes(h.kontent_turi) ? "✏️ OPISANIYE ni nusxa oling, tuzating va yuboring (ssenariy va subtitrni 🔄 izoh bilan o'zgartiraman):" : "✏️ Matnni nusxa oling, tuzating va to'liq holda yuboring:";
+      return { xabarlar: [xab(nima), xab(matn)] };
     }
     if (tugma === 'm_izoh') { saqla(chatId, { ...h, bosqich: 'matn_izoh' }); return { xabarlar: [xab('🔄 Izohingizni yozing — shunga qarab qayta yozaman.')] }; }
     if (tugma === 'm_ok') {
       await band(() => k.tasdiq({ draft_id: h.draft_id, variant: h.variant || 0 }));
-      if (h.kontent_turi === 'reels' || h.kontent_turi === 'matn+rasm') {
-        const ic = await band(() => k.ishlabChiqarish({ draft_id: h.draft_id, variant: h.variant || 0 }));
+      if (['reels', 'video', 'matn+rasm'].includes(h.kontent_turi)) {
+        const ic = await band(() => k.ishlabChiqarish({ draft_id: h.draft_id, variant: h.variant || 0, kino }));
         saqla(chatId, { ...h, bosqich: 'ishlab', band: Date.now() });
-        return { xabarlar: [xab(h.kontent_turi === 'reels' ? '🏭 Matn tasdiqlandi. Rejissyor va prompt muhandisi tayyor — rasm, ovoz va video yasalyapti (3–5 daqiqa)…' : '🏭 Matn tasdiqlandi. Rasm chizilyapti…')],
+        return { xabarlar: [xab(h.kontent_turi === 'matn+rasm' ? '🏭 Matn tasdiqlandi. Rasm chizilyapti…'
+          : `🏭 Matn tasdiqlandi. Rejissyor sahnalarni tayyorladi — ovoz yozilyapti va video yig'ilyapti (${h.kontent_turi === 'video' ? '10–20' : '3–6'} daqiqa)…`)],
           keyingi: { ...ic, draft_id: h.draft_id } };
       }
       let tq;
@@ -207,7 +221,7 @@ async function ichki({ chatId, text = '', tugma = '', hodisa = '', draft_id = ''
       return { xabarlar: [xab(`☝️ Hozir boshqa post ustida ishlayapmiz. Avval uni tugating (tugmalar bilan) yoki "bekor" deb yozing — keyin ${t}-g'oyani tanlaysiz.`)] };
   }
   if (h.bosqich === 'tz' || h.bosqich === 'tz_tuzatish') {
-    const tz = await band(() => k.prodyuser(h.goya, { izoh: t, oldingi: h.tz }));
+    const tz = await band(() => k.prodyuser(h.goya, { izoh: t, oldingi: h.tz, mahsulot: yon }));
     return tzYubor(tz);
   }
   if (h.bosqich === 'matn' || h.bosqich === 'matn_tahrir' || h.bosqich === 'matn_izoh') {
@@ -215,7 +229,7 @@ async function ichki({ chatId, text = '', tugma = '', hodisa = '', draft_id = ''
     if (h.bosqich === 'matn' && /^\d{1,2}$/.test(t)) {
       const v = Number(t) - 1;
       saqla(chatId, { ...h, variant: v });
-      return { xabarlar: [xab(`🎬 ${v + 1}-variant tanlandi. ✅ bosing yoki izoh yozing.`, 'matn')] };
+      return { xabarlar: [xab(k.korinish(d, v), 'matn')] };
     }
     // Tuzatilgan to'liq matn faqat "✏️ O'zim tuzataman" dan keyin qabul qilinadi; boshqa hollarda yozilgani — izoh
     const r = await band(() => k.tasdiq(h.bosqich === 'matn_tahrir'
@@ -244,8 +258,23 @@ async function ichki({ chatId, text = '', tugma = '', hodisa = '', draft_id = ''
 
   // Yangi g'oya: dayjest raqami yoki matn
   let goya = t;
-  if (/^\d{1,2}$/.test(t)) goya = k.goyaTanla({ n: Number(t) }).goya;
+  if (/^\d{1,2}$/.test(t)) goya = k.goyaTanla({ n: Number(t), mahsulot: yon }).goya;
   h = { bosqich: 'bosh', goya };
-  const tz = await band(() => k.prodyuser(goya));
+  const tz = await band(() => k.prodyuser(goya, { mahsulot: yon }));
   return tzYubor(tz);
 }
+
+// Har kuni ertalab: har bog'langan topikka o'z g'oyalari (n8n har xabarni o'z topigiga yuboradi)
+export async function kunlikTarqat(k) {
+  const topiklar = new Map();
+  if (cfg.groupId) for (const [m, thr] of Object.entries(topiklarEnv())) topiklar.set(`${cfg.groupId}:${thr}`, m);
+  for (const [kal, y] of Object.entries(store.setting('suhbat_topiklar', {}))) topiklar.set(kal, y);
+  const xabarlar = [];
+  for (const [kal, y] of topiklar) {
+    const i = kal.lastIndexOf(':'), chatId = kal.slice(0, i), thread = kal.slice(i + 1);
+    try { xabarlar.push({ chatId, thread, matn: k.dayjestMatni(await k.kunlikGoyalar({ soni: 3, mahsulot: y })) }); }
+    catch (e) { xabarlar.push({ chatId, thread, matn: `⚠️ Bugungi g'oyalar tayyorlanmadi: ${String(e.message).slice(0, 200)}` }); }
+  }
+  return xabarlar;
+}
+

@@ -1,7 +1,7 @@
 // Odamdek yozish: AI matnining tipik belgilaridan qochish. Kopirayter, maqola muallifi va ssenariychi uchun umumiy.
 export const TABIIY = `
 ODAMDEK YOZ (AI matniga o'xshamasin):
-- Muallifning o'zi gapirayotgandek yoz: "men", o'z tajribasi, ko'rgan vaziyati, aniq odam va biznes (dorixona, do'kon, o'quv markaz).
+- Muallifning o'zi gapirayotgandek yoz: "men", o'z tajribasi, ko'rgan vaziyati, aniq odam va vaziyat (soha har safar boshqa yoki umuman aytilmaydi — bitta sohani takrorlama).
 - Gap uzunligini aralashtir: qisqa gap, keyin o'rtacha, ba'zan bitta so'z. Hamma gap bir xil ritmda bo'lmasin.
 - Og'zaki, jonli o'zbekcha: kundalik so'zlar, ba'zan savol, ba'zan hazil. Kitobiy va rasmiy iboralar yo'q.
 - Ta'rif va shior bilan emas, misol bilan tushuntir: "tizim — bu …" deb emas, "kecha bir do'kon egasi …" deb.
