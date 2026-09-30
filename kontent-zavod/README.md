@@ -122,6 +122,10 @@ faqat fakt tekshiruvi) → rahbar tasdiqlaydi, o'zi tuzatadi (farq uslub xotiras
 ishlab chiqarish (reels: rejissyor + **prompt muhandisi** — rasm, o'zbekcha TTS matni va rejissurasi, video prompti; matn+rasm: rasm) →
 **Tanqidchi** tayyor postni baholaydi va saboq yozadi (keyingi TZ va matnlar shunga tayanadi) → **kanalga navbat** (`nextSlot`/`parseTime`).
 Qoralamalar `status: 'n8n'` bilan saqlanadi, joylanganda `approved` bo'ladi va nashriyotchi chiqaradi.
+Rahbar bilan suhbat — `src/suhbat.js` (`POST /api/suhbat`): har chatning bosqichi eslab qolinadi, tasdiqlash — xabardagi tugmalar
+(✅ / ✏️ / 🔄 / 🛑), tuzatish — oddiy xabar (uzun xabar — rahbar tuzatgan matn, qisqasi — izoh). Buyruqlar: `goyalar`, `1`–`5`, `kanal: …`,
+`kanallar`, `uslub` (rahbar kanalidan — `USLUB_KANAL` — postlarni o'qib uslubni qayta o'rganadi), `bekor`.
+Odamdek yozish qoidalari (AI iboralari taqiqi) — `src/tabiiy.js`, kopirayter, maqola va ssenariychida.
 Kuzatiladigan kanallar: n8n botga `kanal: @nom — nima uchun`, `kanallar`, `kanal o'chir: @nom`. Telegram ochiq kanallari `t.me/s/<nom>`
 dan o'qiladi; Instagram ro'yxatda saqlanadi, Meta Business Discovery ulanganda o'qiladi.
 

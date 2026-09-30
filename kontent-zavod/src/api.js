@@ -21,6 +21,7 @@ import { timingSafeEqual } from 'node:crypto';
 //   POST /api/goyalar/kunlik    {soni?}                   → kanallar + internet → g'oyalar
 //   POST /api/goyalar/tanla     {n}
 //   POST /api/kanallar          {amal: qosh|ochir|royxat, kanal?, izoh?}
+//   POST /api/suhbat            {chatId, text?, tugma?, hodisa?} → rahbar bilan suhbat (src/suhbat.js)
 //   GET  /api/health
 
 const MAX_BODY = 1024 * 1024;
@@ -88,6 +89,8 @@ export function apiYarat({ kalit = process.env.N8N_API_KALIT || '', agentlar, lo
     'POST /api/kontent/joyla': async (b) => agentlar.kontent.joyla(b),
     'POST /api/goyalar/kunlik': async (b) => agentlar.kontent.kunlikGoyalar({ soni: Math.min(10, Math.max(1, Number(b.soni) || 5)) }),
     'POST /api/goyalar/tanla': async (b) => agentlar.kontent.goyaTanla(b),
+    'POST /api/suhbat': async (b) => agentlar.suhbat({ chatId: String(b.chatId || ''), text: typeof b.text === 'string' ? b.text.slice(0, 6000) : '',
+      tugma: typeof b.tugma === 'string' ? b.tugma.slice(0, 40) : '', hodisa: typeof b.hodisa === 'string' ? b.hodisa : '' }),
     'POST /api/kanallar': async (b) => {
       const k = agentlar.kuzatuv;
       const list = b.amal === 'qosh' ? k.kanalQosh(matn(b.kanal, 'kanal', 200), b.izoh || '')

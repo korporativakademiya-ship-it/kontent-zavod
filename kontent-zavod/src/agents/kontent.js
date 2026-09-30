@@ -127,22 +127,35 @@ function rasmPath(id) {
 
 const matnRejimi = (d) => (d.format === 'maqola' || d.format === 'karusel') ? d.article_html : d.post_html;
 
-// Rahbarga ko'rinish (Telegram uchun oddiy matn)
+const toza = (h = '') => String(h).replace(/<br\s*\/?>|<\/(p|li|h\d|blockquote|div|tr)>/gi, '\n').replace(/<li[^>]*>/gi, '• ')
+  .replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+  .replace(/\n{3,}/g, '\n\n').trim();
+
+export const qoralama = (id) => store.get(String(id || ''));
+// Rahbar nusxa olib tuzatadigan asosiy matn
+export const tozaMatn = (d) => (!d ? '' : toza((d.format === 'maqola' || d.format === 'karusel') ? d.article_html : d.post_html));
+
+// Rahbarga ko'rinish (Telegram uchun oddiy matn): qism nomlari aniq — nima qayerga chiqishi ko'rinsin
 export function korinish(d) {
-  const toza = (h = '') => String(h).replace(/<br\s*\/?>|<\/(p|li|h\d|blockquote|div|tr)>/gi, '\n').replace(/<li[^>]*>/gi, '• ')
-    .replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
-    .replace(/\n{3,}/g, '\n\n').trim();
+  const turi = d.kontent_turi;
   const slaydlar = (d.slides || []).map((s, i) => `${i + 1}) ${[s.kicker, s.title, s.text, s.accent, s.num, s.label, ...(s.items || [])].filter(Boolean).join(' · ')}`).join('\n');
-  const ss = d.reels?.ssenariy;
-  const reelsMatn = ss ? (ss.sahnalar || []).map((x, i) => `${i + 1}) 🎙 ${x.ovoz}\n   🖥 ${x.ekran}`).join('\n') + `\n📣 🎙 ${ss.yakun?.ovoz || ''}\n   🖥 ${ss.yakun?.ekran || ''}` : '';
+  const vlar = d.reels?.variantlar || [];
+  const reelsMatn = vlar.map((v, k) => {
+    const ss = v.ssenariy || {};
+    const sahna = (ss.sahnalar || []).map((x, i) => `${i + 1}) 🎙 ${x.ovoz}\n   🖥 ${x.ekran}`).join('\n');
+    const bosh = vlar.length > 1 ? `— ${k + 1}-variant (${v.nom}, ⭐ ${v.tanqid?.baho ?? '?'}/10)\n` : '';
+    return `${bosh}${sahna}\n📣 🎙 ${ss.yakun?.ovoz || ''}\n   🖥 ${ss.yakun?.ekran || ''}`;
+  }).join('\n\n');
+  const postNomi = turi === 'reels' ? '📝 POST MATNI (video ostiga chiqadi)' : turi === 'karusel' ? '📝 QISQA POST' : '📝 POST MATNI (kanalga chiqadi)';
   return [
-    `✍️ ${TURLAR[d.kontent_turi]?.nom || d.format}: ${d.title}`,
-    toza(d.post_html),
-    d.article_html && d.format !== 'post' ? `━━━ Maqola/karusel matni:\n${toza(d.article_html).slice(0, 1500)}` : '',
-    slaydlar ? `━━━ Slaydlar:\n${slaydlar}` : '',
-    reelsMatn ? `━━━ Reels ssenariy:\n${reelsMatn}` : '',
+    `✍️ ${TURLAR[turi]?.nom || d.format}: ${d.title}`,
+    `${postNomi}:\n${toza(d.post_html)}`,
+    d.article_html && d.format !== 'post' ? `📰 ${turi === 'karusel' ? 'KARUSEL MATNI' : 'MAQOLA'}:\n${toza(d.article_html).slice(0, 1500)}` : '',
+    slaydlar ? `🎠 SLAYDLAR:\n${slaydlar}` : '',
+    reelsMatn ? `🎬 VIDEO SSENARIYSI (🎙 diktor · 🖥 ekrandagi yozuv):\n${reelsMatn}${vlar.length > 1 ? '\n\nVariantni tanlash uchun raqamini yozing (1, 2…).' : ''}` : '',
     d.notes ? `ℹ️ ${d.notes}` : '',
-  ].filter(Boolean).join('\n\n').slice(0, 3900);
+    `✅ — tasdiqlash · ✏️ — o'zim tuzataman · 🔄 — izoh bilan qayta yozish (yoki shunchaki yozing)`,
+  ].filter(Boolean).join('\n\n').slice(0, 4000);
 }
 
 // Muallif: TZ bo'yicha yozadi (rahbar tekshiruvidan qayta yozish yo'q — faqat fakt tekshiruvi)
@@ -178,9 +191,11 @@ export async function muallif(tz) {
 
 // Rahbar qarori: tasdiq / o'zi tuzatgan matn / izoh bilan qayta yozish. Tahrir uslub xotirasiga yoziladi.
 export async function tasdiq({ draft_id, qaror = 'tasdiq', matn = '', izoh = '' }) {
+  qaror = String(qaror || 'tasdiq');
   const d = store.get(String(draft_id || ''));
   if (!d) throw xato('qoralama topilmadi', 404);
   return bilan(mKod(d.mahsulot), async () => {
+    if (qaror === 'qayta' && !String(izoh).trim() && String(matn).trim()) qaror = 'tasdiq'; // matnni o'zi tuzatgan
     if (qaror === 'qayta') {
       if (!String(izoh).trim()) throw xato('qayta yozish uchun izoh kerak');
       addFeedback(String(izoh).trim(), d);
@@ -250,11 +265,13 @@ JSON: {"baho":1-10,"kuchli":["..."],"zaif":["..."],"saboq":"keyingi kontentlar u
 }
 
 // Kanalga joylash: Fabrika nashriyotchisi belgilangan vaqtda chiqaradi
-export function joyla({ draft_id, vaqt = '' }) {
+export function joyla({ draft_id, vaqt = '', qatiy = false }) {
   const d = store.get(String(draft_id || ''));
   if (!d) throw xato('qoralama topilmadi', 404);
   if (d.status === 'published') throw xato('post allaqachon chiqqan');
-  const at = (vaqt && parseTime(vaqt)) || nextSlot();
+  const tanlangan = vaqt ? parseTime(vaqt) : null;
+  if (vaqt && !tanlangan && qatiy) throw xato(`"${vaqt}" — vaqt tushunarsiz yoki o'tib ketgan`);
+  const at = tanlangan || nextSlot();
   store.update(d.id, { status: 'approved', scheduledAt: at });
   return { ok: true, vaqt: fmtTime(at), kanal: cfg.channelId };
 }
@@ -342,4 +359,26 @@ export async function ishlabChiqarish({ draft_id, variant = 0 }) {
     }
     return { tur: d.kontent_turi };
   });
+}
+
+export function dayjestMatni(r) {
+  const TUR = { matn: '📝', 'matn+rasm': '🖼', karusel: '🎠', maqola: '📰', reels: '🎬' };
+  const qator = (r.goyalar || []).map(x => `${x.n}) ${TUR[x.tur] || '•'} ${x.goya}\n   💡 ${x.nega || ''}${x.manba ? `\n   🔗 ${x.manba}` : ''}`).join('\n\n');
+  const xato = (r.kanallar_xatosi || []).length ? `\n\n⚠️ O'qilmagan kanallar: ${r.kanallar_xatosi.join('; ')}` : '';
+  return `☀️ Bugungi ${(r.goyalar || []).length} ta g'oya:\n\n${qator}\n\n👉 Raqamini yozing (masalan: 2) yoki o'z g'oyangizni yozing.${xato}`.slice(0, 4000);
+}
+
+// Uslubni rahbarning o'z kanalidan o'rganish: postlar namuna bo'ladi, uslubshunos tavsif yozadi
+export async function uslubKanaldan({ kanal = process.env.USLUB_KANAL || String(cfg.channelId || '').replace(/^@/, ''), fetchFn } = {}) {
+  if (!kanal || /^-?\d+$/.test(kanal)) throw xato("uslub uchun kanal nomi kerak (USLUB_KANAL=pulatovjurabek)");
+  const { kanalOqi } = await import('../kuzatuv.js');
+  const { analyzeStyle } = await import('./stylist.js');
+  const postlar = (await kanalOqi(kanal, { fetchFn })).filter(p => p.matn.length >= 150);
+  let qoshildi = 0;
+  for (const p of postlar) { const oldin = store.style().samples.length; addSample(p.matn); if (store.style().samples.length > oldin) qoshildi++; }
+  const st = store.style();
+  if (st.samples.length < 5) throw xato(`@${kanal} dan yetarli post topilmadi (${st.samples.length} ta namuna)`);
+  const guide = await analyzeStyle(st.samples.slice(-30));
+  store.saveStyle({ guide });
+  return { kanal, qoshildi, jami: st.samples.length, guide };
 }

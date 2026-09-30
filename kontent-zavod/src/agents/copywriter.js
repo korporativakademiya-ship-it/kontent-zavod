@@ -1,6 +1,7 @@
 import { askJSON } from '../llm.js';
 import { brand, examples } from '../style.js';
 import { ctaRule } from '../cta.js';
+import { TABIIY } from '../tabiiy.js';
 
 const RULES = `
 QOIDALAR:
@@ -9,6 +10,7 @@ QOIDALAR:
 - Faqat Telegram HTML teglar: <b>, <i>, <u>, <a href="">, <blockquote>. Boshqa teg yo'q. Markdown yo'q.
 - Oxirida bitta aniq CTA.
 - Reels ssenariy: HOOK (0–3s), BODY (qisqa kadrlar), CTA. Har qatorda "EKRAN:" va "OVOZ:".
+${TABIIY}
 `;
 
 export async function write(plan) {
