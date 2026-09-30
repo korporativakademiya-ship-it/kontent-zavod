@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { cfg } from './config.js';
-import { bot, dailyRun, log, weeklyReport, weeklyPlanRun, salomlash, zaxira, kalendarYoz } from './bot.js';
+import { bot, dailyRun, log, weeklyReport, weeklyPlanRun, salomlash, zaxira, kalendarYoz, refreshRules, RULES_BATCH } from './bot.js';
 import { kalendarEnabled, syncKalendar } from './kalendar.js';
 import { publishDue } from './publisher.js';
 import { apiYarat } from './api.js';
@@ -30,7 +30,13 @@ if (kalendarEnabled()) cron.schedule('* * * * *', async () => {
 cron.schedule('* * * * *', () => publishDue(bot.api, log), { timezone: cfg.tz });
 
 // n8n doska uchun API (reels liniyasi). Railway domeni PORT ga yo'naltirilgan
-apiYarat({ agentlar: reels, log: (t) => log(t).catch(() => {}) })
+// Rahbarning ssenariy izohlari ham tahrir izohlari kabi yig'iladi va doimiy qoidalarga aylanadi
+const tanlov = (b) => {
+  const r = reels.tanlov(b);
+  if (r.izohlar >= RULES_BATCH) refreshRules().catch(e => log(`⚠️ Qoidalar yangilanmadi: ${e.message}`));
+  return r;
+};
+apiYarat({ agentlar: { ...reels, tanlov }, log: (t) => log(t).catch(() => {}) })
   .listen(Number(process.env.PORT) || 8080, () => console.log('API tayyor'));
 
 bot.start({

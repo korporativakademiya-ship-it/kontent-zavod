@@ -77,3 +77,24 @@ test('rubrikalar: kodlar noyob, formatlar ro\'yxatda', () => {
   assert.equal(new Set(kodlar).size, kodlar.length);
   for (const r of REELS_RUBRIKALAR) assert.ok(FORMATLAR[r.format], r.kod);
 });
+
+test('ssenariy tanlovi: tanlangani ijobiy, qolgani salbiy; izoh uslub xotirasiga', async () => {
+  const { tanlov } = await import('../src/agents/reels.js');
+  const oldin = store.choices().length, fb = store.style().feedback.length;
+  const variantlar = [{ nom: 'Asl variant', ssenariy: { sarlavha: 'A' } }, { nom: 'Xatolari tuzatilgan', ssenariy: { sarlavha: 'B' } }];
+  const r = tanlov({ tz: { mahsulot: 'ka', sarlavha: 'T' }, variantlar, tanlangan: 0, izoh: "jonliroq, ko'cha tilida" });
+  assert.deepEqual(r.ssenariy, { sarlavha: 'A' });
+  const c = store.choices().slice(-2);
+  assert.equal(store.choices().length, oldin + 2);
+  assert.deepEqual(c.map(x => x.ok), [true, false]);
+  assert.match(c[1].sabab, /Asl variant/);
+  assert.equal(store.style().feedback.length, fb + 1);
+  assert.throws(() => tanlov({ tz: {}, variantlar, tanlangan: 5 }), /topilmadi/);
+});
+
+test('API: tanlov yo\'li tz talab qiladi', async () => {
+  const { s, soro } = await server({ kalit: 'k', agentlar: { ...agentlar, tanlov: (b) => ({ ok: true, t: b.tanlangan }) } });
+  assert.equal((await soro('/api/reels/tanlov', { tanlangan: 1 }, 'k')).kod, 400);
+  assert.deepEqual((await soro('/api/reels/tanlov', { tz: {}, tanlangan: 1 }, 'k')).j, { ok: true, t: 1 });
+  s.close();
+});

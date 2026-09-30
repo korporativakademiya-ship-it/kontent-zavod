@@ -5,7 +5,8 @@ import { timingSafeEqual } from 'node:crypto';
 // Kirish: "x-api-kalit" sarlavhasi = N8N_API_KALIT. Kalit berilmasa API o'chiq (faqat /api/health).
 //
 //   POST /api/reels/tz         {goya, mahsulot?}          → TZ
-//   POST /api/reels/ssenariy   {tz, izoh?}                → {ssenariy, tanqid, urinish}
+//   POST /api/reels/ssenariy   {tz, izoh?, asos?}         → {variantlar: [{nom, ssenariy, tanqid}], ssenariy, ...}
+//   POST /api/reels/tanlov     {tz, variantlar, tanlangan, izoh?} → rahbar tanlovi xotiraga → {ssenariy}
 //   POST /api/reels/storibord  {tz, ssenariy}             → {sahnalar, yakun, smm}
 //   POST /api/reels/baho       {sarlavha, mahsulot, ball, sabab?}
 //   GET  /api/health
@@ -52,7 +53,11 @@ export function apiYarat({ kalit = process.env.N8N_API_KALIT || '', agentlar, lo
       await log(`🎬 n8n: yangi reels g'oyasi — ${goya.slice(0, 80)}`);
       return agentlar.prodyuser(goya, { mahsulot: b.mahsulot });
     },
-    'POST /api/reels/ssenariy': async (b) => agentlar.ssenariy(obyekt(b.tz, 'tz'), { izoh: typeof b.izoh === 'string' ? b.izoh.slice(0, 1000) : '' }),
+    'POST /api/reels/ssenariy': async (b) => agentlar.ssenariy(obyekt(b.tz, 'tz'), {
+      izoh: typeof b.izoh === 'string' ? b.izoh.slice(0, 1000) : '',
+      asos: b.asos && typeof b.asos === 'object' ? b.asos : null,
+    }),
+    'POST /api/reels/tanlov': async (b) => agentlar.tanlov({ ...b, tz: obyekt(b.tz, 'tz') }),
     'POST /api/reels/storibord': async (b) => agentlar.storibord(obyekt(b.tz, 'tz'), obyekt(b.ssenariy, 'ssenariy')),
     'POST /api/reels/baho': async (b) => agentlar.baho(b),
   };

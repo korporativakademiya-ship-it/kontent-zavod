@@ -1,5 +1,5 @@
 import { askJSON } from '../llm.js';
-import { brand, examples } from '../style.js';
+import { brand, examples, addFeedback } from '../style.js';
 import { bilan, PROFIL } from '../mahsulot.js';
 import { store } from '../store.js';
 import { uniqueCode } from '../cta.js';
@@ -73,37 +73,70 @@ const SSENARIY_SXEMA = `{"sarlavha":"...","sahnalar":[{"qism":"ilmoq|og'riq|yech
 "yakun":{"ovoz":"CTA diktor gapi","ekran":"CTA ekran matni","tugma":"≤ 24 belgi, masalan: Direct'ga KOTIB deb yozing 👇"}}`;
 
 const MEZONLAR = `1) ilmoq birinchi 3 soniyada ushlaydimi; 2) TZ ga mosmi (rubrika, format, maqsad, asosiy fikr);
-3) bitta aniq fikr, suv yo'q; 4) diktor matni og'zaki va o'qishga oson (uzun gap, qavs, ro'yxat yo'q);
-5) ekran matni qisqa va diktorni takrorlamaydi; 6) CTA aniq va TZ dagi kod bilan; 7) soxta raqam/natija/narx yo'q;
-8) o'zbek tili sof, muallif uslubi va doimiy qoidalari buzilmagan.`;
+3) bitta aniq fikr, suv yo'q; 4) diktor matni og'zaki va o'qishga oson; 5) ekran matni qisqa va diktorni takrorlamaydi;
+6) CTA aniq; 7) o'zbek tili sof, muallif uslubi va doimiy qoidalari buzilmagan.`;
 
-// Ssenariychi yozadi, tanqidchi baholaydi; 8 dan past bo'lsa izoh bilan qayta yoziladi (ko'pi bilan 2 marta)
-export async function ssenariy(tz, { izoh = '', urinishlar = 2 } = {}) {
-  return bilan(mKod(tz.mahsulot), async () => {
-    let tanqid = null, eng = null;
-    for (let i = 0; i <= urinishlar; i++) {
-      const s = await askJSON({
-        maxTokens: 3500,
-        system: `Sen reels ssenariychisan: diktor matni va ekrandagi matnni yozasan. ${brand()}`,
-        prompt: `TZ:\n${JSON.stringify(tz)}\n${examples(tz.asosiy_fikr || tz.sarlavha, 2)}
-${izoh ? `RAHBAR IZOHI (albatta hisobga ol): ${izoh}\n` : ''}${tanqid ? `TANQIDCHI OLDINGI VARIANTGA: ${tanqid.baho}/10. Tuzat: ${tanqid.kamchiliklar.join('; ')}\n` : ''}
+// Qat'iy xatolar — faqat shular tuzatiladi. Uslub va ohang bo'yicha tanqidchi faqat maslahat beradi:
+// qayta yozish matnni silliq, lekin jonsiz qilib qo'yadi (rahbar birinchi variantni afzal ko'rdi).
+const QATIY = `soxta raqam, mijoz natijasi yoki narx va'dasi; CTA kodi yo'q yoki boshqacha; davomiylik TZ dan 30% dan ko'p farq qiladi;
+raqobatchini yomonlash; ekran matni 9 so'zdan uzun.`;
+
+async function yoz(tz, { izoh = '', asos = null } = {}) {
+  return askJSON({
+    maxTokens: 3500,
+    system: `Sen reels ssenariychisan: diktor matni va ekrandagi matnni yozasan. Jonli, og'zaki, muallif ovozida yoz. ${brand()}`,
+    prompt: `TZ:\n${JSON.stringify(tz)}\n${examples(tz.asosiy_fikr || tz.sarlavha, 2)}
+${asos ? `ASOS — rahbar tanlagan variant (uslub va ohangini saqla, faqat izohga ko'ra o'zgartir):\n${JSON.stringify(asos)}\n` : ''}${izoh ? `RAHBAR IZOHI (albatta bajar): ${izoh}\n` : ''}
 Davomiylik ≈ ${tz.davomiylik || 30} soniya; tanlangan ilmoq: "${tz.ilmoqlar?.[tz.tanlangan_ilmoq || 0]?.matn || ''}".
 ${tz.cta?.kod ? `CTA: "Direct'ga ${tz.cta.kod} deb yozing" — kod so'zini o'zgartirma.` : ''}
 JSON: ${SSENARIY_SXEMA}`,
-      });
-      tanqid = await askJSON({
-        maxTokens: 1200,
-        system: `Sen talabchan reels tanqidchisisan (kontent bo'limi rahbari). ${brand()}`,
-        prompt: `TZ:\n${JSON.stringify(tz)}\n\nSSENARIY:\n${JSON.stringify(s)}\n\nMezonlar: ${MEZONLAR}
-JSON: {"baho":1-10,"kamchiliklar":["aniq, tuzatsa bo'ladigan"],"kuchli":"1 gap"}`,
-      });
-      tanqid.baho = Number(tanqid.baho) || 0;
-      tanqid.kamchiliklar = Array.isArray(tanqid.kamchiliklar) ? tanqid.kamchiliklar : [];
-      if (!eng || tanqid.baho > eng.tanqid.baho) eng = { ssenariy: s, tanqid, urinish: i + 1 };
-      if (tanqid.baho >= 8) break;
-    }
-    return eng;
   });
+}
+
+async function tanqidla(tz, s) {
+  const t = await askJSON({
+    maxTokens: 1200,
+    system: `Sen reels tanqidchisisan (kontent bo'limi rahbari). Adolatli baholaysan, jonli uslubni jazolamaysan. ${brand()}`,
+    prompt: `TZ:\n${JSON.stringify(tz)}\n\nSSENARIY:\n${JSON.stringify(s)}\n\nBaholash mezonlari: ${MEZONLAR}
+QAT'IY XATOLAR (faqat shular "qatiy" ga yoziladi): ${QATIY}
+JSON: {"baho":1-10,"qatiy":["bor bo'lsa — aniq qaysi joy"],"maslahat":["uslub/ohang bo'yicha tavsiya — majburiy emas"],"kuchli":"1 gap"}`,
+  });
+  return {
+    baho: Number(t.baho) || 0,
+    qatiy: Array.isArray(t.qatiy) ? t.qatiy.filter(Boolean) : [],
+    maslahat: Array.isArray(t.maslahat) ? t.maslahat.filter(Boolean) : [],
+    kuchli: t.kuchli || '',
+  };
+}
+
+// Ssenariychi yozadi, tanqidchi baholaydi. Qat'iy xato bo'lsa — uslubni saqlab faqat o'sha joy tuzatiladi (2-variant).
+// Hamma variant qaytadi, rahbar o'zi tanlaydi. izoh + asos — rahbar tanlagan variantni izohiga ko'ra qayta yozish.
+export async function ssenariy(tz, { izoh = '', asos = null } = {}) {
+  return bilan(mKod(tz.mahsulot), async () => {
+    const variantlar = [];
+    if (asos) variantlar.push({ nom: 'Oldingi tanlov', ssenariy: asos, tanqid: await tanqidla(tz, asos) });
+    const s1 = await yoz(tz, { izoh, asos });
+    const t1 = await tanqidla(tz, s1);
+    variantlar.unshift({ nom: izoh ? 'Izoh bo\'yicha yangi' : 'Asl variant', ssenariy: s1, tanqid: t1 });
+    if (t1.qatiy.length) {
+      const s2 = await yoz(tz, { asos: s1, izoh: `Faqat shu qat'iy xatolarni tuzat, qolgan hamma so'z, ohang va ritmni o'zgartirma: ${t1.qatiy.join('; ')}` });
+      variantlar.splice(1, 0, { nom: 'Xatolari tuzatilgan', ssenariy: s2, tanqid: await tanqidla(tz, s2) });
+    }
+    // Eski maydonlar (moslik uchun): birinchi variant
+    return { variantlar, ssenariy: variantlar[0].ssenariy, tanqid: variantlar[0].tanqid, urinish: variantlar.length };
+  });
+}
+
+// Rahbar tanlovi: tanlangan variant ijobiy, qolganlari salbiy; izoh uslub xotirasiga (doimiy qoidalar shundan chiqadi)
+export function tanlov({ tz = {}, variantlar = [], tanlangan = 0, izoh = '' }) {
+  const i = Number(tanlangan);
+  if (!Array.isArray(variantlar) || !variantlar[i]) throw Object.assign(new Error('tanlangan variant topilmadi'), { kod: 400 });
+  const m = mKod(tz.mahsulot);
+  const nom = (v) => `${v.ssenariy?.sarlavha || tz.sarlavha || 'reels'} [ssenariy: ${v.nom}]`;
+  variantlar.forEach((v, k) => store.addChoice({ title: nom(v), format: 'reels', mahsulot: m }, k === i,
+    k === i ? '' : `rahbar "${variantlar[i].nom}" variantini afzal ko'rdi`));
+  const izohlar = String(izoh).trim() ? addFeedback(String(izoh).trim(), { title: nom(variantlar[i]), format: 'reels' }) : 0;
+  return { ok: true, ssenariy: variantlar[i].ssenariy, izohlar };
 }
 
 // Rejissyor + SMM: kadrma-kadr storibord (renderer formatida) va Instagram uchun matn

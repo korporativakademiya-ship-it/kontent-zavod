@@ -234,10 +234,10 @@ for (const [cmd, format, example] of [['maqola', 'maqola', 'xodimni ishga olish 
 }
 
 // ---------- Uslub: namuna postlar va doimiy qoidalar ----------
-const RULES_BATCH = 5; // shuncha yangi tahrir izohi yig'ilsa — qoidalar avtomatik yangilanadi
+export const RULES_BATCH = 5; // shuncha yangi tahrir izohi yig'ilsa — qoidalar avtomatik yangilanadi
 let rulesBusy = false;
 
-async function refreshRules() {
+export async function refreshRules() {
   if (rulesBusy) return null;
   const st = store.style();
   const fresh = st.feedback.filter(f => !f.used);
