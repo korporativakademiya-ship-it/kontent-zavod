@@ -11,7 +11,7 @@ export function addSample(text) {
   const t = String(text || '').trim();
   if (t.length < 80) return null; // juda qisqa — uslub ko'rinmaydi
   const st = store.style();
-  if (st.samples.some(s => s.text === t)) return st.samples.length;
+  if (st.samples.some(s => s.text === t || s.text === t.slice(0, 2500))) return st.samples.length;
   const samples = [...st.samples, { text: t.slice(0, 2500), at: new Date().toISOString() }].slice(-MAX_SAMPLES);
   store.saveStyle({ samples });
   return samples.length;

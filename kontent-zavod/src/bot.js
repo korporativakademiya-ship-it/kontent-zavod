@@ -564,7 +564,7 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
   if (act === 'ok') {
     if (d.status !== 'approved') store.addChoice(d, true);
     const planned = d.plannedAt && new Date(d.plannedAt).getTime() > Date.now() + 60e3 ? d.plannedAt : null;
-    const nd = store.update(id, { status: 'approved', scheduledAt: d.status === 'approved' ? d.scheduledAt : planned || nextSlot() });
+    const nd = store.update(id, { status: 'approved', publish_attempts: 0, scheduledAt: d.status === 'approved' ? d.scheduledAt : planned || nextSlot() });
     await ctx.editMessageReplyMarkup({ reply_markup: schedKb(nd) }).catch(() => {});
     return ctx.answerCallbackQuery({ text: `Rejalashtirildi: ${fmtTime(nd.scheduledAt)}` });
   }

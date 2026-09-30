@@ -131,13 +131,25 @@ export async function publish(api, draft) {
   return fallback;
 }
 
+// Bir vaqtda ikki marta ishlamasin (oldingi chaqiruv hali tugamagan bo'lsa — o'tkazib yuboriladi);
+// xato bergan post har daqiqada qayta urinib, xabar bilan to'ldirmasin — MAX_URINISH dan keyin "failed"
+const MAX_URINISH = 3;
+let ishlayapti = false;
 export async function publishDue(api, notify) {
-  const due = store.byStatus('approved').filter(d => new Date(d.scheduledAt).getTime() <= Date.now());
-  for (const d of due) {
-    try {
-      const fb = await publish(api, d);
-      await notify(`📢 Kanalga chiqdi: ${d.title}${fb ? `\n⚠️ Maqola formati o'tmadi, oddiy post bo'lib chiqdi: ${fb}` : ''}`);
+  if (ishlayapti) return;
+  ishlayapti = true;
+  try {
+    const due = store.byStatus('approved').filter(d => new Date(d.scheduledAt).getTime() <= Date.now());
+    for (const d of due) {
+      try {
+        const fb = await publish(api, d);
+        await notify(`📢 Kanalga chiqdi: ${d.title}${fb ? `\n⚠️ Maqola formati o'tmadi, oddiy post bo'lib chiqdi: ${fb}` : ''}`);
+      } catch (e) {
+        const urinish = (d.publish_attempts || 0) + 1;
+        const oxirgi = urinish >= MAX_URINISH;
+        store.update(d.id, { publish_attempts: urinish, ...(oxirgi ? { status: 'failed', publish_error: String(e.message).slice(0, 300) } : {}) });
+        if (urinish === 1 || oxirgi) await notify(oxirgi ? `❌ Chiqmadi (${d.title}), ${urinish} marta urinildi: ${e.message}` : `⚠️ Chiqmadi (${d.title}): ${e.message} — yana urinaman`).catch(() => {});
+      }
     }
-    catch (e) { await notify(`⚠️ Chiqmadi (${d.title}): ${e.message}`); }
-  }
+  } finally { ishlayapti = false; }
 }

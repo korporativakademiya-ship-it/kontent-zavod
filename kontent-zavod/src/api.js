@@ -26,7 +26,7 @@ import { timingSafeEqual } from 'node:crypto';
 //   GET  /api/health
 
 const MAX_BODY = 1024 * 1024;
-const MAX_MEDIA = 40 * 1024 * 1024; // rasm/video base64
+const MAX_MEDIA = 80 * 1024 * 1024; // rasm/video base64
 
 function tengmi(a, b) {
   const x = Buffer.from(String(a)), y = Buffer.from(String(b));

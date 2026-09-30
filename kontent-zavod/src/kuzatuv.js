@@ -63,7 +63,7 @@ export function postlarniAjrat(html) {
 }
 
 export async function kanalOqi(nom, { fetchFn = fetch } = {}) {
-  const res = await fetchFn(`https://t.me/s/${encodeURIComponent(nom)}`, { headers: { 'user-agent': 'Mozilla/5.0 (kontent-zavod kuzatuv)' } });
+  const res = await fetchFn(`https://t.me/s/${encodeURIComponent(nom)}`, { headers: { 'user-agent': 'Mozilla/5.0 (kontent-zavod kuzatuv)' }, signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`t.me/s/${nom}: ${res.status}`);
   return postlarniAjrat(await res.text());
 }
