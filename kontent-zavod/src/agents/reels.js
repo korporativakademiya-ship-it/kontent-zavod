@@ -40,6 +40,7 @@ Qoidalar:
 - Kontent bir xil bo'lmasin: rubrika, format, ilmoq turi va tuzilma g'oyaga qarab tanlanadi va nega tanlanganini qisqa yoz.
 - Vizual qism puxta bo'lsin: bitta personaj (yoshi, tashqi ko'rinishi, kiyimi) va bitta makon/palitra — har kadrda bir xil.
 - Soxta raqam, mijoz natijasi yoki narx to'qima. Dalil yo'q bo'lsa — "misol" deb belgilanadi.
+- Diktor ovozi har doim erkak (muallif ovozi o'rnida); ohang va sur'atni g'oyaga qarab tanla.
 - "toldirilgan" — g'oyada yo'q bo'lib, sen qo'shgan narsalar (rahbar ko'rib chiqishi uchun).
 - O'zbek tili (lotin).
 
@@ -51,7 +52,7 @@ JSON:
 "ilmoqlar":[{"turi":"...","matn":"≤ 12 so'z"},{"turi":"...","matn":"..."},{"turi":"...","matn":"..."}],"tanlangan_ilmoq":0,
 "tuzilma":[{"qism":"ilmoq|og'riq|yechim|dalil|cta","soniya":3,"mazmun":"..."}],
 "dalil":"nimaga tayanamiz yoki 'misol'","davomiylik":30,
-"ovoz":{"jins":"erkak|ayol","ohang":"...","surat":"sekin|o'rtacha|tez"},
+"ovoz":{"jins":"erkak","ohang":"...","surat":"sekin|o'rtacha|tez"},
 "vizual":{"uslub":"...","palitra":"...","yoruglik":"...","makon":"...","personaj":"yoshi, tashqi ko'rinishi, kiyimi"},
 "cta":{"maqsad":"direkt|obuna|saqlash|ulashish","matn":"...","kod":"direkt bo'lsa 1 so'z, lotin katta harf"},
 "taqiqlar":["..."],"toldirilgan":["..."]}`,
@@ -60,6 +61,7 @@ JSON:
   if (!REELS_RUBRIKALAR.some(r => r.kod === tz.rubrika)) tz.rubrika = 'erkin';
   if (!MAQSADLAR.includes(tz.maqsad)) tz.maqsad = 'lid';
   if (!FORMATLAR[tz.format]) tz.format = 'motion';
+  tz.ovoz = { ...(tz.ovoz || {}), jins: 'erkak' };
   tz.cta = tz.cta || {};
   tz.cta.kod = String(tz.cta.maqsad || '').toLowerCase() === 'direkt' ? uniqueCode(tz.cta.kod || tz.sarlavha) : '';
   tz.goya = goya;
