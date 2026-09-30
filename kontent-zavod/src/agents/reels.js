@@ -68,7 +68,7 @@ JSON:
   return tz;
 }
 
-const SSENARIY_SXEMA = `{"sarlavha":"...","sahnalar":[{"qism":"ilmoq|og'riq|yechim|dalil","ovoz":"diktor gapi — og'zaki, 1–2 qisqa gap, ≤ 150 belgi",
+const SSENARIY_SXEMA = `{"sarlavha":"...","sahnalar":[{"qism":"ilmoq|og'riq|yechim|dalil","ovoz":"diktor gapi — jonli og'zaki o'zbekcha, 1–2 qisqa gap, ≤ 110 belgi; raqamlar so'z bilan; inglizcha atama va qisqartma yo'q",
 "ekran":"ekrandagi katta matn — 3–9 so'z, eng muhim 1–2 so'z *yulduzcha* ichida","soniya":3}],
 "yakun":{"ovoz":"CTA diktor gapi","ekran":"CTA ekran matni","tugma":"≤ 24 belgi, masalan: Direct'ga KOTIB deb yozing 👇"}}`;
 
@@ -84,7 +84,9 @@ raqobatchini yomonlash; ekran matni 9 so'zdan uzun.`;
 async function yoz(tz, { izoh = '', asos = null } = {}) {
   return askJSON({
     maxTokens: 3500,
-    system: `Sen reels ssenariychisan: diktor matni va ekrandagi matnni yozasan. Jonli, og'zaki, muallif ovozida yoz. ${brand()}`,
+    system: `Sen reels ssenariychisan: diktor matni va ekrandagi matnni yozasan. Jonli, og'zaki, muallif ovozida yoz.
+Reels zerikarli bo'lmasin: har 3–5 soniyada yangi fikr yoki burilish, suv va takror yo'q, jami diktor matni ≈ 2.5 so'z/soniya
+(35 soniya ≈ 85 so'z). Gaplar qisqa, talaffuzi oson — ovozni AI o'qiydi. ${brand()}`,
     prompt: `TZ:\n${JSON.stringify(tz)}\n${examples(tz.asosiy_fikr || tz.sarlavha, 2)}
 ${asos ? `ASOS — rahbar tanlagan variant (uslub va ohangini saqla, faqat izohga ko'ra o'zgartir):\n${JSON.stringify(asos)}\n` : ''}${izoh ? `RAHBAR IZOHI (albatta bajar): ${izoh}\n` : ''}
 Davomiylik ≈ ${tz.davomiylik || 30} soniya; tanlangan ilmoq: "${tz.ilmoqlar?.[tz.tanlangan_ilmoq || 0]?.matn || ''}".

@@ -9,22 +9,35 @@ import { timingSafeEqual } from 'node:crypto';
 //   POST /api/reels/tanlov     {tz, variantlar, tanlangan, izoh?} → rahbar tanlovi xotiraga → {ssenariy}
 //   POST /api/reels/storibord  {tz, ssenariy}             → {sahnalar, yakun, smm}
 //   POST /api/reels/baho       {sarlavha, mahsulot, ball, sabab?}
+//
+// Kontent liniyasi (src/agents/kontent.js):
+//   POST /api/kontent/tz        {goya, izoh?, oldingi?}   → prodyuser: taklif + TZ
+//   POST /api/kontent/muallif   {tz}                      → qoralama (turiga qarab) + ko'rinish
+//   POST /api/kontent/tasdiq    {draft_id, qaror: tasdiq|qayta, matn?, izoh?}
+//   POST /api/kontent/ishlab-chiqarish {draft_id, variant?} → rejissyor + prompt muhandisi
+//   POST /api/kontent/media     {draft_id, turi: rasm|video, b64, mime}
+//   POST /api/kontent/tanqid    {draft_id}                → tayyor post bahosi va saboq
+//   POST /api/kontent/joyla     {draft_id, vaqt?}         → kanalga navbat
+//   POST /api/goyalar/kunlik    {soni?}                   → kanallar + internet → g'oyalar
+//   POST /api/goyalar/tanla     {n}
+//   POST /api/kanallar          {amal: qosh|ochir|royxat, kanal?, izoh?}
 //   GET  /api/health
 
 const MAX_BODY = 1024 * 1024;
+const MAX_MEDIA = 40 * 1024 * 1024; // rasm/video base64
 
 function tengmi(a, b) {
   const x = Buffer.from(String(a)), y = Buffer.from(String(b));
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-function jsonOqi(req) {
+function jsonOqi(req, max = MAX_BODY) {
   return new Promise((res, rej) => {
     let hajm = 0;
     const qism = [];
     req.on('data', c => {
       hajm += c.length;
-      if (hajm > MAX_BODY) { rej(Object.assign(new Error("so'rov juda katta"), { kod: 413 })); req.destroy(); return; }
+      if (hajm > max) { rej(Object.assign(new Error("so'rov juda katta"), { kod: 413 })); req.destroy(); return; }
       qism.push(c);
     });
     req.on('end', () => {
@@ -60,6 +73,27 @@ export function apiYarat({ kalit = process.env.N8N_API_KALIT || '', agentlar, lo
     'POST /api/reels/tanlov': async (b) => agentlar.tanlov({ ...b, tz: obyekt(b.tz, 'tz') }),
     'POST /api/reels/storibord': async (b) => agentlar.storibord(obyekt(b.tz, 'tz'), obyekt(b.ssenariy, 'ssenariy')),
     'POST /api/reels/baho': async (b) => agentlar.baho(b),
+
+    'POST /api/kontent/tz': async (b) => {
+      const goya = matn(b.goya, 'goya', 2000);
+      if (!b.izoh) await log(`💡 n8n: yangi g'oya — ${goya.slice(0, 80)}`);
+      return agentlar.kontent.prodyuser(goya, { izoh: typeof b.izoh === 'string' ? b.izoh.slice(0, 1500) : '',
+        oldingi: b.oldingi && typeof b.oldingi === 'object' ? b.oldingi : null });
+    },
+    'POST /api/kontent/muallif': async (b) => agentlar.kontent.muallif(obyekt(b.tz, 'tz')),
+    'POST /api/kontent/tasdiq': async (b) => agentlar.kontent.tasdiq(b),
+    'POST /api/kontent/ishlab-chiqarish': async (b) => agentlar.kontent.ishlabChiqarish(b),
+    'POST /api/kontent/media': async (b) => agentlar.kontent.media(b),
+    'POST /api/kontent/tanqid': async (b) => agentlar.kontent.tanqid(b),
+    'POST /api/kontent/joyla': async (b) => agentlar.kontent.joyla(b),
+    'POST /api/goyalar/kunlik': async (b) => agentlar.kontent.kunlikGoyalar({ soni: Math.min(10, Math.max(1, Number(b.soni) || 5)) }),
+    'POST /api/goyalar/tanla': async (b) => agentlar.kontent.goyaTanla(b),
+    'POST /api/kanallar': async (b) => {
+      const k = agentlar.kuzatuv;
+      const list = b.amal === 'qosh' ? k.kanalQosh(matn(b.kanal, 'kanal', 200), b.izoh || '')
+        : b.amal === 'ochir' ? k.kanalOchir(matn(b.kanal, 'kanal', 200)) : k.kanallar();
+      return { kanallar: list };
+    },
   };
 
   return http.createServer(async (req, res) => {
@@ -71,7 +105,7 @@ export function apiYarat({ kalit = process.env.N8N_API_KALIT || '', agentlar, lo
     if (!kalit) return javob(503, { xato: "API o'chiq: N8N_API_KALIT berilmagan" });
     if (!tengmi(req.headers['x-api-kalit'] || '', kalit)) return javob(401, { xato: "kalit noto'g'ri" });
     try {
-      const natija = await ish(await jsonOqi(req));
+      const natija = await ish(await jsonOqi(req, yol === 'POST /api/kontent/media' ? MAX_MEDIA : MAX_BODY));
       javob(200, natija);
     } catch (e) {
       const kod = e.kod || 500;

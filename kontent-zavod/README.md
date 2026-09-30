@@ -113,6 +113,18 @@ Qoralama tugmalari: ✅ Tasdiqlash · 🕒 Vaqt belgilash · ⚡ Hozir · ✏️
 
 Nisha profili: `src/brand.js` — ohang va auditoriyani shu yerda o'zgartirasiz.
 
+## Kontent bo'limi (n8n doska uchun API) — g'oyadan kanalgacha
+`src/agents/kontent.js`, `src/kuzatuv.js`. Oqim: 09:00 da **G'oya ovchisi** (kuzatilayotgan Telegram kanallarning eng ko'p ko'rilgan
+postlari + internet) 5 ta g'oya beradi → rahbar raqam yoki o'z g'oyasini yozadi → **Prodyuser** (taklif: "shunday tasavvur qilaman",
+strategiya, auditoriya, kontent turi, rubrika, format, ilmoq, tuzilma, asosiy fikr, dalil, CTA, taqiqlar + **tanqidiy fikrlash**: xavflar)
+→ rahbar tasdiqlaydi yoki tuzatadi → **Muallif** (matn / matn+rasm / karusel / maqola / reels; rahbar tekshiruvi matnni qayta yozmaydi,
+faqat fakt tekshiruvi) → rahbar tasdiqlaydi, o'zi tuzatadi (farq uslub xotirasiga, matn namuna bo'ladi) yoki izoh bilan qayta yozdiradi →
+ishlab chiqarish (reels: rejissyor + **prompt muhandisi** — rasm, o'zbekcha TTS matni va rejissurasi, video prompti; matn+rasm: rasm) →
+**Tanqidchi** tayyor postni baholaydi va saboq yozadi (keyingi TZ va matnlar shunga tayanadi) → **kanalga navbat** (`nextSlot`/`parseTime`).
+Qoralamalar `status: 'n8n'` bilan saqlanadi, joylanganda `approved` bo'ladi va nashriyotchi chiqaradi.
+Kuzatiladigan kanallar: n8n botga `kanal: @nom — nima uchun`, `kanallar`, `kanal o'chir: @nom`. Telegram ochiq kanallari `t.me/s/<nom>`
+dan o'qiladi; Instagram ro'yxatda saqlanadi, Meta Business Discovery ulanganda o'qiladi.
+
 ## Instagram reels liniyasi (n8n doska uchun API)
 Miya — shu bot (uslub, qoidalar, mahsulot profillari, rubrikalar, rahbar tanlovlari); doska — n8n.
 `N8N_API_KALIT` berilsa, bot `PORT` (standart 8080) da API ochadi; har so'rovda `x-api-kalit` sarlavhasi shu kalit bo'lishi kerak.
