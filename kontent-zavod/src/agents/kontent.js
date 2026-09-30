@@ -14,7 +14,7 @@ import { renderDraftSlides } from '../pipeline.js';
 import { rubrics } from '../weekly.js';
 import { nextSlot, parseTime, fmtTime } from '../publisher.js';
 import { performanceSummary, ideaBank } from '../insights.js';
-import { kuzatuvXulosasi } from '../kuzatuv.js';
+import { kuzatuvXulosasi, normKanal } from '../kuzatuv.js';
 import { REELS_RUBRIKALAR } from '../reels/rubrikalar.js';
 import * as reels from './reels.js';
 
@@ -208,7 +208,9 @@ export async function tasdiq({ draft_id, qaror = 'tasdiq', matn = '', izoh = '',
       if (d.format === 'maqola' || d.format === 'karusel') {
         const art = await writeArticle(d.plan, { post_html: d.post_html }, izoh);
         let x = store.update(d.id, { article_html: art.article_html, slides: art.slides });
-        if (art.slides?.length) x = await renderDraftSlides(x).catch(() => x);
+        // Eski slayd rasmlari yangi matnga mos emas: qayta chiziladi, chizilmasa — olib tashlanadi
+        if (art.slides?.length) x = await renderDraftSlides(x).catch(e => store.update(d.id, { slide_paths: [], notes: `${d.notes || ''}\n⚠️ Slaydlar chizilmadi: ${e.message}`.trim() }));
+        else x = store.update(d.id, { slide_paths: [] });
         return { draft_id: d.id, korinish: korinish(x), qayta: true };
       }
       const r = await revise(d, izoh);
@@ -244,7 +246,9 @@ export function media({ draft_id, turi = 'rasm', b64, mime = 'image/png' }) {
   if (!ext) throw xato(`mime qo'llanmaydi: ${mime}`);
   const fayl = path.join(rasmPath(d.id), `${turi}-${Date.now()}.${ext}`);
   fs.writeFileSync(fayl, Buffer.from(b64, 'base64'));
-  const x = turi === 'video' ? store.update(d.id, { video_path: fayl }) : store.update(d.id, { image_paths: [...(d.image_paths || []), fayl].slice(-10) });
+  // n8n qoralamasida qayta urinish eski rasmni almashtiradi (dublikat bo'lmasin)
+  const rasmlar = d.status === 'n8n' ? [fayl] : [...(d.image_paths || []), fayl].slice(-10);
+  const x = turi === 'video' ? store.update(d.id, { video_path: fayl }) : store.update(d.id, { image_paths: rasmlar });
   return { ok: true, draft_id: x.id, rasmlar: (x.image_paths || []).length, video: Boolean(x.video_path) };
 }
 
@@ -272,13 +276,13 @@ export function joyla({ draft_id, vaqt = '', qatiy = false }) {
   const d = store.get(String(draft_id || ''));
   if (!d) throw xato('qoralama topilmadi', 404);
   if (d.status === 'published') throw xato('post allaqachon chiqqan');
-  if (!['n8n', 'pending', 'approved'].includes(d.status)) throw xato(`bu qoralamani joylab bo'lmaydi (holati: ${d.status})`);
+  if (!['n8n', 'pending', 'approved', 'failed'].includes(d.status)) throw xato(`bu qoralamani joylab bo'lmaydi (holati: ${d.status})`);
   const tanlangan = vaqt ? parseTime(vaqt) : null;
   if (tanlangan && store.byStatus('approved').some(x => x.id !== d.id && x.scheduledAt === tanlangan))
-    throw xato(`${fmtTime(tanlangan)} da boshqa post turibdi — boshqa vaqt yozing`);
-  if (vaqt && !tanlangan && qatiy) throw xato(`"${vaqt}" — vaqt tushunarsiz yoki o'tib ketgan`);
+    throw Object.assign(xato(`${fmtTime(tanlangan)} da boshqa post turibdi — boshqa vaqt yozing`), { vaqtXato: true });
+  if (vaqt && !tanlangan && qatiy) throw Object.assign(xato(`"${vaqt}" — vaqt tushunarsiz yoki o'tib ketgan`), { vaqtXato: true });
   const at = tanlangan || nextSlot();
-  store.update(d.id, { status: 'approved', scheduledAt: at });
+  store.update(d.id, { status: 'approved', scheduledAt: at, publish_attempts: 0 });
   return { ok: true, vaqt: fmtTime(at), kanal: cfg.channelId };
 }
 
@@ -298,7 +302,10 @@ ${ideaBank(8)}${muvozanat()}
 Aynan ${soni} ta g'oya tanla: mahsulotlar va kontent turlari aralash bo'lsin (hammasi video emas), takrorlanmasin.
 JSON: {"goyalar":[{"goya":"1–2 gap — nima haqida va qaysi burchakdan","nega":"nega hozir / nega kuchli","manba":"kanal @nom, havola yoki 'internet'","mahsulot":"ka|qa|kf|umumiy","tur":"${Object.keys(TURLAR).join('|')}"}]}`,
   });
-  const goyalar = (r.goyalar || []).filter(g => g && g.goya).slice(0, soni).map((g, i) => ({ n: i + 1, ...g }));
+  const royxat = Array.isArray(r) ? r : Array.isArray(r?.goyalar) ? r.goyalar : [];
+  const goyalar = royxat.filter(g => g && typeof g.goya === 'string' && g.goya.trim()).slice(0, soni).map((g, i) => ({ ...g, n: i + 1 }));
+  // Bo'sh natija kechagi dayjestni o'chirib yubormasin (raqam bilan tanlash ishlashda davom etadi)
+  if (!goyalar.length) return { goyalar, kanallar_xatosi: kuzatuv.xatolar };
   for (const g of goyalar) bilan(mKod(g.mahsulot), () => store.addIdea(g.goya));
   store.setSetting('kunlik_goyalar', { at: new Date().toISOString(), goyalar });
   return { goyalar, kanallar_xatosi: kuzatuv.xatolar };
@@ -371,12 +378,15 @@ export function dayjestMatni(r) {
   const TUR = { matn: '📝', 'matn+rasm': '🖼', karusel: '🎠', maqola: '📰', reels: '🎬' };
   const qator = (r.goyalar || []).map(x => `${x.n}) ${TUR[x.tur] || '•'} ${x.goya}\n   💡 ${x.nega || ''}${x.manba ? `\n   🔗 ${x.manba}` : ''}`).join('\n\n');
   const xato = (r.kanallar_xatosi || []).length ? `\n\n⚠️ O'qilmagan kanallar: ${r.kanallar_xatosi.join('; ')}` : '';
+  if (!(r.goyalar || []).length) return `😕 Bugun yangi g'oya topa olmadim — birozdan keyin "goyalar" deb qayta yozing yoki o'z g'oyangizni yozing.${xato}`;
   return `☀️ Bugungi ${(r.goyalar || []).length} ta g'oya:\n\n${qator}\n\n👉 Raqamini yozing (masalan: 2) yoki o'z g'oyangizni yozing.${xato}`.slice(0, 4000);
 }
 
 // Uslubni rahbarning o'z kanalidan o'rganish: postlar namuna bo'ladi, uslubshunos tavsif yozadi
 export async function uslubKanaldan({ kanal = process.env.USLUB_KANAL || '', fetchFn } = {}) {
-  if (!kanal || /^-?\d+$/.test(kanal)) throw xato("uslub uchun kanal nomi kerak (USLUB_KANAL=pulatovjurabek)");
+  const nk = normKanal(kanal);
+  if (!nk || nk.platforma !== 'telegram') throw xato("uslub uchun Telegram kanal nomi kerak (Railway'da USLUB_KANAL=pulatovjurabek)");
+  kanal = nk.nom;
   const { kanalOqi } = await import('../kuzatuv.js');
   const { analyzeStyle } = await import('./stylist.js');
   // Bot o'zi joylagan (AI yozgan) postlar rahbar uslubi emas — ular o'tkazib yuboriladi
@@ -384,7 +394,12 @@ export async function uslubKanaldan({ kanal = process.env.USLUB_KANAL || '', fet
   const botniki = new Set(store.byStatus('published').filter(x => !x.tahrirlangan).map(x => imzo(x.post_html)).filter(Boolean));
   const postlar = (await kanalOqi(kanal, { fetchFn })).filter(p => p.matn.length >= 150 && !botniki.has(imzo(p.matn)));
   let qoshildi = 0;
-  for (const p of postlar) { const oldin = store.style().samples.length; addSample(p.matn); if (store.style().samples.length > oldin) qoshildi++; }
+  for (const p of postlar) {
+    const bor = new Set(store.style().samples.map(x => x.text));
+    const t = String(p.matn).trim();
+    if (bor.has(t) || bor.has(t.slice(0, 2500))) continue;
+    if (addSample(t)) qoshildi++;
+  }
   const st = store.style();
   if (st.samples.length < 5) throw xato(`@${kanal} dan yetarli post topilmadi (${st.samples.length} ta namuna)`);
   const guide = await analyzeStyle(st.samples.slice(-30));

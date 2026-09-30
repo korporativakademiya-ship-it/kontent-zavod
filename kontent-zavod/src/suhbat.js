@@ -58,10 +58,24 @@ const tanqidMatni = (t) => `🧐 Tanqidchi: ${t.baho}/10
 📢 Kanalga joylaymi?`;
 
 const xab = (matn, klaviatura = null) => ({ matn: String(matn).slice(0, 4000), klaviatura });
+const TAHRIR_MAX = 3900; // Telegram xabari 4096 belgi — undan uzun matnni nusxa olib tuzatib bo'lmaydi
+
+// Ish davomida rahbar "bekor" yozgan yoki yangi ish boshlangan — eski natija tashlab yuboriladi
+class Eskirdi extends Error {}
 
 // k — agentlar (kontent.js va kuzatuv.js funksiyalari); test uchun almashtiriladi
-export async function suhbat({ chatId, text = '', tugma = '', hodisa = '', draft_id = '', xato = '' }, k) {
-  if (!chatId) throw Object.assign(new Error('chatId kerak'), { kod: 400 });
+export async function suhbat(sorov, k) {
+  if (!sorov?.chatId) throw Object.assign(new Error('chatId kerak'), { kod: 400 });
+  try { return await ichki(sorov, k); }
+  catch (e) {
+    if (e instanceof Eskirdi) return { xabarlar: [] };
+    // Foydalanuvchi xatolari (topilmadi, noto'g'ri qiymat) — xom "400/404" o'rniga tushunarli javob
+    if (e.kod === 400 || e.kod === 404) return { xabarlar: [xab(`⚠️ ${e.message}`)] };
+    throw e;
+  }
+}
+
+async function ichki({ chatId, text = '', tugma = '', hodisa = '', draft_id = '', xato = '' }, k) {
   const t = String(text || '').trim();
   const kichik = t.toLowerCase().replace(/[ʻ‘’`]/g, "'");
   let h = holat(chatId);
@@ -91,23 +105,36 @@ export async function suhbat({ chatId, text = '', tugma = '', hodisa = '', draft
     return { xabarlar: [xab(k.dayjestMatni(r))] };
   }
 
-  if (h.band && Date.now() - h.band < (h.bosqich === 'ishlab' ? ISHLAB_MS : BAND_MS) && !hodisa) return { xabarlar: [xab('⏳ Hali oldingi bosqich ustida ishlayapman, biroz kuting.')] };
+  const mediaHodisa = hodisa === 'media_tayyor' || hodisa === 'media_xato';
+  if (hodisa && !mediaHodisa) return { xabarlar: [] };
+  if (h.band && Date.now() - h.band < (h.bosqich === 'ishlab' ? ISHLAB_MS : BAND_MS) && !mediaHodisa) return { xabarlar: [xab('⏳ Hali oldingi bosqich ustida ishlayapman, biroz kuting.')] };
+  // Uzoq ish (LLM): chat band qilinadi va ish raqami yoziladi. Tugagach holat qayta o'qiladi —
+  // raqam o'zgargan bo'lsa (bekor qilingan / boshqa ish boshlangan) natija eskirgan hisoblanadi
   const band = async (fn) => {
-    saqla(chatId, { ...h, band: Date.now() });
-    try { return await fn(); } catch (e) { saqla(chatId, { ...h, band: 0 }); throw e; }
+    const ish = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    saqla(chatId, { ...h, band: Date.now(), ish });
+    let r;
+    try { r = await fn(); }
+    catch (e) {
+      if (holat(chatId).ish !== ish) throw new Eskirdi();
+      saqla(chatId, { ...h, band: 0 });
+      throw e;
+    }
+    if (holat(chatId).ish !== ish) throw new Eskirdi();
+    return r;
   };
 
   // Ishlab chiqarish natijasi (n8n): faqat shu chat hozir aynan shu qoralamani kutayotgan bo'lsa qabul qilinadi —
   // kechikkan video boshqa (yangi) postga bog'lanib qolmasin
-  if (hodisa === 'media_tayyor' || hodisa === 'media_xato') {
+  if (mediaHodisa) {
     if (h.bosqich !== 'ishlab' || !h.draft_id || String(draft_id) !== String(h.draft_id)) return { xabarlar: [] };
     if (hodisa === 'media_xato') {
       saqla(chatId, { ...h, bosqich: 'matn', band: 0 });
       return { xabarlar: [xab(`⚠️ Rasm/video yasalmadi: ${String(xato || "noma'lum xato").slice(0, 300)}\n\n✅ bossangiz qayta urinaman, 🛑 — to'xtataman.`, 'matn')] };
     }
     let tq;
-    try { tq = await k.tanqid({ draft_id: h.draft_id }); }
-    catch (e) { tq = { baho: '?', kuchli: [], zaif: [], saboq: `tanqidchi ishlamadi: ${e.message}` }; }
+    try { tq = await band(() => k.tanqid({ draft_id: h.draft_id })); }
+    catch (e) { if (e instanceof Eskirdi) throw e; tq = { baho: '?', kuchli: [], zaif: [], saboq: `tanqidchi ishlamadi: ${e.message}` }; }
     saqla(chatId, { ...h, bosqich: 'joyla', band: 0 });
     return { xabarlar: [xab(tanqidMatni(tq), 'joyla')] };
   }
@@ -135,9 +162,11 @@ export async function suhbat({ chatId, text = '', tugma = '', hodisa = '', draft
     }
     if (tugma === 'tz_edit') { saqla(chatId, { ...h, bosqich: 'tz_tuzatish' }); return { xabarlar: [xab("✏️ Nimani o'zgartiray? Oddiy xabar bilan yozing.")] }; }
     if (tugma === 'm_edit') {
+      const matn = k.tozaMatn(k.qoralama(h.draft_id));
+      // Uzun maqola/karusel Telegram xabariga sig'maydi — kesilgan matnni tuzatib yuborsa, oxiri yo'qolardi
+      if (matn.length > TAHRIR_MAX) return { xabarlar: [xab(`✏️ Matn juda uzun (${matn.length} belgi) — Telegramda to'liq tuzatib bo'lmaydi. 🔄 bosib nimani o'zgartirishni yozing, men qayta yozaman.`, 'matn')] };
       saqla(chatId, { ...h, bosqich: 'matn_tahrir' });
-      const d = k.qoralama(h.draft_id);
-      return { xabarlar: [xab("✏️ Matnni nusxa oling, tuzating va to'liq holda yuboring:"), xab(k.tozaMatn(d))] };
+      return { xabarlar: [xab("✏️ Matnni nusxa oling, tuzating va to'liq holda yuboring:"), xab(matn)] };
     }
     if (tugma === 'm_izoh') { saqla(chatId, { ...h, bosqich: 'matn_izoh' }); return { xabarlar: [xab('🔄 Izohingizni yozing — shunga qarab qayta yozaman.')] }; }
     if (tugma === 'm_ok') {
@@ -150,12 +179,14 @@ export async function suhbat({ chatId, text = '', tugma = '', hodisa = '', draft
       }
       let tq;
       try { tq = await band(() => k.tanqid({ draft_id: h.draft_id })); }
-      catch (e) { tq = { baho: '?', kuchli: [], zaif: [], saboq: `tanqidchi ishlamadi: ${e.message}` }; }
+      catch (e) { if (e instanceof Eskirdi) throw e; tq = { baho: '?', kuchli: [], zaif: [], saboq: `tanqidchi ishlamadi: ${e.message}` }; }
       saqla(chatId, { ...h, bosqich: 'joyla', band: 0 });
       return { xabarlar: [xab(tanqidMatni(tq), 'joyla')] };
     }
     if (tugma === 'j_ok') {
-      const r = k.joyla({ draft_id: h.draft_id });
+      let r;
+      try { r = k.joyla({ draft_id: h.draft_id }); }
+      catch (e) { saqla(chatId, { bosqich: 'bosh' }); throw e; } // allaqachon chiqqan / topilmadi — suhbat boshiga
       saqla(chatId, { bosqich: 'bosh' });
       return { xabarlar: [xab(`📅 Tayyor! ${r.kanal} kanaliga ${r.vaqt} da chiqadi.`)] };
     }
@@ -167,14 +198,22 @@ export async function suhbat({ chatId, text = '', tugma = '', hodisa = '', draft
   if (!t) return { xabarlar: [] };
 
   // Kutilayotgan matnlar
+  // Dayjest raqami joriy post o'rtasida — izoh sifatida qabul qilinmaydi
+  const ortada = ['tz', 'tz_tuzatish', 'matn', 'matn_tahrir', 'matn_izoh'].includes(h.bosqich);
+  if (ortada && /^\d{1,2}$/.test(t)) {
+    const d = h.bosqich === 'matn' ? k.qoralama(h.draft_id) : null;
+    const vs = d?.reels?.variantlar?.length || 0;
+    if (!(vs > 1 && Number(t) >= 1 && Number(t) <= vs))
+      return { xabarlar: [xab(`☝️ Hozir boshqa post ustida ishlayapmiz. Avval uni tugating (tugmalar bilan) yoki "bekor" deb yozing — keyin ${t}-g'oyani tanlaysiz.`)] };
+  }
   if (h.bosqich === 'tz' || h.bosqich === 'tz_tuzatish') {
     const tz = await band(() => k.prodyuser(h.goya, { izoh: t, oldingi: h.tz }));
     return tzYubor(tz);
   }
   if (h.bosqich === 'matn' || h.bosqich === 'matn_tahrir' || h.bosqich === 'matn_izoh') {
     const d = k.qoralama(h.draft_id);
-    if (h.bosqich === 'matn' && /^[1-9]$/.test(t) && d?.reels?.variantlar?.length > 1) {
-      const v = Math.min(d.reels.variantlar.length, Number(t)) - 1;
+    if (h.bosqich === 'matn' && /^\d{1,2}$/.test(t)) {
+      const v = Number(t) - 1;
       saqla(chatId, { ...h, variant: v });
       return { xabarlar: [xab(`🎬 ${v + 1}-variant tanlandi. ✅ bosing yoki izoh yozing.`, 'matn')] };
     }
@@ -188,7 +227,11 @@ export async function suhbat({ chatId, text = '', tugma = '', hodisa = '', draft
   if (h.bosqich === 'joyla' || h.bosqich === 'joyla_vaqt') {
     let r;
     try { r = k.joyla({ draft_id: h.draft_id, vaqt: t, qatiy: true }); }
-    catch (e) { if (e.kod === 400) return { xabarlar: [xab(`🕒 ${e.message}. Masalan: 19:00, ertaga 09:00, 03.10 18:30`, 'joyla')] }; throw e; }
+    catch (e) {
+      if (e.vaqtXato) return { xabarlar: [xab(`🕒 ${e.message}. Masalan: 19:00, ertaga 09:00, 03.10 18:30`, 'joyla')] };
+      saqla(chatId, { bosqich: 'bosh' }); // allaqachon chiqqan / topilmadi — suhbat boshiga
+      throw e;
+    }
     saqla(chatId, { bosqich: 'bosh' });
     return { xabarlar: [xab(`📅 Tayyor! ${r.kanal} kanaliga ${r.vaqt} da chiqadi.`)] };
   }
