@@ -8,7 +8,7 @@ const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slic
 // Oxirgi 120 kundagi band kodlar (to'qnashsa raqam qo'shiladi: KPI → KPI2)
 export function uniqueCode(wanted, fallback = 'TIZIM') {
   const since = Date.now() - 120 * 864e5;
-  const taken = new Set(store.byStatus('published').concat(store.byStatus('approved'), store.byStatus('pending'))
+  const taken = new Set(store.byStatus('published').concat(store.byStatus('approved'), store.byStatus('pending'), store.byStatus('reels'))
     .filter(d => d.cta_kod && new Date(d.createdAt).getTime() > since).map(d => d.cta_kod));
   let base = norm(wanted);
   if (base.length < 3) base = norm(fallback);

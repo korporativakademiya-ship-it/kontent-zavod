@@ -113,6 +113,19 @@ Qoralama tugmalari: ✅ Tasdiqlash · 🕒 Vaqt belgilash · ⚡ Hozir · ✏️
 
 Nisha profili: `src/brand.js` — ohang va auditoriyani shu yerda o'zgartirasiz.
 
+## Instagram reels liniyasi (n8n doska uchun API)
+Miya — shu bot (uslub, qoidalar, mahsulot profillari, rubrikalar, rahbar tanlovlari); doska — n8n.
+`N8N_API_KALIT` berilsa, bot `PORT` (standart 8080) da API ochadi; har so'rovda `x-api-kalit` sarlavhasi shu kalit bo'lishi kerak.
+- `POST /api/reels/tz` `{goya, mahsulot?}` — **Prodyuser**: xom g'oyani TZ ga aylantiradi (rubrika, format, maqsad, auditoriya,
+  3 ta ilmoq, tuzilma, ovoz, vizual uslub va personaj, CTA kodi, "o'zim qo'shdim" ro'yxati).
+- `POST /api/reels/ssenariy` `{tz, izoh?}` — **Ssenariychi + Tanqidchi**: diktor va ekran matni; tanqidchi 8/10 dan past
+  baholasa izohi bilan qayta yoziladi (ko'pi bilan 2 marta), eng yaxshi variant qaytadi.
+- `POST /api/reels/storibord` `{tz, ssenariy}` — **Rejissyor + SMM**: kadrma-kadr AI rasm tavsifi (izchil personaj va palitra),
+  Instagram matni, heshteglar, muqova, birinchi izoh. Qoralama `status: 'reels'` bilan saqlanadi (kalendarda ko'rinmaydi, CTA kodi band).
+- `POST /api/reels/baho` `{sarlavha, mahsulot, ball: 1–5, sabab?}` — rahbar bahosi tanlovlar xotirasiga (4–5 ijobiy).
+- `GET /api/health`
+Reels rubrikalari: `src/reels/rubrikalar.js`. n8n workflow va video renderer: `korporativakademiya-ship-it/kotibim` → `kontent-render/`.
+
 ## Kotibim CRM'dagi kontent kalendari
 `KOTIBIM_URL` va `KONTENT_API_KALIT` (Kotibim'dagi bilan bir xil) berilsa, bot har daqiqada Kotibim CRM'ga
 kalendar holatini yuboradi: chiqqan, rejalashtirilgan, tasdiq kutayotgan postlar, rejadagi bandlar va g'oyalar banki

@@ -3,6 +3,8 @@ import { cfg } from './config.js';
 import { bot, dailyRun, log, weeklyReport, weeklyPlanRun, salomlash, zaxira, kalendarYoz } from './bot.js';
 import { kalendarEnabled, syncKalendar } from './kalendar.js';
 import { publishDue } from './publisher.js';
+import { apiYarat } from './api.js';
+import * as reels from './agents/reels.js';
 
 // Har kuni g'oya izlash
 cron.schedule(cfg.dailyCron, dailyRun, { timezone: cfg.tz });
@@ -26,6 +28,10 @@ if (kalendarEnabled()) cron.schedule('* * * * *', async () => {
 }, { timezone: cfg.tz });
 // Har daqiqada vaqti kelgan postlarni kanalga chiqarish
 cron.schedule('* * * * *', () => publishDue(bot.api, log), { timezone: cfg.tz });
+
+// n8n doska uchun API (reels liniyasi). Railway domeni PORT ga yo'naltirilgan
+apiYarat({ agentlar: reels, log: (t) => log(t).catch(() => {}) })
+  .listen(Number(process.env.PORT) || 8080, () => console.log('API tayyor'));
 
 bot.start({
   // Kanal reaksiyalari standart yangilanishlarga kirmaydi — alohida so'raladi
