@@ -9,7 +9,7 @@ import { TURLAR } from './agents/kontent.js';
 // Javob: { xabarlar: [{ matn, klaviatura: null|'tz'|'matn'|'joyla' }], keyingi: null|{ tur, draft_id, ... } }
 
 const BAND_MS = 10 * 60e3;
-const ISHLAB_MS = 25 * 60e3; // rasm/video yasash uzoqroq davom etadi
+const ISHLAB_MS = 40 * 60e3; // rasm/video yasash uzoqroq davom etadi (uzun video — 10–20 daqiqa)
 const kalit = (chatId) => `suhbat:${chatId}`;
 const holat = (chatId) => store.setting(kalit(chatId), { bosqich: 'bosh' });
 const saqla = (chatId, h) => store.setSetting(kalit(chatId), { ...h, at: Date.now() });
@@ -75,7 +75,7 @@ export async function suhbat(sorov, k) {
   }
 }
 
-async function ichki({ chatId, text = '', tugma = '', hodisa = '', draft_id = '', xato = '' }, k) {
+async function ichki({ chatId, text = '', tugma = '', hodisa = '', draft_id = '', xato = '', kino = false }, k) {
   const t = String(text || '').trim();
   const kichik = t.toLowerCase().replace(/[ʻ‘’`]/g, "'");
   let h = holat(chatId);
@@ -171,10 +171,11 @@ async function ichki({ chatId, text = '', tugma = '', hodisa = '', draft_id = ''
     if (tugma === 'm_izoh') { saqla(chatId, { ...h, bosqich: 'matn_izoh' }); return { xabarlar: [xab('🔄 Izohingizni yozing — shunga qarab qayta yozaman.')] }; }
     if (tugma === 'm_ok') {
       await band(() => k.tasdiq({ draft_id: h.draft_id, variant: h.variant || 0 }));
-      if (h.kontent_turi === 'reels' || h.kontent_turi === 'matn+rasm') {
-        const ic = await band(() => k.ishlabChiqarish({ draft_id: h.draft_id, variant: h.variant || 0 }));
+      if (['reels', 'video', 'matn+rasm'].includes(h.kontent_turi)) {
+        const ic = await band(() => k.ishlabChiqarish({ draft_id: h.draft_id, variant: h.variant || 0, kino }));
         saqla(chatId, { ...h, bosqich: 'ishlab', band: Date.now() });
-        return { xabarlar: [xab(h.kontent_turi === 'reels' ? '🏭 Matn tasdiqlandi. Rejissyor va prompt muhandisi tayyor — rasm, ovoz va video yasalyapti (3–5 daqiqa)…' : '🏭 Matn tasdiqlandi. Rasm chizilyapti…')],
+        return { xabarlar: [xab(h.kontent_turi === 'matn+rasm' ? '🏭 Matn tasdiqlandi. Rasm chizilyapti…'
+          : `🏭 Matn tasdiqlandi. Rejissyor sahnalarni tayyorladi — ovoz yozilyapti va video yig'ilyapti (${h.kontent_turi === 'video' ? '10–20' : '3–6'} daqiqa)…`)],
           keyingi: { ...ic, draft_id: h.draft_id } };
       }
       let tq;

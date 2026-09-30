@@ -78,7 +78,7 @@ test("ishlab chiqarish xatosi va javobsiz qolishi — chat qotib qolmaydi; tanqi
   assert.match(r.xabarlar[0].matn, /render 400/); assert.equal(r.xabarlar[0].klaviatura, 'matn');
   await suhbat({ chatId: C, tugma: 'm_ok' }, k);                     // qayta urinish
   const { store } = await import('../src/store.js');
-  store.setSetting(`suhbat:${C}`, { ...store.setting(`suhbat:${C}`), band: Date.now() - 26 * 60e3 }); // 25 daqiqadan oshdi
+  store.setSetting(`suhbat:${C}`, { ...store.setting(`suhbat:${C}`), band: Date.now() - 41 * 60e3 }); // 40 daqiqadan oshdi
   r = await suhbat({ chatId: C, text: 'yangi fikr' }, k);
   assert.match(r.xabarlar[0].matn, /javobi kelmadi/); assert.equal(r.xabarlar[0].klaviatura, 'matn');
   k.tanqid = async () => { throw new Error('Max limiti tugadi'); };
@@ -154,4 +154,16 @@ test("post o'rtasida raqam, uzun matn tahriri, topilmagan g'oya, begona hodisa, 
   assert.match(r.xabarlar[0].matn, /allaqachon chiqqan/);
   const { store } = await import('../src/store.js');
   assert.equal(store.setting(`suhbat:${C}`).bosqich, 'bosh');
+});
+
+test("m_ok: doska /kino ni bilsa (kino: true) ishlab chiqarishga uzatiladi; video turi ham ishlab chiqariladi", async () => {
+  const { k } = agentlar();
+  const olindi = [];
+  k.muallif = async () => ({ draft_id: 'D1', kontent_turi: 'video', korinish: 'KOR' });
+  k.ishlabChiqarish = async (b) => { olindi.push(b.kino); return { tur: 'kino', sahnalar: [] }; };
+  const C = '888';
+  await suhbat({ chatId: C, text: "g'oya" }, k);
+  await suhbat({ chatId: C, tugma: 'tz_ok' }, k);
+  const r = await suhbat({ chatId: C, tugma: 'm_ok', kino: true }, k);
+  assert.deepEqual(olindi, [true]); assert.equal(r.keyingi.tur, 'kino'); assert.match(r.xabarlar[0].matn, /10–20 daqiqa/);
 });

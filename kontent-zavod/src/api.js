@@ -14,7 +14,7 @@ import { timingSafeEqual } from 'node:crypto';
 //   POST /api/kontent/tz        {goya, izoh?, oldingi?}   → prodyuser: taklif + TZ
 //   POST /api/kontent/muallif   {tz}                      → qoralama (turiga qarab) + ko'rinish
 //   POST /api/kontent/tasdiq    {draft_id, qaror: tasdiq|qayta, matn?, izoh?}
-//   POST /api/kontent/ishlab-chiqarish {draft_id, variant?} → rejissyor + prompt muhandisi
+//   POST /api/kontent/ishlab-chiqarish {draft_id, variant?, kino?} → rejissyor (+ prompt muhandisi)
 //   POST /api/kontent/media     {draft_id, turi: rasm|video, b64, mime}
 //   POST /api/kontent/kollaj    {draft_id}                → karusel slaydlari bitta JPG (b64)
 //   POST /api/kontent/tanqid    {draft_id}                → tayyor post bahosi va saboq
@@ -22,7 +22,7 @@ import { timingSafeEqual } from 'node:crypto';
 //   POST /api/goyalar/kunlik    {soni?}                   → kanallar + internet → g'oyalar
 //   POST /api/goyalar/tanla     {n}
 //   POST /api/kanallar          {amal: qosh|ochir|royxat, kanal?, izoh?}
-//   POST /api/suhbat            {chatId, text?, tugma?, hodisa?} → rahbar bilan suhbat (src/suhbat.js)
+//   POST /api/suhbat            {chatId, text?, tugma?, hodisa?, kino?} → rahbar bilan suhbat (src/suhbat.js); kino — doska /kino ni biladi
 //   GET  /api/health
 
 const MAX_BODY = 1024 * 1024;
@@ -85,7 +85,7 @@ export function apiYarat({ kalit = process.env.N8N_API_KALIT || '', agentlar, lo
     },
     'POST /api/kontent/muallif': async (b) => agentlar.kontent.muallif(obyekt(b.tz, 'tz')),
     'POST /api/kontent/tasdiq': async (b) => agentlar.kontent.tasdiq(b),
-    'POST /api/kontent/ishlab-chiqarish': async (b) => agentlar.kontent.ishlabChiqarish(b),
+    'POST /api/kontent/ishlab-chiqarish': async (b) => agentlar.kontent.ishlabChiqarish({ ...b, kino: b.kino === true }),
     'POST /api/kontent/media': async (b) => agentlar.kontent.media(b),
     'POST /api/kontent/kollaj': async (b) => agentlar.kontent.slaydKollaj(b),
     'POST /api/kontent/tanqid': async (b) => agentlar.kontent.tanqid(b),
@@ -94,7 +94,7 @@ export function apiYarat({ kalit = process.env.N8N_API_KALIT || '', agentlar, lo
     'POST /api/goyalar/tanla': async (b) => agentlar.kontent.goyaTanla(b),
     'POST /api/suhbat': async (b) => agentlar.suhbat({ chatId: String(b.chatId || ''), text: typeof b.text === 'string' ? b.text.slice(0, 6000) : '',
       tugma: typeof b.tugma === 'string' ? b.tugma.slice(0, 40) : '', hodisa: typeof b.hodisa === 'string' ? b.hodisa : '',
-      draft_id: String(b.draft_id || ''), xato: typeof b.xato === 'string' ? b.xato.slice(0, 500) : '' }),
+      draft_id: String(b.draft_id || ''), xato: typeof b.xato === 'string' ? b.xato.slice(0, 500) : '', kino: b.kino === true }),
     'POST /api/kanallar': async (b) => {
       const k = agentlar.kuzatuv;
       const list = b.amal === 'qosh' ? k.kanalQosh(matn(b.kanal, 'kanal', 200), b.izoh || '')
