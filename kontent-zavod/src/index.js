@@ -4,6 +4,7 @@ import { bot, dailyRun, log, weeklyReport, weeklyPlanRun, salomlash, zaxira, kal
 import { kalendarEnabled, syncKalendar } from './kalendar.js';
 import { publishDue } from './publisher.js';
 import { apiYarat } from './api.js';
+import { store } from './store.js';
 import * as reels from './agents/reels.js';
 import * as kontent from './agents/kontent.js';
 import * as kuzatuv from './kuzatuv.js';
@@ -39,7 +40,13 @@ const tanlov = (b) => {
   if (r.izohlar >= RULES_BATCH) refreshRules().catch(e => log(`⚠️ Qoidalar yangilanmadi: ${e.message}`));
   return r;
 };
-apiYarat({ agentlar: { ...reels, tanlov, kontent, kuzatuv, suhbat: (b) => suhbat(b, { ...kontent, ...kuzatuv }) }, log: (t) => log(t).catch(() => {}) })
+// Suhbatdagi tuzatish va izohlar ham 5 tadan doimiy qoidalarga aylanadi
+const suhbatQoida = async (b) => {
+  const r = await suhbat(b, { ...kontent, ...kuzatuv });
+  if (store.style().feedback.filter(f => !f.used).length >= RULES_BATCH) refreshRules().catch(e => log(`⚠️ Qoidalar yangilanmadi: ${e.message}`));
+  return r;
+};
+apiYarat({ agentlar: { ...reels, tanlov, kontent, kuzatuv, suhbat: suhbatQoida }, log: (t) => log(t).catch(() => {}) })
   .listen(Number(process.env.PORT) || 8080, () => console.log('API tayyor'));
 
 bot.start({

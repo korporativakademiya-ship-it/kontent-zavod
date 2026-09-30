@@ -144,7 +144,7 @@ export function tanlov({ tz = {}, variantlar = [], tanlangan = 0, izoh = '' }) {
 }
 
 // Rejissyor + SMM: kadrma-kadr storibord (renderer formatida) va Instagram uchun matn
-export async function storibord(tz, s) {
+export async function storibord(tz, s, { saqla = true } = {}) {
   const r = await bilan(mKod(tz.mahsulot), () => askJSON({
     maxTokens: 4500,
     system: `Sen reels rejissyori va SMM mutaxassisisan. Har kadrda nima ko'rinishini puxta rejalaysan va Instagram uchun matn yozasan. ${brand()}`,
@@ -164,7 +164,7 @@ JSON:
   const sahnalar = (r.sahnalar || []).filter(x => x && x.matn).slice(0, 10);
   if (!sahnalar.length) throw new Error("Rejissyor sahna qaytarmadi");
   // Qoralama sifatida saqlanadi: sarlavha takrorlanmasin va CTA kodi band bo'lsin (kalendarda ko'rinmaydi)
-  store.addDraft({ title: s.sarlavha || tz.sarlavha, format: 'reels', status: 'reels', cta_kod: tz.cta?.kod || '',
+  if (saqla) store.addDraft({ title: s.sarlavha || tz.sarlavha, format: 'reels', status: 'reels', cta_kod: tz.cta?.kod || '',
     ...(mKod(tz.mahsulot) ? { mahsulot: tz.mahsulot } : {}), rubric: tz.rubrika, plan: tz });
   return { sahnalar, yakun: r.yakun || {}, smm: r.smm || {} };
 }
