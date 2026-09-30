@@ -118,7 +118,9 @@ export async function suhbat({ chatId, text = '', tugma = '', hodisa = '', draft
   };
   const matnYubor = async (r, qo = {}) => {
     saqla(chatId, { ...h, ...qo, bosqich: 'matn', draft_id: r.draft_id, kontent_turi: r.kontent_turi || h.kontent_turi, band: 0 });
-    return { xabarlar: [xab(r.korinish, 'matn')] };
+    // Karusel bo'lsa — avval slaydlar kollaji (n8n rasmni /api/kontent/kollaj dan oladi)
+    const slayd = (k.qoralama(r.draft_id)?.slide_paths || []).length;
+    return { xabarlar: [...(slayd ? [{ matn: `🎠 ${slayd} ta slayd`, klaviatura: null, kollaj: r.draft_id }] : []), xab(r.korinish, 'matn')] };
   };
 
   // Tugmalar

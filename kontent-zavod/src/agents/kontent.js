@@ -391,3 +391,18 @@ export async function uslubKanaldan({ kanal = process.env.USLUB_KANAL || '', fet
   store.saveStyle({ guide });
   return { kanal, qoshildi, jami: st.samples.length, guide };
 }
+
+// Karusel slaydlarini bitta rasmga yig'ish (rahbar joylashdan oldin ko'rsin)
+export async function slaydKollaj({ draft_id }) {
+  const d = store.get(String(draft_id || ''));
+  if (!d) throw xato('qoralama topilmadi', 404);
+  const fayllar = (d.slide_paths || []).filter(f => fs.existsSync(f));
+  if (!fayllar.length) throw xato("slaydlar yo'q", 404);
+  const { ffmpeg } = await import('../video/ffmpeg.js');
+  const papka = path.dirname(fayllar[0]);
+  const chiqish = path.join(rasmPath(d.id), `kollaj-${fayllar.length}.jpg`);
+  const ustun = Math.min(4, fayllar.length), qator = Math.ceil(fayllar.length / ustun);
+  await ffmpeg(['-y', '-loglevel', 'error', '-framerate', '1', '-i', path.join(papka, '%02d.png'),
+    '-vf', `scale=432:540,tile=${ustun}x${qator}:padding=12:margin=12:color=white`, '-frames:v', '1', '-q:v', '3', chiqish]);
+  return { b64: fs.readFileSync(chiqish).toString('base64'), mime: 'image/jpeg', soni: fayllar.length };
+}
