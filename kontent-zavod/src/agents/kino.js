@@ -120,7 +120,9 @@ QOIDALAR:
 - Birinchi sahna — ilmoq (1,5–3 soniya): kinetik, kartalar, meme yoki raqam. Oxirgi sahna — CTA (grid.cta, doska.cta yoki sariq kinetik).
 - Formatlarni ARALASHTIR: kamida 2–3 xil shablon; bir xil sahna turi ketma-ket 2 martadan ko'p emas. ${uzun ? "Uzun video: 3–5 bob (bob maydoni: 'Muammo', 'Hisob', 'Yechim', 'Natija', 'Xulosa' kabi), har 5–8 soniyada vizual o'zgarish, o'rtasida 1 ta test yoki meme (tomoshabinni uyg'otish)." : 'Reels: 6–10 sahna, bob shart emas.'}
 - Har sahnada "ovoz" — diktor aytadigan gap: ssenariydagi diktor matnidan ol, ma'nosini o'zgartirma; o'zbekcha og'zaki, raqamlar so'z bilan, inglizcha qisqartma yo'q; sahnaga 1–2 qisqa gap.
-- "rejissura" — ovoz uchun inglizcha qisqa ko'rsatma (sur'at, hissiyot, urg'u). "subtitr" — ekran pastidagi qisqa yozuv (≤ 9 so'z, *urg'u*), diktorni so'zma-so'z takrorlamasin; kinetik va audiogramma uchun bo'sh.
+- "rejissura" — ovoz uchun inglizcha qisqa ko'rsatma (sur'at, hissiyot, urg'u).
+- "subtitr" — ekran pastidagi yozuv: ssenariydagi "ekran" matnini tartib bo'yicha AYNAN ol (rahbar tasdiqlagan, *urg'u* bilan saqla); kinetik va audiogramma sahnasida o'sha matn "matn" maydoniga o'tadi, subtitr bo'sh.
+- Misollardagi nomlar (Kotib AI, Aziz, instagram…) — faqat namuna: topik yo'nalishi va TZ ga mosini yoz; mahsulot bo'lmasa, uni tiqma.
 - "soniya" — sahna ≈ ovoz uzunligi (2,5 so'z ≈ 1 soniya), 2–10.
 - Soxta raqam, manba yoki mijoz natijasi to'qima; hisob-kitob "misol" bo'lsa shuni ko'rsat (masalan izoh: "misol").
 - Matnlar o'zbek tilida (lotin), qisqa — shablon kichik joyga sig'dirishi kerak.

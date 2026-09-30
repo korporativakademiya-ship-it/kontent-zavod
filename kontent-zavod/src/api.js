@@ -19,10 +19,10 @@ import { timingSafeEqual } from 'node:crypto';
 //   POST /api/kontent/kollaj    {draft_id}                → karusel slaydlari bitta JPG (b64)
 //   POST /api/kontent/tanqid    {draft_id}                → tayyor post bahosi va saboq
 //   POST /api/kontent/joyla     {draft_id, vaqt?}         → kanalga navbat
-//   POST /api/goyalar/kunlik    {soni?}                   → kanallar + internet → g'oyalar
+//   POST /api/goyalar/kunlik    {soni?, tarqat?}          → kanallar + internet → g'oyalar; tarqat — har topikka o'zi: {xabarlar:[{chatId, thread, matn}]}
 //   POST /api/goyalar/tanla     {n}
 //   POST /api/kanallar          {amal: qosh|ochir|royxat, kanal?, izoh?}
-//   POST /api/suhbat            {chatId, text?, tugma?, hodisa?, kino?} → rahbar bilan suhbat (src/suhbat.js); kino — doska /kino ni biladi
+//   POST /api/suhbat            {chatId, thread?, text?, tugma?, hodisa?, kino?} → rahbar bilan suhbat (src/suhbat.js); kino — doska /kino ni biladi
 //   GET  /api/health
 
 const MAX_BODY = 1024 * 1024;
@@ -90,9 +90,10 @@ export function apiYarat({ kalit = process.env.N8N_API_KALIT || '', agentlar, lo
     'POST /api/kontent/kollaj': async (b) => agentlar.kontent.slaydKollaj(b),
     'POST /api/kontent/tanqid': async (b) => agentlar.kontent.tanqid(b),
     'POST /api/kontent/joyla': async (b) => agentlar.kontent.joyla(b),
-    'POST /api/goyalar/kunlik': async (b) => agentlar.kontent.kunlikGoyalar({ soni: Math.min(10, Math.max(1, Number(b.soni) || 5)) }),
+    'POST /api/goyalar/kunlik': async (b) => (b.tarqat && agentlar.kunlikTarqat ? { xabarlar: await agentlar.kunlikTarqat() }
+      : agentlar.kontent.kunlikGoyalar({ soni: Math.min(10, Math.max(1, Number(b.soni) || 5)) })),
     'POST /api/goyalar/tanla': async (b) => agentlar.kontent.goyaTanla(b),
-    'POST /api/suhbat': async (b) => agentlar.suhbat({ chatId: String(b.chatId || ''), text: typeof b.text === 'string' ? b.text.slice(0, 6000) : '',
+    'POST /api/suhbat': async (b) => agentlar.suhbat({ chatId: String(b.chatId || ''), thread: /^\d{1,12}$/.test(String(b.thread ?? '')) ? String(b.thread) : '', text: typeof b.text === 'string' ? b.text.slice(0, 6000) : '',
       tugma: typeof b.tugma === 'string' ? b.tugma.slice(0, 40) : '', hodisa: typeof b.hodisa === 'string' ? b.hodisa : '',
       draft_id: String(b.draft_id || ''), xato: typeof b.xato === 'string' ? b.xato.slice(0, 500) : '', kino: b.kino === true }),
     'POST /api/kanallar': async (b) => {

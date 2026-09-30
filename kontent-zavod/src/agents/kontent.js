@@ -36,6 +36,11 @@ const VIDEOLI = ['reels', 'video'];
 export const videomi = (t) => VIDEOLI.includes(t);
 const MAHSULOTLAR = Object.keys(PROFIL);
 const mKod = (m) => (MAHSULOTLAR.includes(m) ? m : null);
+// Topik yo'nalishi: ka | qa | kf — mahsulot; umumiy — shaxsiy brend (tizimlashtirish, boshqaruv, tajriba)
+export const YONALISHLAR = { ...Object.fromEntries(Object.entries(PROFIL).map(([k, v]) => [k, v.nom])), umumiy: 'Shaxsiy brend' };
+const yonalishQatlami = (y) => !y ? '' : y === 'umumiy'
+  ? `\nBU TOPIK: SHAXSIY BREND — Jo'rabekning yo'nalishi (tizimlashtirish, boshqaruv, xodimlar, AI, o'z tajribasi). Mahsulotni reklama qilma; mos kelsa, oxirida bir gap bilan eslatish mumkin.\n`
+  : `\nBU TOPIK: ${PROFIL[y]?.nom} — g'oya va kontent shu mahsulot auditoriyasi va mavzulari uchun (profil yuqorida). Har postda sotma: ko'p post foydali fikr, mahsulot — tabiiy yechim sifatida.\n`;
 const xato = (msg, kod = 400) => Object.assign(new Error(msg), { kod });
 
 // Tanqidchining oxirgi saboqlari — prodyuser va muallif shularni hisobga oladi
@@ -73,11 +78,12 @@ const TZ_SXEMA = `{"sarlavha":"ishchi nom",
 "davomiylik":"reels bo'lsa 30–40, video bo'lsa 60–180 (soniya), aks holda 0"}`;
 
 // Prodyuser: g'oyani rahbarga moslab "o'raydi" — taklif + TZ. izoh + oldingi — rahbar tuzatishi bilan qayta
-export async function prodyuser(goya, { izoh = '', oldingi = null } = {}) {
-  const tz = await askJSON({
+export async function prodyuser(goya, { izoh = '', oldingi = null, mahsulot } = {}) {
+  const tz = await bilan(mKod(mahsulot), () => askJSON({
     maxTokens: 4000,
     system: `Sen kontent prodyuserisan. Rahbarning g'oyasini uning biznes maqsadiga moslab o'raysan va texnik topshiriq (TZ) yozasan.
-Maqsad — uchala mahsulotni (Kotib AI, Qadam AI, Kontent Fabrika) va Jo'rabekning shaxsiy brendini sotish; kontent faqat bitta mahsulot haqida bo'lib qolmasin.
+Maqsad — Jo'rabekning yo'nalishi (biznesni tizimlashtirish, boshqaruv, AI) bo'yicha ekspertlik va ishonch, shaxsiy brend; mahsulotlar
+(Kotib AI, Qadam AI, Kontent Fabrika) — faqat mavzuga tabiiy mos kelsa. Hamma kontent mahsulot reklamasi bo'lmasin.
 Kontent turini g'oyaga qarab tanla: hamma narsa video emas. Matn — tez fikr; matn+rasm — hissiy yoki vaziyatli fikr;
 karusel — qadamlar, ro'yxat, taqqoslash (saqlanadigan); maqola — chuqur qo'llanma; reels — hikoya, e'tiroz, demo (30–40 s);
 video — 1–3 daqiqalik tushuntiruvchi video (hisob-kitob, bosqichma-bosqich yechim, keys) Telegram kanal va YouTube uchun.
@@ -85,14 +91,14 @@ TANQIDIY FIKRLASH: taklif berishdan oldin o'zingdan so'ra — bu g'oyaning zaif 
 oldin shunaqasi bo'lganmi, soxta va'da yo'qmi. Topganingni "xavflar" ga yoz va TZ da yop.
 ${brand()}${saboqlar()}`,
     prompt: `G'OYA: ${goya}
-${oldingi ? `\nOLDINGI TZ (rahbar ko'rib chiqdi):\n${JSON.stringify(oldingi)}\n` : ''}${izoh ? `RAHBAR TUZATISHI (albatta bajar, qolganini saqla): ${izoh}\n` : ''}
+${yonalishQatlami(mahsulot)}${oldingi ? `\nOLDINGI TZ (rahbar ko'rib chiqdi):\n${JSON.stringify(oldingi)}\n` : ''}${izoh ? `RAHBAR TUZATISHI (albatta bajar, qolganini saqla): ${izoh}\n` : ''}
 RUBRIKALAR:\n${rubrikaRoyxati()}
 ${muvozanat()}${performanceSummary()}
 Soxta raqam, mijoz natijasi yoki narx to'qima. O'zbek tili (lotin).
 JSON: ${TZ_SXEMA}`,
-  });
+  }));
   if (!TURLAR[tz.kontent_turi]) tz.kontent_turi = 'matn';
-  tz.mahsulot = mKod(tz.mahsulot) || 'umumiy';
+  tz.mahsulot = mahsulot ? (mKod(mahsulot) || 'umumiy') : (mKod(tz.mahsulot) || 'umumiy');
   tz.cta = tz.cta || {};
   const direkt = String(tz.cta.maqsad || '').toLowerCase() === 'direkt';
   tz.cta.kod = direkt ? (oldingi?.cta?.kod || uniqueCode(tz.cta.kod || tz.sarlavha)) : '';
@@ -142,25 +148,33 @@ export const qoralama = (id) => store.get(String(id || ''));
 export const tozaMatn = (d) => (!d ? '' : toza((d.format === 'maqola' || d.format === 'karusel') ? d.article_html : d.post_html));
 
 // Rahbarga ko'rinish (Telegram uchun oddiy matn): qism nomlari aniq — nima qayerga chiqishi ko'rinsin
-export function korinish(d) {
+export function korinish(d, variant = 0) {
   const turi = d.kontent_turi;
+  const tugmalar = `✅ tasdiqlash · ✏️ o'zim tuzataman · 🔄 izoh bilan qayta`;
+  if (videomi(turi)) {
+    const vlar = d.reels?.variantlar || [];
+    const k = Math.min(Math.max(0, Number(variant) || 0), Math.max(0, vlar.length - 1));
+    const ss = vlar[k]?.ssenariy || {};
+    const sah = ss.sahnalar || [];
+    const y = ss.yakun || {};
+    return [
+      `${turi === 'video' ? '🎞 Video' : '🎬 Reels'}: ${d.title}${vlar.length > 1 ? `  (${k + 1}/${vlar.length}-variant, ⭐ ${vlar[k]?.tanqid?.baho ?? '?'}/10)` : ''}`,
+      `━━ 1. SSENARIY — diktor o'qiydi\n${sah.map((x, i) => `${i + 1}. ${x.ovoz}`).join('\n')}${y.ovoz ? `\n${sah.length + 1}. ${y.ovoz}` : ''}`,
+      `━━ 2. SUBTITR — videoda yoziladi\n${sah.map((x, i) => `${i + 1}. ${String(x.ekran || '').replace(/\*/g, '')}`).join('\n')}${y.ekran ? `\n${sah.length + 1}. ${String(y.ekran).replace(/\*/g, '')}` : ''}${y.tugma ? `\n🔘 ${y.tugma}` : ''}`,
+      `━━ 3. OPISANIYE — video ostidagi matn\n${toza(d.post_html)}`,
+      vlar.length > 1 ? `🔢 Boshqa variant: raqamini yozing (1–${vlar.length}).` : '',
+      tugmalar,
+    ].filter(Boolean).join('\n\n').slice(0, 4000);
+  }
   const slaydlar = (d.slides || []).map((s, i) => `${i + 1}) ${[s.kicker, s.title, s.text, s.accent, s.num, s.label, ...(s.items || [])].filter(Boolean).join(' · ')}`).join('\n');
-  const vlar = d.reels?.variantlar || [];
-  const reelsMatn = vlar.map((v, k) => {
-    const ss = v.ssenariy || {};
-    const sahna = (ss.sahnalar || []).map((x, i) => `${i + 1}) 🎙 ${x.ovoz}\n   🖥 ${x.ekran}`).join('\n');
-    const bosh = vlar.length > 1 ? `— ${k + 1}-variant (${v.nom}, ⭐ ${v.tanqid?.baho ?? '?'}/10)\n` : '';
-    return `${bosh}${sahna}\n📣 🎙 ${ss.yakun?.ovoz || ''}\n   🖥 ${ss.yakun?.ekran || ''}`;
-  }).join('\n\n');
-  const postNomi = videomi(turi) ? '📝 POST MATNI (video ostiga chiqadi)' : turi === 'karusel' ? '📝 QISQA POST' : '📝 POST MATNI (kanalga chiqadi)';
+  const postNomi = turi === 'karusel' ? '📝 QISQA POST' : '📝 POST (kanalga chiqadi)';
   return [
     `✍️ ${TURLAR[turi]?.nom || d.format}: ${d.title}`,
     `${postNomi}:\n${toza(d.post_html)}`,
-    d.article_html && d.format !== 'post' ? `📰 ${turi === 'karusel' ? 'KARUSEL MATNI' : 'MAQOLA'}:\n${toza(d.article_html).slice(0, 1500)}` : '',
+    d.article_html && d.format !== 'post' ? `📰 ${turi === 'karusel' ? 'KARUSEL MATNI' : 'MAQOLA'}:\n${toza(d.article_html).slice(0, 1200)}` : '',
     slaydlar ? `🎠 SLAYDLAR:\n${slaydlar}` : '',
-    reelsMatn ? `🎬 VIDEO SSENARIYSI (🎙 diktor · 🖥 ekrandagi yozuv):\n${reelsMatn}${vlar.length > 1 ? '\n\nVariantni tanlash uchun raqamini yozing (1, 2…).' : ''}` : '',
-    d.notes ? `ℹ️ ${d.notes}` : '',
-    `✅ — tasdiqlash · ✏️ — o'zim tuzataman · 🔄 — izoh bilan qayta yozish (yoki shunchaki yozing)`,
+    d.notes ? `ℹ️ ${String(d.notes).slice(0, 300)}` : '',
+    tugmalar,
   ].filter(Boolean).join('\n\n').slice(0, 4000);
 }
 
@@ -293,7 +307,11 @@ export function joyla({ draft_id, vaqt = '', qatiy = false }) {
 }
 
 // G'oya ovchisi: kuzatilayotgan kanallar + internet → kunlik g'oyalar (g'oyalar bankiga ham yoziladi)
-export async function kunlikGoyalar({ soni = 5, fetchFn } = {}) {
+const dayjestKalit = (m) => (m ? `kunlik_goyalar:${m}` : 'kunlik_goyalar');
+export async function kunlikGoyalar({ soni = 5, fetchFn, mahsulot } = {}) {
+  return bilan(mKod(mahsulot), () => kunlikGoyalarIchki({ soni, fetchFn, mahsulot }));
+}
+async function kunlikGoyalarIchki({ soni, fetchFn, mahsulot }) {
   const [kuzatuv, internet] = await Promise.all([
     kuzatuvXulosasi({ fetchFn }).catch(e => ({ natija: [], xatolar: [e.message] })),
     research({ count: 8, used: store.usedTitles() }).catch(() => []),
@@ -304,21 +322,22 @@ export async function kunlikGoyalar({ soni = 5, fetchFn } = {}) {
 Boshqalarni ko'chirmaysan — ilhom olib, o'z auditoriyamizga va mahsulotlarimizga moslaysan. ${brand()}${saboqlar()}`,
     prompt: `KANALLAR (oxirgi kunlardagi eng ko'p ko'rilgan postlar):\n${JSON.stringify(kuzatuv.natija).slice(0, 9000)}
 \nINTERNET:\n${JSON.stringify(internet).slice(0, 5000)}
-${ideaBank(8)}${muvozanat()}
-Aynan ${soni} ta g'oya tanla: mahsulotlar va kontent turlari aralash bo'lsin (hammasi video emas), takrorlanmasin.
+${ideaBank(8)}${mahsulot ? yonalishQatlami(mahsulot) : muvozanat()}
+Aynan ${soni} ta g'oya tanla: ${mahsulot ? 'hammasi shu topik uchun' : "mahsulotlar va shaxsiy brend aralash"}; kontent turlari aralash (hammasi video emas), takrorlanmasin.
 JSON: {"goyalar":[{"goya":"1–2 gap — nima haqida va qaysi burchakdan","nega":"nega hozir / nega kuchli","manba":"kanal @nom, havola yoki 'internet'","mahsulot":"ka|qa|kf|umumiy","tur":"${Object.keys(TURLAR).join('|')}"}]}`,
   });
   const royxat = Array.isArray(r) ? r : Array.isArray(r?.goyalar) ? r.goyalar : [];
-  const goyalar = royxat.filter(g => g && typeof g.goya === 'string' && g.goya.trim()).slice(0, soni).map((g, i) => ({ ...g, n: i + 1 }));
+  const goyalar = royxat.filter(g => g && typeof g.goya === 'string' && g.goya.trim()).slice(0, soni)
+    .map((g, i) => ({ ...g, ...(mahsulot ? { mahsulot } : {}), n: i + 1 }));
   // Bo'sh natija kechagi dayjestni o'chirib yubormasin (raqam bilan tanlash ishlashda davom etadi)
   if (!goyalar.length) return { goyalar, kanallar_xatosi: kuzatuv.xatolar };
   for (const g of goyalar) bilan(mKod(g.mahsulot), () => store.addIdea(g.goya));
-  store.setSetting('kunlik_goyalar', { at: new Date().toISOString(), goyalar });
-  return { goyalar, kanallar_xatosi: kuzatuv.xatolar };
+  store.setSetting(dayjestKalit(mahsulot), { at: new Date().toISOString(), goyalar });
+  return { goyalar, kanallar_xatosi: kuzatuv.xatolar, mahsulot: mahsulot || '' };
 }
 
-export function goyaTanla({ n }) {
-  const k = store.setting('kunlik_goyalar', null);
+export function goyaTanla({ n, mahsulot }) {
+  const k = store.setting(dayjestKalit(mahsulot), null);
   const g = k?.goyalar?.find(x => x.n === Number(n));
   if (!g) throw xato(`${n}-g'oya topilmadi (oxirgi dayjestda ${k?.goyalar?.length || 0} ta)`, 404);
   return { goya: `${g.goya}${g.tur ? ` (taklif: ${TURLAR[g.tur]?.nom || g.tur})` : ''}`, manba: g.manba || '' };
@@ -391,10 +410,11 @@ export async function ishlabChiqarish({ draft_id, variant = 0, kino = false }) {
 
 export function dayjestMatni(r) {
   const TUR = { matn: '📝', 'matn+rasm': '🖼', karusel: '🎠', maqola: '📰', reels: '🎬', video: '🎞' };
-  const qator = (r.goyalar || []).map(x => `${x.n}) ${TUR[x.tur] || '•'} ${x.goya}\n   💡 ${x.nega || ''}${x.manba ? `\n   🔗 ${x.manba}` : ''}`).join('\n\n');
-  const xato = (r.kanallar_xatosi || []).length ? `\n\n⚠️ O'qilmagan kanallar: ${r.kanallar_xatosi.join('; ')}` : '';
-  if (!(r.goyalar || []).length) return `😕 Bugun yangi g'oya topa olmadim — birozdan keyin "goyalar" deb qayta yozing yoki o'z g'oyangizni yozing.${xato}`;
-  return `☀️ Bugungi ${(r.goyalar || []).length} ta g'oya:\n\n${qator}\n\n👉 Raqamini yozing (masalan: 2) yoki o'z g'oyangizni yozing.${xato}`.slice(0, 4000);
+  const xato = (r.kanallar_xatosi || []).length ? `\n\n⚠️ O'qilmagan kanallar: ${r.kanallar_xatosi.join('; ').slice(0, 300)}` : '';
+  if (!(r.goyalar || []).length) return `😕 Bugun yangi g'oya topa olmadim — keyinroq "goyalar" deb yozing yoki o'z g'oyangizni yozing.${xato}`;
+  const qator = r.goyalar.map(x => `${x.n}) ${TUR[x.tur] || '•'} ${x.goya}${x.nega ? `\n   💡 ${String(x.nega).slice(0, 140)}` : ''}`).join('\n\n');
+  const nom = r.mahsulot ? `${YONALISHLAR[r.mahsulot] || ''} — ` : '';
+  return `☀️ ${nom}bugungi ${r.goyalar.length} ta g'oya:\n\n${qator}\n\n👉 Raqamini yozing yoki o'z g'oyangizni yozing.${xato}`.slice(0, 4000);
 }
 
 // Uslubni rahbarning o'z kanalidan o'rganish: postlar namuna bo'ladi, uslubshunos tavsif yozadi

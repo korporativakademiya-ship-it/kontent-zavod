@@ -8,7 +8,7 @@ import { store } from './store.js';
 import * as reels from './agents/reels.js';
 import * as kontent from './agents/kontent.js';
 import * as kuzatuv from './kuzatuv.js';
-import { suhbat } from './suhbat.js';
+import { suhbat, kunlikTarqat } from './suhbat.js';
 
 // Har kuni g'oya izlash
 cron.schedule(cfg.dailyCron, dailyRun, { timezone: cfg.tz });
@@ -46,7 +46,7 @@ const suhbatQoida = async (b) => {
   if (store.style().feedback.filter(f => !f.used).length >= RULES_BATCH) refreshRules().catch(e => log(`⚠️ Qoidalar yangilanmadi: ${e.message}`));
   return r;
 };
-apiYarat({ agentlar: { ...reels, tanlov, kontent, kuzatuv, suhbat: suhbatQoida }, log: (t) => log(t).catch(() => {}) })
+apiYarat({ agentlar: { ...reels, tanlov, kontent, kuzatuv, suhbat: suhbatQoida, kunlikTarqat: () => kunlikTarqat({ ...kontent, ...kuzatuv }) }, log: (t) => log(t).catch(() => {}) })
   .listen(Number(process.env.PORT) || 8080, () => console.log('API tayyor'));
 
 bot.start({

@@ -1,22 +1,24 @@
 process.env.DATA_DIR = '/tmp/kz-test-suhbat-' + process.pid;
+process.env.GROUP_ID = '-100500';
+process.env.PRODUCT_TOPICS = 'qa:869';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-const { suhbat } = await import('../src/suhbat.js');
+const { suhbat, kunlikTarqat } = await import('../src/suhbat.js');
 
 // Soxta agentlar: nima chaqirilganini yozib boradi
 function agentlar() {
   const log = [];
   const d = { id: 'D1', format: 'post', post_html: 'Asl matn '.repeat(40), reels: null };
   return { log, d, k: {
-    prodyuser: async (goya, o = {}) => { log.push(['prodyuser', goya, o.izoh || '']); return { sarlavha: 'S', taklif: 'T', kontent_turi: 'matn', mahsulot: 'ka', tuzilma: [], xavflar: [] }; },
+    prodyuser: async (goya, o = {}) => { log.push(['prodyuser', goya, o.izoh || '']); log.m = o.mahsulot; return { sarlavha: 'S', taklif: 'T', kontent_turi: 'matn', mahsulot: 'ka', tuzilma: [], xavflar: [] }; },
     muallif: async () => { log.push(['muallif']); return { draft_id: 'D1', kontent_turi: 'matn', korinish: 'KOR' }; },
     tasdiq: async (b) => { log.push(['tasdiq', b.qaror || 'tasdiq', b.matn ? 'matn' : '', b.izoh || '']); return { draft_id: 'D1', korinish: 'KOR2' }; },
     tanqid: async () => { log.push(['tanqid']); return { baho: 7, kuchli: [], zaif: [], saboq: 's' }; },
     joyla: ({ vaqt, qatiy }) => { log.push(['joyla', vaqt || '']); if (vaqt === 'xyz' && qatiy) throw Object.assign(new Error('"xyz" — vaqt tushunarsiz'), { kod: 400, vaqtXato: true }); return { kanal: '@pulatovjurabek', vaqt: '01.10 19:00' }; },
     ishlabChiqarish: async () => { log.push(['ishlab']); return { tur: 'matn+rasm', rasm_prompt: 'p' }; },
-    qoralama: () => d, tozaMatn: (x) => x.post_html,
+    qoralama: () => d, tozaMatn: (x) => x.post_html, korinish: (x, v) => `KORINISH ${v}`,
     goyaTanla: ({ n }) => ({ goya: `dayjest-${n}` }),
-    kunlikGoyalar: async () => ({ goyalar: [] }), dayjestMatni: () => 'DAYJEST',
+    kunlikGoyalar: async (o) => { log.push(['kunlik', o.mahsulot, o.soni]); return { goyalar: [] }; }, dayjestMatni: () => 'DAYJEST',
     kanallar: () => [], kanalQosh: (n, iz) => [{ platforma: 'telegram', nom: n.replace('@', ''), izoh: iz }], kanalOchir: () => [],
     uslubKanaldan: async () => ({ kanal: 'pulatovjurabek', qoshildi: 12, jami: 12, guide: 'G' }),
   } };
@@ -97,7 +99,7 @@ test('reels: tanlangan variant qayta yozishga asos bo\'ladi, keyin 1-variantga q
   const C = '555';
   await suhbat({ chatId: C, text: "g'oya" }, k);
   await suhbat({ chatId: C, tugma: 'tz_ok' }, k);
-  assert.match((await suhbat({ chatId: C, text: '2' }, k)).xabarlar[0].matn, /2-variant tanlandi/);
+  assert.match((await suhbat({ chatId: C, text: '2' }, k)).xabarlar[0].matn, /KORINISH 1/);
   await suhbat({ chatId: C, text: 'jonliroq' }, k);
   assert.deepEqual([tasdiqlar.at(-1).qaror, tasdiqlar.at(-1).variant], ['qayta', 1]);
   const n = tasdiqlar.length;
@@ -166,4 +168,25 @@ test("m_ok: doska /kino ni bilsa (kino: true) ishlab chiqarishga uzatiladi; vide
   await suhbat({ chatId: C, tugma: 'tz_ok' }, k);
   const r = await suhbat({ chatId: C, tugma: 'm_ok', kino: true }, k);
   assert.deepEqual(olindi, [true]); assert.equal(r.keyingi.tur, 'kino'); assert.match(r.xabarlar[0].matn, /10–20 daqiqa/);
+});
+
+test("topiklar: bog'lanmagan topik so'raydi, 'topik: ka' bog'laydi, ofis topigi env dan, har topik o'z suhbati; kunlik tarqatish", async () => {
+  const { k, log } = agentlar();
+  const G = '-100777';
+  assert.match((await suhbat({ chatId: G, thread: '12', text: "g'oya" }, k)).xabarlar[0].matn, /qaysi yo'nalish/);
+  assert.match((await suhbat({ chatId: G, thread: '12', text: 'topik: Kotib' }, k)).xabarlar[0].matn, /Kotib AI/);
+  await suhbat({ chatId: G, thread: '12', text: "mijoz tunda yozadi" }, k);
+  assert.equal(log.m, 'ka');
+  await suhbat({ chatId: '-100500', thread: '869', text: 'yangi xodim' }, k);   // PRODUCT_TOPICS dagi ofis topigi
+  assert.equal(log.m, 'qa');
+  await suhbat({ chatId: '9999', text: 'shaxsiy chat' }, k);                   // topiksiz — shaxsiy brend
+  assert.equal(log.m, 'umumiy');
+  // 12-topik TZ bosqichida, 869 ham — bir-biriga aralashmaydi
+  const { store } = await import('../src/store.js');
+  assert.equal(store.setting(`suhbat:${G}:12`).goya, 'mijoz tunda yozadi');
+  assert.equal(store.setting('suhbat:-100500:869').goya, 'yangi xodim');
+  await suhbat({ chatId: G, thread: '12', text: 'goyalar' }, k);
+  assert.deepEqual(log.at(-1), ['kunlik', 'ka', 3]);
+  const x = await kunlikTarqat(k);
+  assert.deepEqual(x.map(m => [m.chatId, m.thread]).sort(), [['-100500', '869'], [G, '12']].sort());
 });
