@@ -190,7 +190,7 @@ export async function muallif(tz) {
 }
 
 // Rahbar qarori: tasdiq / o'zi tuzatgan matn / izoh bilan qayta yozish. Tahrir uslub xotirasiga yoziladi.
-export async function tasdiq({ draft_id, qaror = 'tasdiq', matn = '', izoh = '' }) {
+export async function tasdiq({ draft_id, qaror = 'tasdiq', matn = '', izoh = '', variant = 0 }) {
   qaror = String(qaror || 'tasdiq');
   const d = store.get(String(draft_id || ''));
   if (!d) throw xato('qoralama topilmadi', 404);
@@ -200,7 +200,8 @@ export async function tasdiq({ draft_id, qaror = 'tasdiq', matn = '', izoh = '' 
       if (!String(izoh).trim()) throw xato('qayta yozish uchun izoh kerak');
       addFeedback(String(izoh).trim(), d);
       if (d.kontent_turi === 'reels' && d.reels) {
-        const r = await reels.ssenariy(reelsTz(d.tz), { izoh, asos: d.reels.ssenariy });
+        const asos = d.reels.variantlar?.[Number(variant) || 0]?.ssenariy || d.reels.ssenariy;
+        const r = await reels.ssenariy(reelsTz(d.tz), { izoh, asos });
         const x = store.update(d.id, { reels: r });
         return { draft_id: d.id, korinish: korinish(x), qayta: true, reels: r };
       }
@@ -222,12 +223,13 @@ export async function tasdiq({ draft_id, qaror = 'tasdiq', matn = '', izoh = '' 
       addFeedback(`Rahbar AI matnini o'zi tahrirladi. AI yozgani: «${eski}» → rahbar varianti: «${yangi.slice(0, 700)}». Farqidan uslubni o'rgan.`, d);
       addSample(yangi);
       const html = yangi.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const x = store.update(d.id, { [maydon]: maydon === 'article_html' ? `<p>${html.replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br/>')}</p>` : html, tahrirlangan: true });
-      if (maydon === 'article_html' && x.slides?.length) await renderDraftSlides(x).catch(() => {});
+      const qiymat = maydon === 'article_html' ? `<p>${html.replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br/>')}</p>` : ensureCode(html, d.cta_kod);
+      const eslatma = d.slides?.length ? "\n⚠️ Slaydlar oldingicha qoldi — ularni o'zgartirish uchun 🔄 izoh bilan qayta yozdiring." : '';
+      store.update(d.id, { [maydon]: qiymat, tahrirlangan: true, notes: `${d.notes || ''}${eslatma}`.trim() });
       return { draft_id: d.id, korinish: korinish(store.get(d.id)), tahrirlangan: true };
     }
-    if (d.format === 'post') addSample(d.post_html.replace(/<[^>]+>/g, ''));
-    store.addChoice(d, true);
+    // AI matni rahbar namunasi emas — namuna faqat rahbar o'zi tuzatgan matndan olinadi
+    if (!d.tasdiqlangan) { store.addChoice(d, true); store.update(d.id, { tasdiqlangan: true }); }
     return { draft_id: d.id, korinish: korinish(d) };
   });
 }
@@ -236,6 +238,7 @@ export async function tasdiq({ draft_id, qaror = 'tasdiq', matn = '', izoh = '' 
 export function media({ draft_id, turi = 'rasm', b64, mime = 'image/png' }) {
   const d = store.get(String(draft_id || ''));
   if (!d) throw xato('qoralama topilmadi', 404);
+  if (turi !== 'rasm' && turi !== 'video') throw xato("turi: rasm yoki video");
   if (typeof b64 !== 'string' || b64.length < 100) throw xato('b64 fayl kerak');
   const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'video/mp4': 'mp4' }[mime];
   if (!ext) throw xato(`mime qo'llanmaydi: ${mime}`);
@@ -269,7 +272,10 @@ export function joyla({ draft_id, vaqt = '', qatiy = false }) {
   const d = store.get(String(draft_id || ''));
   if (!d) throw xato('qoralama topilmadi', 404);
   if (d.status === 'published') throw xato('post allaqachon chiqqan');
+  if (!['n8n', 'pending', 'approved'].includes(d.status)) throw xato(`bu qoralamani joylab bo'lmaydi (holati: ${d.status})`);
   const tanlangan = vaqt ? parseTime(vaqt) : null;
+  if (tanlangan && store.byStatus('approved').some(x => x.id !== d.id && x.scheduledAt === tanlangan))
+    throw xato(`${fmtTime(tanlangan)} da boshqa post turibdi — boshqa vaqt yozing`);
   if (vaqt && !tanlangan && qatiy) throw xato(`"${vaqt}" — vaqt tushunarsiz yoki o'tib ketgan`);
   const at = tanlangan || nextSlot();
   store.update(d.id, { status: 'approved', scheduledAt: at });
@@ -348,7 +354,7 @@ export async function ishlabChiqarish({ draft_id, variant = 0 }) {
       const v = d.reels?.variantlar?.[Number(variant)] || d.reels?.variantlar?.[0];
       if (!v) throw xato('reels ssenariysi yo\'q');
       const rt = reelsTz(d.tz);
-      const sb = await reels.storibord(rt, v.ssenariy);
+      const sb = await reels.storibord(rt, v.ssenariy, { saqla: false });
       const pm = await promptMuhandis(rt, sb.sahnalar, sb.yakun);
       store.update(d.id, { reels: { ...d.reels, tanlangan: Number(variant) || 0 } });
       return { tur: 'reels', sahnalar: pm.sahnalar, yakun: pm.yakun, personaj: pm.personaj, smm: sb.smm };
@@ -369,11 +375,14 @@ export function dayjestMatni(r) {
 }
 
 // Uslubni rahbarning o'z kanalidan o'rganish: postlar namuna bo'ladi, uslubshunos tavsif yozadi
-export async function uslubKanaldan({ kanal = process.env.USLUB_KANAL || String(cfg.channelId || '').replace(/^@/, ''), fetchFn } = {}) {
+export async function uslubKanaldan({ kanal = process.env.USLUB_KANAL || '', fetchFn } = {}) {
   if (!kanal || /^-?\d+$/.test(kanal)) throw xato("uslub uchun kanal nomi kerak (USLUB_KANAL=pulatovjurabek)");
   const { kanalOqi } = await import('../kuzatuv.js');
   const { analyzeStyle } = await import('./stylist.js');
-  const postlar = (await kanalOqi(kanal, { fetchFn })).filter(p => p.matn.length >= 150);
+  // Bot o'zi joylagan (AI yozgan) postlar rahbar uslubi emas — ular o'tkazib yuboriladi
+  const imzo = (t) => String(t).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 80).toLowerCase();
+  const botniki = new Set(store.byStatus('published').filter(x => !x.tahrirlangan).map(x => imzo(x.post_html)).filter(Boolean));
+  const postlar = (await kanalOqi(kanal, { fetchFn })).filter(p => p.matn.length >= 150 && !botniki.has(imzo(p.matn)));
   let qoshildi = 0;
   for (const p of postlar) { const oldin = store.style().samples.length; addSample(p.matn); if (store.style().samples.length > oldin) qoshildi++; }
   const st = store.style();

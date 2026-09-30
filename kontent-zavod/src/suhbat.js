@@ -9,6 +9,7 @@ import { TURLAR } from './agents/kontent.js';
 // Javob: { xabarlar: [{ matn, klaviatura: null|'tz'|'matn'|'joyla' }], keyingi: null|{ tur, draft_id, ... } }
 
 const BAND_MS = 10 * 60e3;
+const ISHLAB_MS = 25 * 60e3; // rasm/video yasash uzoqroq davom etadi
 const kalit = (chatId) => `suhbat:${chatId}`;
 const holat = (chatId) => store.setting(kalit(chatId), { bosqich: 'bosh' });
 const saqla = (chatId, h) => store.setSetting(kalit(chatId), { ...h, at: Date.now() });
@@ -59,7 +60,7 @@ const tanqidMatni = (t) => `🧐 Tanqidchi: ${t.baho}/10
 const xab = (matn, klaviatura = null) => ({ matn: String(matn).slice(0, 4000), klaviatura });
 
 // k — agentlar (kontent.js va kuzatuv.js funksiyalari); test uchun almashtiriladi
-export async function suhbat({ chatId, text = '', tugma = '', hodisa = '' }, k) {
+export async function suhbat({ chatId, text = '', tugma = '', hodisa = '', draft_id = '', xato = '' }, k) {
   if (!chatId) throw Object.assign(new Error('chatId kerak'), { kod: 400 });
   const t = String(text || '').trim();
   const kichik = t.toLowerCase().replace(/[ʻ‘’`]/g, "'");
@@ -90,16 +91,23 @@ export async function suhbat({ chatId, text = '', tugma = '', hodisa = '' }, k) 
     return { xabarlar: [xab(k.dayjestMatni(r))] };
   }
 
-  if (h.band && Date.now() - h.band < BAND_MS && !hodisa) return { xabarlar: [xab('⏳ Hali oldingi bosqich ustida ishlayapman, biroz kuting.')] };
+  if (h.band && Date.now() - h.band < (h.bosqich === 'ishlab' ? ISHLAB_MS : BAND_MS) && !hodisa) return { xabarlar: [xab('⏳ Hali oldingi bosqich ustida ishlayapman, biroz kuting.')] };
   const band = async (fn) => {
     saqla(chatId, { ...h, band: Date.now() });
     try { return await fn(); } catch (e) { saqla(chatId, { ...h, band: 0 }); throw e; }
   };
 
-  // Ishlab chiqarish tugadi (n8n: rasm/video tayyor) → tanqidchi → joylash savoli
-  if (hodisa === 'media_tayyor' || hodisa === 'tanqid') {
-    if (!h.draft_id) return { xabarlar: [] };
-    const tq = await band(() => k.tanqid({ draft_id: h.draft_id }));
+  // Ishlab chiqarish natijasi (n8n): faqat shu chat hozir aynan shu qoralamani kutayotgan bo'lsa qabul qilinadi —
+  // kechikkan video boshqa (yangi) postga bog'lanib qolmasin
+  if (hodisa === 'media_tayyor' || hodisa === 'media_xato') {
+    if (h.bosqich !== 'ishlab' || !h.draft_id || String(draft_id) !== String(h.draft_id)) return { xabarlar: [] };
+    if (hodisa === 'media_xato') {
+      saqla(chatId, { ...h, bosqich: 'matn', band: 0 });
+      return { xabarlar: [xab(`⚠️ Rasm/video yasalmadi: ${String(xato || "noma'lum xato").slice(0, 300)}\n\n✅ bossangiz qayta urinaman, 🛑 — to'xtataman.`, 'matn')] };
+    }
+    let tq;
+    try { tq = await k.tanqid({ draft_id: h.draft_id }); }
+    catch (e) { tq = { baho: '?', kuchli: [], zaif: [], saboq: `tanqidchi ishlamadi: ${e.message}` }; }
     saqla(chatId, { ...h, bosqich: 'joyla', band: 0 });
     return { xabarlar: [xab(tanqidMatni(tq), 'joyla')] };
   }
@@ -131,14 +139,16 @@ export async function suhbat({ chatId, text = '', tugma = '', hodisa = '' }, k) 
     }
     if (tugma === 'm_izoh') { saqla(chatId, { ...h, bosqich: 'matn_izoh' }); return { xabarlar: [xab('🔄 Izohingizni yozing — shunga qarab qayta yozaman.')] }; }
     if (tugma === 'm_ok') {
-      await band(() => k.tasdiq({ draft_id: h.draft_id }));
+      await band(() => k.tasdiq({ draft_id: h.draft_id, variant: h.variant || 0 }));
       if (h.kontent_turi === 'reels' || h.kontent_turi === 'matn+rasm') {
         const ic = await band(() => k.ishlabChiqarish({ draft_id: h.draft_id, variant: h.variant || 0 }));
         saqla(chatId, { ...h, bosqich: 'ishlab', band: Date.now() });
         return { xabarlar: [xab(h.kontent_turi === 'reels' ? '🏭 Matn tasdiqlandi. Rejissyor va prompt muhandisi tayyor — rasm, ovoz va video yasalyapti (3–5 daqiqa)…' : '🏭 Matn tasdiqlandi. Rasm chizilyapti…')],
           keyingi: { ...ic, draft_id: h.draft_id } };
       }
-      const tq = await band(() => k.tanqid({ draft_id: h.draft_id }));
+      let tq;
+      try { tq = await band(() => k.tanqid({ draft_id: h.draft_id })); }
+      catch (e) { tq = { baho: '?', kuchli: [], zaif: [], saboq: `tanqidchi ishlamadi: ${e.message}` }; }
       saqla(chatId, { ...h, bosqich: 'joyla', band: 0 });
       return { xabarlar: [xab(tanqidMatni(tq), 'joyla')] };
     }
@@ -161,16 +171,17 @@ export async function suhbat({ chatId, text = '', tugma = '', hodisa = '' }, k) 
   }
   if (h.bosqich === 'matn' || h.bosqich === 'matn_tahrir' || h.bosqich === 'matn_izoh') {
     const d = k.qoralama(h.draft_id);
-    if (h.bosqich === 'matn' && /^\d$/.test(t) && d?.reels?.variantlar?.length > 1) {
+    if (h.bosqich === 'matn' && /^[1-9]$/.test(t) && d?.reels?.variantlar?.length > 1) {
       const v = Math.min(d.reels.variantlar.length, Number(t)) - 1;
       saqla(chatId, { ...h, variant: v });
-      return { xabarlar: [xab(`🎬 ${v + 1}-variant tanlandi.`, 'matn')] };
+      return { xabarlar: [xab(`🎬 ${v + 1}-variant tanlandi. ✅ bosing yoki izoh yozing.`, 'matn')] };
     }
-    // Tugmasiz yozilgan matn: uzun bo'lsa — rahbar tuzatgan matn, qisqa bo'lsa — izoh
-    const asl = k.tozaMatn(d).length;
-    const tahrir = h.bosqich === 'matn_tahrir' || (h.bosqich === 'matn' && t.length >= Math.max(200, asl * 0.5));
-    const r = await band(() => k.tasdiq(tahrir ? { draft_id: h.draft_id, matn: t } : { draft_id: h.draft_id, qaror: 'qayta', izoh: t }));
-    return matnYubor({ ...r, kontent_turi: h.kontent_turi });
+    // Tuzatilgan to'liq matn faqat "✏️ O'zim tuzataman" dan keyin qabul qilinadi; boshqa hollarda yozilgani — izoh
+    const r = await band(() => k.tasdiq(h.bosqich === 'matn_tahrir'
+      ? { draft_id: h.draft_id, matn: t }
+      : { draft_id: h.draft_id, qaror: 'qayta', izoh: t, variant: h.variant || 0 }));
+    // Qayta yozilgach variantlar tartibi o'zgaradi — yangisi birinchi
+    return matnYubor({ ...r, kontent_turi: h.kontent_turi }, { variant: 0 });
   }
   if (h.bosqich === 'joyla' || h.bosqich === 'joyla_vaqt') {
     let r;
@@ -178,6 +189,12 @@ export async function suhbat({ chatId, text = '', tugma = '', hodisa = '' }, k) 
     catch (e) { if (e.kod === 400) return { xabarlar: [xab(`🕒 ${e.message}. Masalan: 19:00, ertaga 09:00, 03.10 18:30`, 'joyla')] }; throw e; }
     saqla(chatId, { bosqich: 'bosh' });
     return { xabarlar: [xab(`📅 Tayyor! ${r.kanal} kanaliga ${r.vaqt} da chiqadi.`)] };
+  }
+
+  // Ishlab chiqarish natijasi kelmay qoldi (n8n to'xtagan) — matn bosqichiga qaytamiz, yangi g'oya bilan aralashmasin
+  if (h.bosqich === 'ishlab') {
+    saqla(chatId, { ...h, bosqich: 'matn', band: 0 });
+    return { xabarlar: [xab("⚠️ Rasm/video javobi kelmadi. ✅ bossangiz qayta urinaman, 🛑 — to'xtataman, keyin yangi g'oya yozing.", 'matn')] };
   }
 
   // Yangi g'oya: dayjest raqami yoki matn

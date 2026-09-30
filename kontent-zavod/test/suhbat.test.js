@@ -33,7 +33,10 @@ test("g'oya → TZ (tugmalar) → matn bilan tuzatish → tasdiq → muallif →
   assert.equal(r.xabarlar[0].klaviatura, 'matn');
   r = await suhbat({ chatId: C, text: 'qisqaroq' }, k);              // qisqa — izoh
   assert.deepEqual(log.at(-1), ['tasdiq', 'qayta', '', 'qisqaroq']);
-  r = await suhbat({ chatId: C, text: 'Yangi matn '.repeat(40) }, k); // uzun — rahbar tahriri
+  r = await suhbat({ chatId: C, text: 'Uzun izoh '.repeat(40) }, k);  // tugmasiz uzun xabar ham — izoh (matn o'rnini bosmaydi)
+  assert.deepEqual(log.at(-1), ['tasdiq', 'qayta', '', ('Uzun izoh '.repeat(40)).trim()]);
+  await suhbat({ chatId: C, tugma: 'm_edit' }, k);
+  r = await suhbat({ chatId: C, text: 'Yangi matn '.repeat(40) }, k); // ✏️ dan keyin — rahbar tahriri
   assert.deepEqual(log.at(-1), ['tasdiq', 'tasdiq', 'matn', '']);
   r = await suhbat({ chatId: C, tugma: 'm_ok' }, k);
   assert.equal(r.xabarlar[0].klaviatura, 'joyla'); assert.match(r.xabarlar[0].matn, /Tanqidchi: 7/);
@@ -56,8 +59,49 @@ test("matn+rasm: tasdiqdan keyin n8n ga ishlab chiqarish topshirig'i, media tayy
   assert.deepEqual(r.keyingi, { tur: 'matn+rasm', rasm_prompt: 'p', draft_id: 'D1' });
   r = await suhbat({ chatId: C, text: 'yana nimadir' }, k);           // ishlab chiqarish paytida
   assert.match(r.xabarlar[0].matn, /Hali oldingi bosqich/);
-  r = await suhbat({ chatId: C, hodisa: 'media_tayyor' }, k);
+  r = await suhbat({ chatId: C, hodisa: 'media_tayyor', draft_id: 'BOSHQA' }, k); // boshqa qoralama — e'tiborsiz
+  assert.equal(r.xabarlar.length, 0);
+  r = await suhbat({ chatId: C, hodisa: 'media_tayyor', draft_id: 'D1' }, k);
   assert.equal(r.xabarlar[0].klaviatura, 'joyla');
+  r = await suhbat({ chatId: C, hodisa: 'media_tayyor', draft_id: 'D1' }, k);    // takroriy — e'tiborsiz
+  assert.equal(r.xabarlar.length, 0);
+});
+
+test("ishlab chiqarish xatosi va javobsiz qolishi — chat qotib qolmaydi; tanqidchi xatosi joylashni to'smaydi", async () => {
+  const { k, log } = agentlar();
+  k.muallif = async () => ({ draft_id: 'D1', kontent_turi: 'matn+rasm', korinish: 'KOR' });
+  const C = '444';
+  await suhbat({ chatId: C, text: "g'oya" }, k);
+  await suhbat({ chatId: C, tugma: 'tz_ok' }, k);
+  await suhbat({ chatId: C, tugma: 'm_ok' }, k);
+  let r = await suhbat({ chatId: C, hodisa: 'media_xato', draft_id: 'D1', xato: 'render 400' }, k);
+  assert.match(r.xabarlar[0].matn, /render 400/); assert.equal(r.xabarlar[0].klaviatura, 'matn');
+  await suhbat({ chatId: C, tugma: 'm_ok' }, k);                     // qayta urinish
+  const { store } = await import('../src/store.js');
+  store.setSetting(`suhbat:${C}`, { ...store.setting(`suhbat:${C}`), band: Date.now() - 26 * 60e3 }); // 25 daqiqadan oshdi
+  r = await suhbat({ chatId: C, text: 'yangi fikr' }, k);
+  assert.match(r.xabarlar[0].matn, /javobi kelmadi/); assert.equal(r.xabarlar[0].klaviatura, 'matn');
+  k.tanqid = async () => { throw new Error('Max limiti tugadi'); };
+  await suhbat({ chatId: C, tugma: 'm_ok' }, k);
+  r = await suhbat({ chatId: C, hodisa: 'media_tayyor', draft_id: 'D1' }, k);
+  assert.match(r.xabarlar[0].matn, /tanqidchi ishlamadi: Max limiti/); assert.equal(r.xabarlar[0].klaviatura, 'joyla');
+  assert.ok(!log.some(x => x[0] === 'prodyuser' && x[1] === 'yangi fikr'), "ishlab paytidagi xabar yangi g'oya bo'lib ketmadi");
+});
+
+test('reels: tanlangan variant qayta yozishga asos bo\'ladi, keyin 1-variantga qaytadi; "0" variant emas', async () => {
+  const { k, log, d } = agentlar();
+  d.reels = { variantlar: [{}, {}] };
+  k.muallif = async () => ({ draft_id: 'D1', kontent_turi: 'reels', korinish: 'KOR' });
+  const tasdiqlar = [];
+  k.tasdiq = async (b) => { tasdiqlar.push(b); return { draft_id: 'D1', korinish: 'KOR2' }; };
+  const C = '555';
+  await suhbat({ chatId: C, text: "g'oya" }, k);
+  await suhbat({ chatId: C, tugma: 'tz_ok' }, k);
+  assert.match((await suhbat({ chatId: C, text: '2' }, k)).xabarlar[0].matn, /2-variant tanlandi/);
+  await suhbat({ chatId: C, text: 'jonliroq' }, k);
+  assert.deepEqual([tasdiqlar.at(-1).qaror, tasdiqlar.at(-1).variant], ['qayta', 1]);
+  await suhbat({ chatId: C, text: '0' }, k);                        // 0 — izoh sifatida
+  assert.deepEqual([tasdiqlar.at(-1).izoh, tasdiqlar.at(-1).variant], ['0', 0]);
 });
 
 test("buyruqlar: /start, kanal qo'shish, bekor, dayjest raqami, m_edit nusxa matni", async () => {

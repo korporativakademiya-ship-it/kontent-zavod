@@ -34,14 +34,15 @@ function tengmi(a, b) {
 
 function jsonOqi(req, max = MAX_BODY) {
   return new Promise((res, rej) => {
-    let hajm = 0;
+    let hajm = 0, oshdi = false;
     const qism = [];
     req.on('data', c => {
       hajm += c.length;
-      if (hajm > max) { rej(Object.assign(new Error("so'rov juda katta"), { kod: 413 })); req.destroy(); return; }
-      qism.push(c);
+      if (hajm > max) { oshdi = true; qism.length = 0; return; } // oxirigacha o'qib, 413 bilan javob beramiz
+      if (!oshdi) qism.push(c);
     });
     req.on('end', () => {
+      if (oshdi) return rej(Object.assign(new Error(`so'rov juda katta (${Math.round(hajm / 1048576)} MB)`), { kod: 413 }));
       if (!qism.length) return res({});
       try { res(JSON.parse(Buffer.concat(qism).toString('utf8'))); }
       catch { rej(Object.assign(new Error("JSON noto'g'ri"), { kod: 400 })); }
@@ -90,7 +91,8 @@ export function apiYarat({ kalit = process.env.N8N_API_KALIT || '', agentlar, lo
     'POST /api/goyalar/kunlik': async (b) => agentlar.kontent.kunlikGoyalar({ soni: Math.min(10, Math.max(1, Number(b.soni) || 5)) }),
     'POST /api/goyalar/tanla': async (b) => agentlar.kontent.goyaTanla(b),
     'POST /api/suhbat': async (b) => agentlar.suhbat({ chatId: String(b.chatId || ''), text: typeof b.text === 'string' ? b.text.slice(0, 6000) : '',
-      tugma: typeof b.tugma === 'string' ? b.tugma.slice(0, 40) : '', hodisa: typeof b.hodisa === 'string' ? b.hodisa : '' }),
+      tugma: typeof b.tugma === 'string' ? b.tugma.slice(0, 40) : '', hodisa: typeof b.hodisa === 'string' ? b.hodisa : '',
+      draft_id: String(b.draft_id || ''), xato: typeof b.xato === 'string' ? b.xato.slice(0, 500) : '' }),
     'POST /api/kanallar': async (b) => {
       const k = agentlar.kuzatuv;
       const list = b.amal === 'qosh' ? k.kanalQosh(matn(b.kanal, 'kanal', 200), b.izoh || '')
