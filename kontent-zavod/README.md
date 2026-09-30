@@ -118,8 +118,12 @@ Miya — shu bot (uslub, qoidalar, mahsulot profillari, rubrikalar, rahbar tanlo
 `N8N_API_KALIT` berilsa, bot `PORT` (standart 8080) da API ochadi; har so'rovda `x-api-kalit` sarlavhasi shu kalit bo'lishi kerak.
 - `POST /api/reels/tz` `{goya, mahsulot?}` — **Prodyuser**: xom g'oyani TZ ga aylantiradi (rubrika, format, maqsad, auditoriya,
   3 ta ilmoq, tuzilma, ovoz, vizual uslub va personaj, CTA kodi, "o'zim qo'shdim" ro'yxati).
-- `POST /api/reels/ssenariy` `{tz, izoh?}` — **Ssenariychi + Tanqidchi**: diktor va ekran matni; tanqidchi 8/10 dan past
-  baholasa izohi bilan qayta yoziladi (ko'pi bilan 2 marta), eng yaxshi variant qaytadi.
+- `POST /api/reels/ssenariy` `{tz, izoh?, asos?}` — **Ssenariychi + Tanqidchi**: diktor va ekran matni. Tanqidchi baholaydi va
+  uslub bo'yicha faqat maslahat beradi (qayta yozish matnni jonsiz qiladi). Qat'iy xato (soxta raqam, CTA kodi, uzunlik) bo'lsa —
+  uslubni saqlab tuzatilgan 2-variant ham yoziladi. Hamma variant qaytadi, rahbar tanlaydi. `izoh` + `asos` — tanlangan variantni
+  izohga ko'ra qayta yozish.
+- `POST /api/reels/tanlov` `{tz, variantlar, tanlangan, izoh?}` — rahbar tanlovi tanlovlar xotirasiga; izoh tahrir izohlari
+  qatoriga qo'shiladi va har 5 tadan doimiy qoidalar yangilanadi.
 - `POST /api/reels/storibord` `{tz, ssenariy}` — **Rejissyor + SMM**: kadrma-kadr AI rasm tavsifi (izchil personaj va palitra),
   Instagram matni, heshteglar, muqova, birinchi izoh. Qoralama `status: 'reels'` bilan saqlanadi (kalendarda ko'rinmaydi, CTA kodi band).
 - `POST /api/reels/baho` `{sarlavha, mahsulot, ball: 1–5, sabab?}` — rahbar bahosi tanlovlar xotirasiga (4–5 ijobiy).
