@@ -2,7 +2,8 @@ import { store } from './store.js';
 
 // Kuzatiladigan kanallar: rahbar n8n bot orqali qo'shadi ("kanal: @nom — nima uchun").
 // Telegram ochiq kanallari t.me/s/<nom> sahifasidan o'qiladi (API kaliti kerak emas).
-// Instagram — Meta tasdig'idan keyin (Business Discovery API); hozircha ro'yxatda saqlanadi, o'qilmaydi.
+// Instagram — Meta Business Discovery API: IG_ACCESS_TOKEN va IG_USER_ID (o'z Instagram biznes akkauntingiz) berilsa,
+// kuzatilayotgan profillarning oxirgi postlari (izoh, layk, kommentlar) o'qiladi; berilmasa — ro'yxatda turadi.
 
 const MAX_KANAL = 30;
 
@@ -68,16 +69,36 @@ export async function kanalOqi(nom, { fetchFn = fetch } = {}) {
   return postlarniAjrat(await res.text());
 }
 
-// Oxirgi kunlardagi eng ko'p ko'rilgan postlar — har kanaldan bir nechtasi
-export async function kuzatuvXulosasi({ kunlar = 3, harKanaldan = 4, fetchFn } = {}) {
+export const instagramYoqilgan = (env = process.env) => Boolean(env.IG_ACCESS_TOKEN && env.IG_USER_ID);
+
+// Instagram profilining oxirgi postlari (Business Discovery). korish — layk + 3×komment (Instagram ko'rishlarni bermaydi)
+export async function instagramOqi(nom, { fetchFn = fetch, env = process.env } = {}) {
+  const ver = env.GRAPH_API_VERSION || 'v21.0';
+  const maydon = `business_discovery.username(${nom}){media.limit(20){caption,like_count,comments_count,timestamp,permalink,media_type}}`;
+  const url = `https://graph.facebook.com/${ver}/${encodeURIComponent(env.IG_USER_ID)}?fields=${encodeURIComponent(maydon)}&access_token=${encodeURIComponent(env.IG_ACCESS_TOKEN)}`;
+  const res = await fetchFn(url, { signal: AbortSignal.timeout(20000) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`instagram @${nom}: ${data?.error?.message || res.status}`);
+  return (data?.business_discovery?.media?.data || []).map(m => ({
+    matn: String(m.caption || '').slice(0, 1500), korish: (m.like_count || 0) + 3 * (m.comments_count || 0),
+    vaqt: m.timestamp || '', havola: m.permalink || '', turi: m.media_type || '',
+  }));
+}
+
+// Oxirgi kunlardagi eng ko'p ko'rilgan / eng faol postlar — har kanal va profildan bir nechtasi
+export async function kuzatuvXulosasi({ kunlar = 3, harKanaldan = 4, fetchFn, env = process.env } = {}) {
   const since = Date.now() - kunlar * 864e5;
   const natija = [], xatolar = [];
-  for (const k of kanallar().filter(x => x.platforma === 'telegram')) {
+  const ig = instagramYoqilgan(env);
+  for (const k of kanallar().filter(x => x.platforma === 'telegram' || ig)) {
     try {
-      const postlar = (await kanalOqi(k.nom, { fetchFn }))
-        .filter(p => !p.vaqt || new Date(p.vaqt).getTime() >= since)
+      const instagram = k.platforma === 'instagram';
+      // Instagram'da post kamroq chiqadi — 2 haftalik oyna
+      const chegara = instagram ? Date.now() - 14 * 864e5 : since;
+      const postlar = (await (instagram ? instagramOqi(k.nom, { fetchFn, env }) : kanalOqi(k.nom, { fetchFn })))
+        .filter(p => p.matn && (!p.vaqt || new Date(p.vaqt).getTime() >= chegara))
         .sort((a, b) => b.korish - a.korish).slice(0, harKanaldan);
-      natija.push({ kanal: `@${k.nom}`, izoh: k.izoh, postlar });
+      natija.push({ kanal: `${instagram ? 'instagram ' : ''}@${k.nom}`, izoh: k.izoh, postlar });
     } catch (e) { xatolar.push(`@${k.nom}: ${e.message}`); }
   }
   return { natija, xatolar };

@@ -127,7 +127,7 @@ Rahbar bilan suhbat — `src/suhbat.js` (`POST /api/suhbat`): har chatning bosqi
 `kanallar`, `uslub` (rahbar kanalidan — `USLUB_KANAL` — postlarni o'qib uslubni qayta o'rganadi), `bekor`.
 Odamdek yozish qoidalari (AI iboralari taqiqi) — `src/tabiiy.js`, kopirayter, maqola va ssenariychida.
 Kuzatiladigan kanallar: n8n botga `kanal: @nom — nima uchun`, `kanallar`, `kanal o'chir: @nom`. Telegram ochiq kanallari `t.me/s/<nom>`
-dan o'qiladi; Instagram ro'yxatda saqlanadi, Meta Business Discovery ulanganda o'qiladi.
+dan o'qiladi; Instagram profillari — `IG_ACCESS_TOKEN` va `IG_USER_ID` (Meta Business Discovery) berilsa o'qiladi (oxirgi 2 hafta, layk+komment bo'yicha), aks holda ro'yxatda turadi.
 
 ## Instagram reels liniyasi (n8n doska uchun API)
 Miya — shu bot (uslub, qoidalar, mahsulot profillari, rubrikalar, rahbar tanlovlari); doska — n8n.
