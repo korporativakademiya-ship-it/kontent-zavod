@@ -120,7 +120,7 @@ function rejaga(tz) {
 }
 
 // Reels TZ (reels.js ssenariy/storibord kutgan shakl)
-function reelsTz(tz) {
+export function reelsTz(tz) {
   return {
     sarlavha: tz.sarlavha, mahsulot: tz.mahsulot, rubrika: tz.rubrika, format: 'motion', maqsad: 'lid',
     auditoriya: tz.auditoriya, asosiy_fikr: tz.asosiy_fikr, burchak: tz.taklif, dalil: tz.dalil,

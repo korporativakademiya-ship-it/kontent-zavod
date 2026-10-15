@@ -9,7 +9,7 @@ import { revise } from './agents/copywriter.js';
 import { writeArticle } from './agents/article.js';
 import { isRich, sendRich, approvalPrefix } from './rich.js';
 import { nextSlot, fmtTime, parseTime, publish, sendMediaPost, sendSafe, imagePaths, AllaqachonChiqqan } from './publisher.js';
-import { makeVideo } from './video/make.js';
+import { videoYasa } from './video/kino.js';
 import { renderSlides } from './video/slides.js';
 import { VIDEO_SIGNATURE } from './brand.js';
 import { ttsEnabled, TTS_SETUP, synth, speechText, toVoiceNote } from './tts.js';
@@ -102,7 +102,7 @@ async function videoRun(d) {
   videoBusy = true;
   try {
     await reply(`🎥 "${d.title}" — video yasalmoqda (1–3 daqiqa)...`);
-    const v = await makeVideo(d);
+    const v = await videoYasa(d, { log: reply });
     const nd = store.update(d.id, { video_path: v.file, video_duration: v.duration, motion: v.data });
     const cap = `<b>🎥 Video</b> | ${esc(d.title)} | ${Math.round(v.duration)} s${v.voiced ? ' | 🎙 dublyaj' : ''}\n<i>${isRich(d) ? 'Tasdiqlansa, video maqola ichida chiqadi.' : 'Tasdiqlansa, kanalga shu video post matni bilan chiqadi.'}</i>`;
     await bot.api.sendVideo(cfg.groupId, new InputFile(v.file), {

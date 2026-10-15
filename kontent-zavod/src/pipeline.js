@@ -7,7 +7,7 @@ import { write } from './agents/copywriter.js';
 import { review } from './agents/director.js';
 import { writeArticle } from './agents/article.js';
 import { renderSlides } from './video/slides.js';
-import { makeVideo } from './video/make.js';
+import { videoYasa } from './video/kino.js';
 import { prodyuser, rasmPrompti } from './agents/kontent.js';
 import { rasmYoqilgan, rasmYasa } from './rasm.js';
 import { joriy } from './mahsulot.js';
@@ -97,7 +97,7 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
   if (p.format === 'reels' && process.env.AVTO_VIDEO !== '0') {
     try {
       await log(`🎥 Video yasalmoqda: ${p.title}`);
-      const v = await makeVideo(draft);
+      const v = await videoYasa(draft, { log });
       draft = store.update(draft.id, { video_path: v.file, video_duration: v.duration, motion: v.data });
     } catch (e) { await log(`⚠️ Video yasalmadi (${p.title}): ${e.message} — post matn bo'lib qoladi, 🎥 bilan qayta urinib ko'ring`); }
   }
