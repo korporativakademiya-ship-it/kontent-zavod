@@ -7,6 +7,7 @@ import { write } from './agents/copywriter.js';
 import { review } from './agents/director.js';
 import { writeArticle } from './agents/article.js';
 import { renderSlides } from './video/slides.js';
+import { makeVideo } from './video/make.js';
 import { VIDEO_SIGNATURE } from './brand.js';
 import { uniqueCode, ensureCode, ensureLink } from './cta.js';
 import { topish } from './kontentReja.js';
@@ -65,6 +66,14 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
   if (art) {
     try { draft = await renderDraftSlides(draft); }
     catch (e) { await log(`⚠️ Slaydlar chizilmadi (${p.title}): ${e.message}`); }
+  }
+  // Reels — video ham o'zi yasaladi (avto rejimda matn videosiz chiqib ketmasin). O'chirish: AVTO_VIDEO=0
+  if (p.format === 'reels' && process.env.AVTO_VIDEO !== '0') {
+    try {
+      await log(`🎥 Video yasalmoqda: ${p.title}`);
+      const v = await makeVideo(draft);
+      draft = store.update(draft.id, { video_path: v.file, video_duration: v.duration, motion: v.data });
+    } catch (e) { await log(`⚠️ Video yasalmadi (${p.title}): ${e.message} — post matn bo'lib qoladi, 🎥 bilan qayta urinib ko'ring`); }
   }
   return draft;
 }
