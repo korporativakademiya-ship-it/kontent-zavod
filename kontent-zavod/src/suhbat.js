@@ -94,6 +94,8 @@ async function ichki({ chatId: guruh, thread = '', text = '', tugma = '', hodisa
 
   // Buyruqlar — istalgan bosqichda
   if (kichik === '/start' || kichik === 'yordam') return { xabarlar: [xab(YORDAM)] };
+  // Boshqa /buyruqlar va "g'oya: ..." — Fabrika botiga tegishli (bir topikda ikki bot): g'oya deb TZ yozilmaydi
+  if (!tugma && (/^\//.test(kichik) || /^\s*(g'?oya|idea)\s*[:\-—]/.test(kichik))) return { xabarlar: [] };
   if (kichik === 'bekor' || tugma === 'stop') {
     saqla(chatId, { bosqich: 'bosh' });
     return { xabarlar: [xab("🛑 To'xtatildi. Yangi g'oya yozing yoki \"goyalar\".")] };
