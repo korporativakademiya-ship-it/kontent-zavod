@@ -144,7 +144,7 @@ Miya — shu bot (uslub, qoidalar, mahsulot profillari, rubrikalar, rahbar tanlo
   Instagram matni, heshteglar, muqova, birinchi izoh. Qoralama `status: 'reels'` bilan saqlanadi (kalendarda ko'rinmaydi, CTA kodi band).
 - `POST /api/reels/baho` `{sarlavha, mahsulot, ball: 1–5, sabab?}` — rahbar bahosi tanlovlar xotirasiga (4–5 ijobiy).
 - `GET /api/health`
-Reels rubrikalari: `src/reels/rubrikalar.js`. n8n workflow va video renderer: `korporativakademiya-ship-it/kotibim` → `kontent-render/`.
+Reels rubrikalari: `src/reels/rubrikalar.js`. n8n workflow va video renderer: shu repodagi `kontent-render/` (n8n — `kontent-render/n8n/`).
 
 ## Kotibim CRM'dagi kontent kalendari
 `KOTIBIM_URL` va `KONTENT_API_KALIT` (Kotibim'dagi bilan bir xil) berilsa, bot har daqiqada Kotibim CRM'ga

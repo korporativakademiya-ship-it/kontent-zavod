@@ -1,0 +1,20 @@
+{
+  "nik": "@pulatovjurabek",
+  "sahnalar": [
+    { "fon": "doska", "tur": "sarlavha", "soniya": 3.6, "qatorlar": ["Javobsiz xabar", "sizga *qanchaga*", "tushadi?"],
+      "subtitr": "Javobsiz xabar sizga *qanchaga* tushadi? Hisoblaymiz" },
+    { "fon": "daftar", "tur": "hisob", "soniya": 7.5,
+      "qatorlar": ["Kuniga xabar: 40 ta", "Javobsiz qoladi: 12 ta", "Har 3-tasi sotib olardi: *4 ta*", "4 × 250 000 = 1 000 000 so'm/kun"],
+      "natija": "Oyiga: 30 000 000 so'm", "izoh": "shunchaki yo'qoladi!",
+      "subtitr": "Kuniga 4 ta mijoz — oyiga *30 mln so'm* yo'qotish" },
+    { "fon": "doska", "tur": "oqim", "soniya": 5.2, "yakun": "yomon", "qadamlar": ["Mijoz yozdi 23:47", "Javob yo'q...", "Raqobatchidan oldi"],
+      "subtitr": "Chunki mijoz kutmaydi — *raqobatchiga* yozadi" },
+    { "fon": "doska", "tur": "oqim", "soniya": 6.2, "yakun": "yaxshi", "qadamlar": ["Mijoz yozdi 23:47", "Kotib AI: 3 soniya", "Ism + telefon", "CRM'da saqlandi"],
+      "subtitr": "Kotib AI 3 soniyada javob beradi va *lidni saqlaydi*" },
+    { "fon": "daftar", "tur": "taqqos", "soniya": 6.5, "chap": "Oldin", "ong": "Kotib AI bilan",
+      "qatorlar": [["Kechasi javob yo'q", "24/7 javob"], ["Lidlar yo'qoladi", "Hammasi CRM'da"], ["O'zingiz yozasiz", "Siz faqat sotasiz"]],
+      "subtitr": "Farqi — *har oy* sezilarli" },
+    { "fon": "doska", "tur": "cta", "soniya": 4.2, "soz": "KOTIB", "matn": "Direct'ga yozing",
+      "subtitr": "Hisobingizni tekshiramiz — Direct'ga *KOTIB* deb yozing" }
+  ]
+}

@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Plakat shablon</title>
+<style>
+  @font-face { font-family: 'InterL'; font-weight: 600; src: url(fonts/inter600.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 800; src: url(fonts/inter800.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 900; src: url(fonts/inter900.ttf); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #111; }
+  body { font-family: 'InterL', 'Noto Color Emoji', 'DejaVu Sans'; }
+  #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; }
+  .scene { position: absolute; inset: 0; opacity: 0; overflow: hidden; }
+  .scene.sariq { background: #FFD43B; color: #111; --urgu: #111; --urgu-matn: #FFD43B; --xira: rgba(0,0,0,.55); --karta: rgba(255,255,255,.55); }
+  .scene.qora { background: radial-gradient(900px 700px at 50% 35%, #232323, #0E0E0E 70%); color: #fff; --urgu: #FFD43B; --urgu-matn: #111; --xira: rgba(255,255,255,.55); --karta: rgba(255,255,255,.08); }
+  .scene.oq { background: radial-gradient(rgba(0,0,0,.09) 2.5px, transparent 3px) 0 0 / 44px 44px, #F6F5F1; color: #111; --urgu: #FFD43B; --urgu-matn: #111; --xira: rgba(0,0,0,.5); --karta: #fff; }
+  .abs { position: absolute; }
+  .markaz { left: 60px; right: 60px; text-align: center; }
+  .sub { position: absolute; left: 60px; right: 60px; top: 1400px; text-align: center; }
+  .sub .quti { display: inline-block; padding: 18px 32px; border-radius: 28px; font-size: 62px; font-weight: 900; line-height: 1.14; letter-spacing: -1.5px; }
+  .sariq .sub .quti { background: #111; color: #fff; }
+  .qora .sub .quti, .oq .sub .quti { background: #fff; color: #111; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+  .w { display: inline-block; opacity: 0; margin: 0 .12em; }
+  .w.hl { color: var(--urgu-matn); background: var(--urgu); padding: 0 .14em; border-radius: .14em; }
+  .sariq .sub .w.hl { background: #FFD43B; color: #111; }
+  #nik { position: absolute; left: 0; right: 0; top: 1760px; text-align: center; font-size: 40px; font-weight: 800; opacity: .55; z-index: 5; }
+
+  .kin { position: absolute; left: 70px; right: 70px; top: 0; text-align: center; font-size: 132px; font-weight: 900; line-height: 1.08; letter-spacing: -4px; }
+  .kin .w { margin: 0 .1em; }
+  .emoji { position: absolute; left: 0; right: 0; text-align: center; font-size: 190px; }
+
+  .sarlavha { font-size: 74px; font-weight: 900; line-height: 1.08; letter-spacing: -2px; }
+  .band { position: absolute; left: 70px; right: 70px; height: 150px; display: flex; align-items: center; gap: 36px; padding: 0 30px; border-radius: 36px; background: var(--karta); }
+  .band .n { flex: none; width: 104px; height: 104px; border-radius: 30px; background: var(--urgu); color: var(--urgu-matn); font-size: 64px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+  .band .t { font-size: 50px; font-weight: 800; line-height: 1.12; letter-spacing: -1px; }
+
+  .son { font-size: 300px; font-weight: 900; letter-spacing: -12px; line-height: 1; }
+  .ustun { position: absolute; bottom: 0; border-radius: 26px 26px 8px 8px; }
+  .qiymat { position: absolute; font-size: 54px; font-weight: 900; text-align: center; }
+  .yorliq { position: absolute; font-size: 36px; font-weight: 800; text-align: center; line-height: 1.1; }
+
+  .variant { position: absolute; left: 70px; right: 70px; height: 156px; border-radius: 40px; display: flex; align-items: center; gap: 34px; padding: 0 34px;
+    background: var(--karta); border: 4px solid transparent; font-size: 52px; font-weight: 800; }
+  .variant .h { flex: none; width: 100px; height: 100px; border-radius: 50%; border: 5px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: 56px; font-weight: 900; }
+  .pill { position: absolute; left: 50%; padding: 26px 50px; border-radius: 999px; background: var(--urgu); color: var(--urgu-matn); font-size: 56px; font-weight: 900; white-space: nowrap; }
+
+  .tugun { position: absolute; width: 64px; height: 64px; border-radius: 50%; background: var(--urgu); box-shadow: 0 0 0 12px rgba(255,212,59,.25); }
+  .qadam { position: absolute; left: 270px; right: 70px; }
+  .qadam b { display: block; font-size: 60px; font-weight: 900; color: var(--urgu); }
+  .sariq .qadam b { color: #111; }
+  .qadam span { display: block; font-size: 46px; font-weight: 800; line-height: 1.15; margin-top: 6px; }
+
+  .yarim { position: absolute; top: 0; bottom: 0; width: 540px; }
+  .yb { position: absolute; width: 470px; display: flex; gap: 18px; align-items: flex-start; font-size: 40px; font-weight: 800; line-height: 1.15; }
+  .yb i { font-style: normal; flex: none; width: 58px; height: 58px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #fff; }
+  .vs { position: absolute; left: 470px; width: 140px; height: 140px; border-radius: 50%; background: #111; color: #FFD43B; font-size: 58px; font-weight: 900; display: flex; align-items: center; justify-content: center; border: 6px solid #FFD43B; }
+
+  .panel { position: absolute; left: 50px; right: 50px; height: 560px; border-radius: 40px; overflow: hidden; background: #fff; color: #111; border: 5px solid #111; }
+  .panel .yorl { position: absolute; left: 26px; top: 24px; padding: 12px 28px; border-radius: 999px; background: #111; color: #FFD43B; font-size: 44px; font-weight: 900; z-index: 2; }
+  .panel .rasm { position: absolute; inset: 0; background-size: cover; background-position: center; }
+  .panel .emo { position: absolute; left: 0; right: 0; top: 90px; text-align: center; font-size: 230px; }
+  .panel .izoh { position: absolute; left: 30px; right: 30px; bottom: 26px; text-align: center; font-size: 56px; font-weight: 900; line-height: 1.1; }
+  .panel.rasmli .izoh { color: #fff; text-shadow: 0 4px 0 #000, 0 -4px 0 #000, 4px 0 0 #000, -4px 0 0 #000; }
+
+  .avatar { position: absolute; left: 50%; top: 250px; width: 300px; height: 300px; margin-left: -150px; border-radius: 50%; background: linear-gradient(150deg, #FFE066, #F59F00);
+    color: #111; font-size: 120px; font-weight: 900; display: flex; align-items: center; justify-content: center; background-size: cover; background-position: center; }
+  .halqa { position: absolute; left: 50%; top: 400px; width: 300px; height: 300px; margin: -150px 0 0 -150px; border-radius: 50%; border: 6px solid #FFD43B; }
+  .toblqin { position: absolute; left: 90px; right: 90px; top: 720px; height: 180px; display: flex; align-items: center; justify-content: space-between; }
+  .toblqin i { display: block; width: 12px; border-radius: 6px; background: #FFD43B; }
+  .iqt { position: absolute; left: 80px; right: 80px; top: 960px; text-align: center; font-size: 66px; font-weight: 900; line-height: 1.15; letter-spacing: -1.5px; }
+
+  .slayd { position: absolute; left: 140px; top: 190px; width: 800px; height: 1000px; border-radius: 36px; overflow: hidden; background: #fff center / cover no-repeat;
+    box-shadow: 0 40px 80px rgba(0,0,0,.3); }
+  .nuqta { position: absolute; top: 1240px; width: 20px; height: 20px; border-radius: 10px; background: var(--xira); }
+  .w.yop { margin-left: -.1em !important; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="nik"></div></div>
+<script src="umumiy.js"></script>
+<script>
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = x => 1 - Math.pow(1 - clamp(x), 3);
+const easeIO = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const back = x => { x = clamp(x); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, p) => a + (b - a) * p;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const sozlar = (m) => { const chiq = []; let bosh = true;
+  for (const q of String(m || '').split(/(\*[^*]+\*)/)) {
+    if (!q) continue; const hl = /^\*[^*]+\*$/.test(q);
+    for (const p of q.replace(/\*/g, '').split(/(\s+)/)) { if (!p) continue; if (/^\s+$/.test(p)) { bosh = true; continue; } chiq.push({ s: p, hl, yop: !bosh && chiq.length > 0 }); bosh = false; }
+  }
+  return chiq; };
+const sozHTML = (m) => sozlar(m).map(w => `<span class="w${w.hl ? ' hl' : ''}${w.yop ? ' yop' : ''}">${esc(w.s)}</span>`).join('');
+const pop = (el, p, from = .5) => { el.style.opacity = clamp(p * 3); el.style.transform = `scale(${lerp(from, 1, back(p))})`; };
+const rasmUrl = (u) => /^(https:\/\/|data:image\/)/.test(u || '') ? `url('${String(u).replace(/'/g, '%27').replace(/"/g, '%22')}')` : '';
+// sahna ichidagi so'zlarni bir tekis chiqarish
+function sozChiqar(ws, lt, bosh, oyna, katta = false) {
+  const n = ws.length || 1;
+  ws.forEach((w, k) => {
+    const q = (lt - bosh - (k / n) * oyna) / (katta ? .22 : .16);
+    w.style.opacity = clamp(q * 1.5);
+    w.style.transform = katta ? `scale(${lerp(1.9, 1, back(q))}) rotate(${lerp(k % 2 ? 6 : -6, 0, ease(q))}deg)` : `translateY(${lerp(24, 0, ease(q))}px) scale(${lerp(1.2, 1, ease(q))})`;
+  });
+}
+
+const TURLAR = {
+  // Katta so'zlar birma-bir "urilib" chiqadi
+  kinetik(el, s, h, dur) {
+    el.insertAdjacentHTML('beforeend', `${s.emoji ? `<div class="emoji" style="top:170px">${esc(s.emoji)}</div>` : ''}<div class="kin">${sozHTML(s.matn)}</div>`);
+    const kin = el.querySelector('.kin'), ws = [...kin.querySelectorAll('.w')], em = el.querySelector('.emoji');
+    let f = 132; while (kin.offsetHeight > 900 && f > 70) { f -= 6; kin.style.fontSize = f + 'px'; }
+    kin.style.top = `${(s.emoji ? 760 : 700) - kin.offsetHeight / 2}px`;
+    const oyna = Math.min(dur * .7, ws.length * .38);
+    ws.forEach((_, k) => h.push({ t: .15 + (k / ws.length) * oyna, tur: k % 3 ? 'tik' : 'pop' }));
+    return (lt) => {
+      sozChiqar(ws, lt, .15, oyna, true);
+      if (em) { const p = lt / .5; em.style.opacity = clamp(p * 3); em.style.transform = `scale(${lerp(.3, 1, back(p))}) translateY(${Math.sin(lt * 3) * 12}px)`; }
+    };
+  },
+
+  // Top-ro'yxat: raqamli bandlar birma-bir, joriy band yorqin
+  royxat(el, s, h, dur) {
+    const b = s.bandlar || [];
+    const qadam = Math.min(185, 980 / Math.max(1, b.length));
+    el.insertAdjacentHTML('beforeend', `<div class="abs markaz sarlavha" style="top:170px">${esc(s.sarlavha)}</div>` +
+      b.map((x, i) => `<div class="band" style="top:${400 + i * qadam}px;height:${Math.min(150, qadam - 20)}px"><div class="n">${s.teskari ? b.length - i : i + 1}</div><div class="t">${esc(x)}</div></div>`).join(''));
+    const sar = el.querySelector('.sarlavha'), bandlar = [...el.querySelectorAll('.band')];
+    bandlar.forEach(bd => { const t = bd.querySelector('.t'); let f = 50; while (t.scrollHeight > bd.offsetHeight - 10 && f > 30) { f -= 3; t.style.fontSize = f + 'px'; } });
+    const vaqt = b.map((_, i) => .6 + i * Math.min(1.6, (dur * .8 - .6) / Math.max(1, b.length)));
+    vaqt.forEach(t => h.push({ t, tur: 'pop' }));
+    return (lt) => {
+      const p = lt / .4; sar.style.opacity = clamp(p * 2); sar.style.transform = `translateY(${lerp(-40, 0, ease(p))}px)`;
+      bandlar.forEach((bd, i) => {
+        const q = (lt - vaqt[i]) / .4, joriy = lt >= vaqt[i] && (i === b.length - 1 || lt < vaqt[i + 1]);
+        bd.style.opacity = clamp(q * 3) * (joriy || lt > vaqt[b.length - 1] + 1 ? 1 : .55);
+        bd.style.transform = `translateX(${lerp(700, 0, ease(q))}px) scale(${joriy ? 1.03 : 1})`;
+      });
+    };
+  },
+
+  // Katta raqam sanaladi, % bo'lsa atrofida halqa to'ladi
+  raqam(el, s, h) {
+    const foiz = s.belgi === '%', v = Number(s.qiymat) || 0;
+    el.insertAdjacentHTML('beforeend', `${foiz ? `<svg class="abs" style="left:190px;top:260px" width="700" height="700" viewBox="0 0 700 700">
+        <circle cx="350" cy="350" r="320" fill="none" stroke="var(--xira)" stroke-opacity=".25" stroke-width="34"/>
+        <circle class="halq" cx="350" cy="350" r="320" fill="none" stroke="var(--urgu)" stroke-width="34" stroke-linecap="round" transform="rotate(-90 350 350)" stroke-dasharray="2011" stroke-dashoffset="2011"/></svg>` : ''}
+      <div class="abs markaz son" style="top:${foiz ? 455 : 380}px"><span class="v">0</span><span style="font-size:.5em;letter-spacing:-4px">${esc(s.belgi || '')}</span></div>
+      <div class="abs markaz sarlavha" style="top:1020px;font-size:62px">${sozHTML(s.matn)}</div>
+      ${s.manba ? `<div class="abs markaz" style="top:1270px;font-size:34px;font-weight:600;color:var(--xira)">Manba: ${esc(s.manba)}</div>` : ''}`);
+    const vEl = el.querySelector('.v'), halq = el.querySelector('.halq'), son = el.querySelector('.son'), ws = [...el.querySelectorAll('.sarlavha .w')], manba = el.querySelector('.abs[style*="1270"]');
+    h.push({ t: .1, tur: 'whoosh' }, { t: 1.9, tur: 'ding' });
+    const kasr = String(s.qiymat).includes('.') ? 1 : 0;
+    return (lt) => {
+      const p = ease((lt - .2) / 1.7);
+      vEl.textContent = (v * p).toLocaleString('ru-RU', { minimumFractionDigits: kasr, maximumFractionDigits: kasr });
+      pop(son, (lt - .05) / .5, .6);
+      if (halq) halq.setAttribute('stroke-dashoffset', 2011 * (1 - clamp(v / 100) * p));
+      sozChiqar(ws, lt, 1.2, .8);
+      if (manba) manba.style.opacity = clamp((lt - 2.2) * 2);
+    };
+  },
+
+  // Ustunli diagramma
+  grafik(el, s, h) {
+    const u = s.ustunlar || [], max = Math.max(...u.map(x => Number(x.qiymat) || 0), 1);
+    const X0 = 110, W = 860, gap = 40, bw = (W - gap * (u.length - 1)) / Math.max(1, u.length), BASE = 1170, HMAX = 620;
+    const eng = u.findIndex(x => Number(x.qiymat) === max);
+    el.insertAdjacentHTML('beforeend', `<div class="abs markaz sarlavha" style="top:170px">${esc(s.sarlavha)}</div>
+      <div class="abs" style="left:${X0 - 20}px;right:${1080 - X0 - W - 20}px;top:${BASE}px;height:6px;border-radius:3px;background:var(--xira)"></div>` +
+      u.map((x, i) => `<div class="ustun" style="left:${X0 + i * (bw + gap)}px;width:${bw}px;top:${BASE}px;height:0;background:${i === eng ? 'var(--urgu)' : 'var(--xira)'}"></div>
+        <div class="qiymat" style="left:${X0 + i * (bw + gap) - 20}px;width:${bw + 40}px">0</div>
+        <div class="yorliq" style="left:${X0 + i * (bw + gap) - 20}px;width:${bw + 40}px;top:${BASE + 24}px">${esc(x.nom)}</div>`).join(''));
+    const sar = el.querySelector('.sarlavha'), us = [...el.querySelectorAll('.ustun')], qs = [...el.querySelectorAll('.qiymat')], ys = [...el.querySelectorAll('.yorliq')];
+    u.forEach((_, i) => h.push({ t: .5 + i * .25, tur: 'tik' }));
+    h.push({ t: .5 + u.length * .25 + .9, tur: 'ding' });
+    return (lt) => {
+      sar.style.opacity = clamp(lt * 3);
+      us.forEach((b, i) => {
+        const p = ease((lt - .5 - i * .25) / 1), hh = HMAX * (Number(u[i].qiymat) || 0) / max * p;
+        b.style.height = hh + 'px'; b.style.top = BASE - hh + 'px';
+        qs[i].style.top = BASE - hh - 76 + 'px'; qs[i].style.opacity = clamp(p * 4);
+        qs[i].textContent = `${Math.round((Number(u[i].qiymat) || 0) * p).toLocaleString('ru-RU')}${s.birlik || ''}`;
+        ys[i].style.opacity = clamp((lt - .3 - i * .25) * 4);
+      });
+    };
+  },
+
+  // Savol + variantlar; javob belgilanadi yoki "izohda yozing"
+  test(el, s, h, dur) {
+    const v = s.variantlar || [], harf = 'ABCDE';
+    el.insertAdjacentHTML('beforeend', `<div class="abs markaz sarlavha" style="top:190px;font-size:80px">${esc(s.savol)}</div>` +
+      v.map((x, i) => `<div class="variant" style="top:${640 + i * 188}px"><div class="h">${harf[i]}</div><div>${esc(x)}</div></div>`).join('') +
+      `<div class="pill" style="top:${660 + v.length * 188}px">${esc(s.cta || '👇 Javobingizni izohda yozing')}</div>`);
+    const sar = el.querySelector('.sarlavha'), vs = [...el.querySelectorAll('.variant')], pill = el.querySelector('.pill');
+    let f = 80; while (sar.offsetHeight > 400 && f > 50) { f -= 4; sar.style.fontSize = f + 'px'; }
+    const javob = Number.isInteger(s.javob) ? s.javob : -1, tj = Math.max(1.2 + v.length * .35, dur * .62);
+    v.forEach((_, i) => h.push({ t: .7 + i * .35, tur: 'pop' }));
+    h.push({ t: tj, tur: javob >= 0 ? 'ding' : 'pop' });
+    return (lt) => {
+      pop(sar, lt / .45, .8);
+      vs.forEach((c, i) => {
+        const p = (lt - .7 - i * .35) / .4; c.style.opacity = clamp(p * 3); c.style.transform = `translateY(${lerp(80, 0, ease(p))}px)`;
+        if (javob >= 0 && lt > tj) {
+          const q = ease((lt - tj) / .3);
+          if (i === javob) { c.style.background = '#12B76A'; c.style.color = '#fff'; c.style.transform = `scale(${1 + Math.sin(q * Math.PI) * .06})`; }
+          else c.style.opacity = lerp(1, .35, q);
+        }
+      });
+      if (javob < 0) { const p = (lt - tj) / .4; pill.style.opacity = clamp(p * 3); pill.style.transform = `translateX(-50%) scale(${lerp(.4, 1, back(p)) * (1 + Math.sin(lt * 6) * .03 * clamp(lt - tj - .4))})`; }
+      else pill.style.opacity = 0;
+    };
+  },
+
+  // Yo'l xaritasi: vertikal chiziq, tugunlar va bosqichlar
+  yol(el, s, h, dur) {
+    const b = s.bosqichlar || [], Y0 = 350, Y1 = 1230, qadam = (Y1 - Y0) / Math.max(1, b.length - 1 || 1);
+    el.insertAdjacentHTML('beforeend', `${s.sarlavha ? `<div class="abs markaz sarlavha" style="top:170px;font-size:66px">${esc(s.sarlavha)}</div>` : ''}
+      <div class="chiz abs" style="left:192px;top:${Y0}px;width:16px;height:0;border-radius:8px;background:var(--urgu)"></div>` +
+      b.map((x, i) => `<div class="tugun" style="left:168px;top:${Y0 + i * qadam - 32}px"></div><div class="qadam" style="top:${Y0 + i * qadam - 46}px"><b>${esc(x.vaqt)}</b><span>${esc(x.matn)}</span></div>`).join(''));
+    const chiz = el.querySelector('.chiz'), tug = [...el.querySelectorAll('.tugun')], qad = [...el.querySelectorAll('.qadam')], sar = el.querySelector('.sarlavha');
+    const T = Math.max(1.5, dur * .75);
+    b.forEach((_, i) => h.push({ t: .3 + T * (b.length > 1 ? i / (b.length - 1) : 0), tur: 'pop' }));
+    return (lt) => {
+      if (sar) sar.style.opacity = clamp(lt * 3);
+      const p = clamp((lt - .3) / T);
+      chiz.style.height = (Y1 - Y0) * p + 'px';
+      tug.forEach((t, i) => { const q = (lt - .3 - T * (b.length > 1 ? i / (b.length - 1) : 0)) / .35; pop(t, q, .2); pop(qad[i], q, .8); qad[i].style.transform += ` translateX(${lerp(60, 0, ease(q))}px)`; });
+    };
+  },
+
+  // Ikki tomonlama: chapda yomon, o'ngda yaxshi
+  ikki(el, s, h, dur) {
+    const c = s.chap || {}, o = s.ong || {}, n = Math.max((c.bandlar || []).length, (o.bandlar || []).length);
+    el.insertAdjacentHTML('beforeend', `<div class="yarim" style="left:0;background:rgba(224,49,49,.14)"></div><div class="yarim" style="left:540px;background:rgba(18,183,106,.14)"></div>
+      <div class="abs" style="left:30px;width:480px;top:170px;text-align:center"><div style="font-size:170px">${esc(c.emoji || '😩')}</div><div class="sarlavha" style="font-size:54px">${esc(c.sarlavha || 'Oldin')}</div></div>
+      <div class="abs" style="left:570px;width:480px;top:170px;text-align:center"><div style="font-size:170px">${esc(o.emoji || '😎')}</div><div class="sarlavha" style="font-size:54px">${esc(o.sarlavha || 'Keyin')}</div></div>
+      <div class="vs" style="top:260px">VS</div>` +
+      Array.from({ length: n }, (_, i) => `${(c.bandlar || [])[i] ? `<div class="yb" style="left:40px;top:${560 + i * 190}px"><i style="background:#E03131">✕</i><span>${esc(c.bandlar[i])}</span></div>` : ''}
+        ${(o.bandlar || [])[i] ? `<div class="yb" style="left:580px;top:${560 + i * 190}px"><i style="background:#12B76A">✓</i><span>${esc(o.bandlar[i])}</span></div>` : ''}`).join(''));
+    const yb = [...el.querySelectorAll('.yb')], vs = el.querySelector('.vs'), bosh = [...el.querySelectorAll('.abs[style*="top:170px"]')];
+    const qadam = Math.min(1.1, (dur * .8 - 1) / Math.max(1, yb.length));
+    yb.forEach((_, i) => h.push({ t: 1 + i * qadam, tur: i % 2 ? 'tik' : 'pop' }));
+    h.push({ t: .5, tur: 'pop' });
+    return (lt) => {
+      bosh.forEach((b, i) => pop(b, (lt - i * .15) / .45, .6));
+      pop(vs, (lt - .5) / .4, .2);
+      yb.forEach((b, i) => { const q = (lt - 1 - i * qadam) / .35; b.style.opacity = clamp(q * 3); b.style.transform = `translateY(${lerp(40, 0, ease(q))}px)`; });
+    };
+  },
+
+  // Meme: "Kutilgan / Haqiqat" — ikkinchi panel zarb bilan tushadi
+  meme(el, s, h, dur) {
+    const panel = (y, p) => `<div class="panel${p.rasm ? ' rasmli' : ''}" style="top:${y}px">${p.rasm ? `<div class="rasm" style="background-image:${rasmUrl(p.rasm)}"></div>` : `<div class="emo">${esc(p.emoji || '🙂')}</div>`}
+      <div class="yorl">${esc(p.yorliq)}</div><div class="izoh">${esc(p.matn)}</div></div>`;
+    el.insertAdjacentHTML('beforeend', panel(150, { yorliq: 'Kutilgan', ...(s.yuqori || {}) }) + panel(740, { yorliq: 'Haqiqat', ...(s.pastki || {}) }));
+    const [a, b] = el.querySelectorAll('.panel'), tb = Math.max(1.2, dur * .42);
+    h.push({ t: .1, tur: 'pop' }, { t: tb, tur: 'xato' });
+    return (lt) => {
+      pop(a, lt / .45, .7);
+      const q = (lt - tb) / .3, sil = lt > tb && lt < tb + .45 ? Math.sin(lt * 70) * 14 * (1 - (lt - tb) / .45) : 0;
+      b.style.opacity = clamp(q * 3); b.style.transform = `translate(${sil}px, ${lerp(-120, 0, ease(q))}px) scale(${lerp(1.3, 1, ease(q))}) rotate(${lerp(-4, 0, ease(q))}deg)`;
+    };
+  },
+
+  // Audiogramma: avatar, to'lqin, iqtibos so'zma-so'z
+  audiogramma(el, s, h, dur) {
+    const ism = String(s.muallif || '').split(/\s+/).map(x => x[0] || '').join('').slice(0, 2).toUpperCase();
+    el.insertAdjacentHTML('beforeend', `<div class="halqa"></div><div class="halqa"></div>
+      <div class="avatar" style="${s.rasm ? `background-image:${rasmUrl(s.rasm)}` : ''}">${s.rasm ? '' : esc(ism || '🎙')}</div>
+      <div class="abs markaz" style="top:590px;font-size:48px;font-weight:900">${esc(s.muallif || '')}</div>
+      <div class="toblqin">${Array.from({ length: 44 }, () => '<i></i>').join('')}</div>
+      <div class="iqt">${sozHTML(s.matn)}</div>`);
+    const hq = [...el.querySelectorAll('.halqa')], bars = [...el.querySelectorAll('.toblqin i')], iqt = el.querySelector('.iqt'), ws = [...iqt.querySelectorAll('.w')];
+    let f = 66; while (iqt.offsetHeight > 400 && f > 40) { f -= 3; iqt.style.fontSize = f + 'px'; }
+    return (lt) => {
+      hq.forEach((x, i) => { const q = ((lt * .8 + i * .5) % 1); x.style.transform = `scale(${1 + q * .7})`; x.style.opacity = (1 - q) * .8; });
+      bars.forEach((b, i) => { const v = Math.abs(Math.sin(lt * 7 + i * .7) * Math.sin(lt * 3.1 + i * 1.9)) * .8 + .12; b.style.height = `${v * 170}px`; b.style.opacity = .5 + v * .5; });
+      sozChiqar(ws, lt, .3, Math.max(.6, dur * .8));
+    };
+  },
+
+  // Karusel slaydlari video bo'lib varaqlanadi
+  slaydlar(el, s, h, dur) {
+    const r = (s.rasmlar || []).slice(0, 12), n = r.length || 1, bir = dur / n;
+    el.insertAdjacentHTML('beforeend', r.map(u => `<div class="slayd" style="background-image:${rasmUrl(u)}"></div>`).join('') +
+      r.map((_, i) => `<div class="nuqta" style="left:${540 - n * 18 + i * 36}px"></div>`).join(''));
+    const sl = [...el.querySelectorAll('.slayd')], nq = [...el.querySelectorAll('.nuqta')];
+    r.forEach((_, i) => { if (i) h.push({ t: i * bir - .2, tur: 'whoosh' }); });
+    return (lt) => {
+      const k = Math.min(n - 1, Math.floor(lt / bir)), q = easeIO((lt - k * bir - (bir - .45)) / .45);
+      sl.forEach((x, i) => {
+        let tx = 1100, rot = 0, o = 0;
+        if (i === k) { tx = -1100 * (k < n - 1 ? q : 0); rot = -8 * (k < n - 1 ? q : 0); o = 1; }
+        else if (i === k + 1) { tx = 1100 * (1 - q); rot = 8 * (1 - q); o = q > 0 ? 1 : 0; }
+        x.style.opacity = o; x.style.transform = `translateX(${tx}px) rotate(${rot}deg) scale(${i === k ? 1 + (lt - k * bir) * .01 : 1})`;
+      });
+      nq.forEach((d, i) => { d.style.width = i === k ? '52px' : '20px'; d.style.background = i === k ? 'var(--urgu)' : ''; });
+    };
+  },
+};
+
+const RANGLAR = ['sariq', 'qora', 'oq'];
+const SUBSIZ = ['kinetik', 'audiogramma'];
+let SAHNALAR = [], JAMI = 0, HODISALAR = [];
+window.hodisalar = () => HODISALAR.filter(x => x.t < JAMI);
+
+window.init = async function (data) {
+  await Promise.all(['900 100px InterL', '800 50px InterL', '600 30px InterL'].map(f => document.fonts.load(f)));
+  const stage = document.getElementById('stage');
+  document.getElementById('nik').textContent = data.nik || '';
+  const kutish = [];
+  let t = 0;
+  SAHNALAR = data.sahnalar.map((s, i) => {
+    const rang = RANGLAR.includes(s.rang) ? s.rang : (s.tur === 'audiogramma' ? 'qora' : RANGLAR[i % 3]);
+    const el = document.createElement('div'); el.className = `scene ${rang}`; stage.insertBefore(el, document.getElementById('nik'));
+    const dur = s.soniya || 4, h = [];
+    const yangila = (TURLAR[s.tur] || TURLAR.kinetik)(el, s, h, dur);
+    [...el.querySelectorAll('[style*="url("]')].forEach(x => { const m = /url\("([^"]+)"\)/.exec(x.style.backgroundImage); if (m) kutish.push(new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = m[1]; })); });
+    let sub = null;
+    if (s.subtitr && !SUBSIZ.includes(s.tur)) { sub = document.createElement('div'); sub.className = 'sub'; sub.innerHTML = `<span class="quti">${sozHTML(s.subtitr)}</span>`; el.appendChild(sub); }
+    h.forEach(x => HODISALAR.push({ ...x, t: x.t + t }));
+    if (i > 0) HODISALAR.push({ t, tur: 'whoosh' });
+    const x = { el, yangila, bosh: t, dur, sub, sw: sub ? [...sub.querySelectorAll('.w')] : [] };
+    t += dur; return x;
+  });
+  JAMI = t;
+  await Promise.race([Promise.all(kutish), new Promise(r => setTimeout(r, 20000))]);
+  return JAMI;
+};
+
+window.render = function (t) {
+  SAHNALAR.forEach((s, i) => {
+    const lt = t - s.bosh, oxirgi = i === SAHNALAR.length - 1;
+    const kor = lt >= 0 && (oxirgi || lt < s.dur);
+    if (!kor) { s.el.style.opacity = 0; return; }
+    s.el.style.opacity = clamp(lt / .15);
+    document.getElementById('nik').style.color = s.el.classList.contains('qora') ? '#fff' : '#111';
+    s.el.style.transform = `scale(${lerp(1.06, 1, ease(lt / .35))})`;
+    s.yangila(lt);
+    if (s.sub) { s.sub.style.opacity = 1; sozChiqar(s.sw, lt, .15, Math.max(.6, s.dur * .5)); }
+  });
+};
+</script>
+</body>
+</html>

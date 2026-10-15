@@ -54,12 +54,18 @@ const suhbatQoida = async (b) => {
   if (store.style().feedback.filter(f => !f.used).length >= RULES_BATCH) refreshRules().catch(e => log(`⚠️ Qoidalar yangilanmadi: ${e.message}`));
   return r;
 };
-apiYarat({ agentlar: { ...reels, tanlov, kontent, kuzatuv, suhbat: suhbatQoida, kunlikTarqat: () => kunlikTarqat({ ...kontent, ...kuzatuv }) }, log: (t) => log(t).catch(() => {}) })
+const server = apiYarat({ agentlar: { ...reels, tanlov, kontent, kuzatuv, suhbat: suhbatQoida, kunlikTarqat: () => kunlikTarqat({ ...kontent, ...kuzatuv }) }, log: (t) => log(t).catch(() => {}) })
   .listen(Number(process.env.PORT) || 8080, () => console.log('API tayyor'));
 
 bot.start({
   // Kanal reaksiyalari standart yangilanishlarga kirmaydi — alohida so'raladi
   allowed_updates: ['message', 'callback_query', 'message_reaction_count'],
   onStart: () => { console.log('Kontent zavod ishga tushdi'); if (!process.env.PRODUCT_TOPICS) log('🟢 Kontent zavod ishga tushdi'); salomlash().catch(e => console.error('Salom:', e.message)); } });
-process.once('SIGTERM', () => bot.stop());
-process.once('SIGINT', () => bot.stop());
+// Toza to'xtash: bot va API yopiladi, cron'lar jarayonni ushlab turmaydi
+const toxta = async () => {
+  await bot.stop().catch(() => {});
+  server.close();
+  setTimeout(() => process.exit(0), 3000).unref();
+};
+process.once('SIGTERM', toxta);
+process.once('SIGINT', toxta);

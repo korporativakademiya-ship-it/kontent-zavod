@@ -1,0 +1,263 @@
+{
+  "name": "Ovoz sinovi — Gemini TTS",
+  "nodes": [
+    {
+      "id": "d7bd0131-6791-458c-8172-5deb745b9b33",
+      "name": "Sinovni boshlash",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "04ce510a-35b4-4bb3-8403-df12ab647c71",
+      "name": "Modellar ro'yxati",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {}
+      }
+    },
+    {
+      "id": "af8ca77b-6243-4174-9d6b-4eeb27784e7c",
+      "name": "Model va ovozlar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const barchasi = ($json.models || []).map(m => m.name.replace('models/', ''));\nconst tts = barchasi.filter(n => /tts/i.test(n));\nconst rasm = barchasi.filter(n => /image/i.test(n));\nif (!tts.length) throw new Error('TTS model topilmadi. Mavjud modellar: ' + barchasi.join(', ').slice(0, 800));\n// Eng yangi versiya, bir xil bo'lsa — flash (tez va arzon)\nconst ver = n => parseFloat((n.match(/(\\d+(?:\\.\\d+)?)/) || [0, 0])[1]);\ntts.sort((a, b) => ver(b) - ver(a) || (/flash/.test(b) - /flash/.test(a)));\nconst model = tts[0];\nconst MATN = \"Assalomu alaykum! Mijozingiz tunda yozdi, siz esa uxlayapsiz. Lekin AI agentingiz uxlamaydi: u darhol javob beradi, ehtiyojni aniqlaydi va mijozni uchrashuvgacha olib keladi.\";\nconst OVOZLAR = [['Kore', 'ayol, ishonchli'], ['Aoede', 'ayol, yengil'], ['Charon', 'erkak, tushuntiruvchi'], ['Puck', 'erkak, jonli']];\nreturn OVOZLAR.map(([ovoz, tavsif]) => ({ json: { model, ovoz, tavsif, matn: MATN, tts, rasm } }));"
+      }
+    },
+    {
+      "id": "b603c214-7d16-4d10-b341-1365f9078b1f",
+      "name": "Modellar haqida",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "chatId": "8815205589",
+        "text": "={{ '🧪 Ovoz sinovi boshlandi.\\nTTS model: ' + $json.model + '\\n\\nTopilgan TTS modellar: ' + $json.tts.join(', ') + '\\n\\nRasm modellari (Nano Banana nomi shu yerda): ' + ($json.rasm.join(', ') || 'topilmadi') }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "610a478d-4046-432f-9c52-e10f1447a6c7",
+      "name": "Ovoz yasash",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + $json.model + ':generateContent' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: 'Read this Uzbek text aloud in a warm, confident, natural voice: ' + $json.matn }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: $json.ovoz } } } } }) }}",
+        "options": {
+          "timeout": 120000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 3000
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "7e35d011-0433-48ab-9041-bd3fa550ffde",
+      "name": "WAV qil",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Gemini xom PCM (audio/L16) qaytaradi — oldiga WAV sarlavha qo'shamiz\nconst manba = $('Model va ovozlar').all();\nreturn $input.all().map((it, k) => {\n  const s = manba[k].json;\n  const p = it.json.candidates?.[0]?.content?.parts?.find(x => x.inlineData || x.inline_data);\n  if (!p) return { json: { ok: false, ovoz: s.ovoz, xato: JSON.stringify(it.json.error || it.json).slice(0, 400) } };\n  const d = p.inlineData || p.inline_data;\n  const mime = d.mimeType || d.mime_type || '';\n  let audio = Buffer.from(d.data, 'base64');\n  if (/L16|pcm/i.test(mime)) {\n    const rate = Number((/rate=(\\d+)/.exec(mime) || [0, 24000])[1]);\n    const h = Buffer.alloc(44);\n    h.write('RIFF', 0); h.writeUInt32LE(36 + audio.length, 4); h.write('WAVE', 8);\n    h.write('fmt ', 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22);\n    h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 2, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34);\n    h.write('data', 36); h.writeUInt32LE(audio.length, 40);\n    audio = Buffer.concat([h, audio]);\n  }\n  return {\n    json: { ok: true, ovoz: s.ovoz, tavsif: s.tavsif, model: s.model },\n    binary: { data: { data: audio.toString('base64'), mimeType: 'audio/wav', fileName: `${s.ovoz}.wav` } },\n  };\n});",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "347985f9-6975-4412-a664-16c6ccce2e70",
+      "name": "Chiqdimi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c2508f76-87a8-44e9-bba8-581b93475d6b",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "df1af7f8-ee4c-44a1-a60f-6643e9c448a7",
+      "name": "Ovozni yuborish",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1320,
+        200
+      ],
+      "parameters": {
+        "operation": "sendAudio",
+        "chatId": "8815205589",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{ '🎙 ' + $json.ovoz + ' — ' + $json.tavsif }}",
+          "title": "={{ $json.ovoz }}"
+        }
+      }
+    },
+    {
+      "id": "dbd39ad2-4145-434c-bf15-bad5b76f072f",
+      "name": "Xatoni yuborish",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1320,
+        400
+      ],
+      "parameters": {
+        "chatId": "8815205589",
+        "text": "={{ '❌ ' + $json.ovoz + ' chiqmadi: ' + $json.xato }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Sinovni boshlash": {
+      "main": [
+        [
+          {
+            "node": "Modellar ro'yxati",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modellar ro'yxati": {
+      "main": [
+        [
+          {
+            "node": "Model va ovozlar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Model va ovozlar": {
+      "main": [
+        [
+          {
+            "node": "Modellar haqida",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ovoz yasash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ovoz yasash": {
+      "main": [
+        [
+          {
+            "node": "WAV qil",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WAV qil": {
+      "main": [
+        [
+          {
+            "node": "Chiqdimi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chiqdimi": {
+      "main": [
+        [
+          {
+            "node": "Ovozni yuborish",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Xatoni yuborish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Tashkent"
+  },
+  "pinData": {}
+}

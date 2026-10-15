@@ -1,0 +1,85 @@
+{
+ "nik": "@pulatovjurabek",
+ "sahnalar": [
+  {
+   "shablon": "ekran",
+   "qurilma": "telefon",
+   "video": "https://example.com/ekran-yozuvi.mp4",
+   "boshlash": 0.5,
+   "tezlik": 1.2,
+   "soniya": 8,
+   "subtitr": "Mijoz yozdi — *Kotib* javob beryapti",
+   "zoomlar": [
+    {
+     "t": 3.2,
+     "x": 0.6,
+     "y": 0.42,
+     "k": 1.7,
+     "d": 2.4
+    }
+   ],
+   "bosishlar": [
+    {
+     "t": 1.2,
+     "x": 0.5,
+     "y": 0.95
+    }
+   ],
+   "izohlar": [
+    {
+     "t": 3.6,
+     "matn": "3 soniyada javob ⚡",
+     "x": 0.62,
+     "y": 0.45,
+     "d": 2.2
+    }
+   ]
+  },
+  {
+   "shablon": "ekran",
+   "qurilma": "kompyuter",
+   "rasm": "https://example.com/crm.png",
+   "soniya": 7,
+   "subtitr": "Hammasi *CRM*da — lid yo'qolmaydi",
+   "zoomlar": [
+    {
+     "t": 1,
+     "x": 0.3,
+     "y": 0.12,
+     "k": 2.2,
+     "d": 1.8
+    },
+    {
+     "t": 4.2,
+     "x": 0.87,
+     "y": 0.55,
+     "k": 2.4,
+     "d": 1.6
+    }
+   ],
+   "bosishlar": [
+    {
+     "t": 4.8,
+     "x": 0.87,
+     "y": 0.55
+    }
+   ],
+   "izohlar": [
+    {
+     "t": 1.4,
+     "matn": "Bugun 47 ta lid",
+     "x": 0.3,
+     "y": 0.12,
+     "d": 1.6
+    },
+    {
+     "t": 4.6,
+     "matn": "Sotildi ✅",
+     "x": 0.87,
+     "y": 0.55,
+     "d": 1.5
+    }
+   ]
+  }
+ ]
+}

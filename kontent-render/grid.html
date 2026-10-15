@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Grid shablon</title>
+<style>
+  @font-face { font-family: 'InterL'; font-weight: 400; src: url(fonts/inter400.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 600; src: url(fonts/inter600.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 800; src: url(fonts/inter800.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 900; src: url(fonts/inter900.ttf); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #F3F3F1; }
+  body { font-family: 'InterL', 'Noto Color Emoji', 'DejaVu Sans'; color: #111; }
+  #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden;
+    background:
+      radial-gradient(900px 900px at 50% 40%, rgba(255,255,255,.95) 0%, rgba(255,255,255,0) 70%),
+      linear-gradient(rgba(0,0,0,.055) 2px, transparent 2px) 0 0 / 72px 72px,
+      linear-gradient(90deg, rgba(0,0,0,.055) 2px, transparent 2px) 0 0 / 72px 72px,
+      #F3F3F1; }
+  .scene { position: absolute; inset: 0; opacity: 0; }
+  .sub { position: absolute; left: 70px; right: 70px; top: 1330px; text-align: center;
+    font-size: 76px; font-weight: 900; line-height: 1.12; letter-spacing: -2px; }
+  .w { display: inline-block; opacity: 0; margin: 0 .13em; }
+  .w.hl { background: linear-gradient(transparent 58%, #FFD43B 58%, #FFD43B 92%, transparent 92%); padding: 0 .06em; }
+  #nik { position: absolute; left: 0; right: 0; top: 1720px; text-align: center; font-size: 40px; font-weight: 600; color: #6B6B6B; }
+
+  /* kartochka (reference: CURSOR / CLAUDE tugmalari) */
+  .karta { position: absolute; left: 50%; width: 700px; height: 150px; margin-left: -350px; border-radius: 34px;
+    background: linear-gradient(180deg, #FFFFFF, #ECECEA); border: 2px solid #D9D9D6;
+    box-shadow: 0 18px 40px rgba(0,0,0,.12), inset 0 2px 0 #fff; display: flex; align-items: center; padding: 0 40px; gap: 34px; }
+  .karta .nom { font-size: 58px; font-weight: 900; letter-spacing: 1px; }
+  .badge { position: absolute; right: -26px; top: -26px; min-width: 92px; height: 92px; padding: 0 20px; border-radius: 46px; background: #FF3B30;
+    color: #fff; font-size: 44px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 24px rgba(255,59,48,.4); }
+  .ikon { width: 96px; height: 96px; flex: none; }
+  .soat { position: absolute; left: 50%; top: 290px; transform: translateX(-50%); font-size: 64px; font-weight: 900; padding: 14px 44px;
+    border-radius: 999px; background: #111; color: #FFD43B; }
+
+  /* 3D obyekt */
+  .obyekt { position: absolute; left: 50%; top: 330px; width: 520px; height: 520px; margin-left: -260px; }
+  .bosh { position: absolute; inset: 60px; border-radius: 120px;
+    background: radial-gradient(160px 120px at 30% 22%, rgba(255,255,255,.9), rgba(255,255,255,0) 70%),
+                linear-gradient(150deg, #FFF3B0 0%, #FFD43B 38%, #F59F00 100%);
+    box-shadow: 0 60px 90px rgba(0,0,0,.22), inset 0 -26px 50px rgba(160,90,0,.35), inset 0 16px 30px rgba(255,255,255,.6); }
+  .visor { position: absolute; left: 70px; right: 70px; top: 130px; height: 160px; border-radius: 80px; background: linear-gradient(180deg, #2B2B2B, #0B0B0B);
+    box-shadow: inset 0 6px 14px rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; gap: 90px; }
+  .koz { width: 58px; height: 58px; border-radius: 50%; background: #FFD43B; box-shadow: 0 0 30px #FFD43B, 0 0 60px rgba(255,212,59,.6); }
+  .antenna { position: absolute; left: 50%; top: -6px; width: 16px; height: 80px; margin-left: -8px; background: #CFCFCF; border-radius: 8px; }
+  .antenna::after { content: ''; position: absolute; left: -16px; top: -34px; width: 48px; height: 48px; border-radius: 50%; background: #FFD43B; box-shadow: 0 0 24px #FFD43B; }
+  .soya { position: absolute; left: 50%; top: 900px; width: 380px; height: 50px; margin-left: -190px; border-radius: 50%; background: radial-gradient(rgba(0,0,0,.22), transparent 70%); }
+
+  /* oqim */
+  .kichik { position: absolute; width: 170px; height: 170px; border-radius: 40px; background: linear-gradient(180deg, #fff, #ECECEA); border: 2px solid #D9D9D6;
+    box-shadow: 0 14px 30px rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; }
+  .kichik .ikon { width: 110px; height: 110px; }
+  .markaz { position: absolute; left: 50%; top: 860px; width: 260px; height: 260px; margin-left: -130px; border-radius: 64px;
+    background: linear-gradient(150deg, #FFF3B0 0%, #FFD43B 40%, #F59F00 100%); box-shadow: 0 30px 60px rgba(245,159,0,.35), inset 0 -14px 30px rgba(160,90,0,.3);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; font-size: 46px; }
+  .markaz .visor { position: static; width: 170px; height: 70px; border-radius: 35px; gap: 40px; margin-bottom: 14px; }
+  .markaz .koz { width: 26px; height: 26px; }
+  .tik { position: absolute; padding: 10px 22px; border-radius: 999px; background: #12B76A; color: #fff; font-size: 34px; font-weight: 800; opacity: 0; white-space: nowrap; }
+
+  /* ramka (chat va CRM) */
+  .ramka { position: absolute; left: 50%; top: 190px; width: 880px; height: 1060px; margin-left: -440px; border-radius: 56px; background: #fff;
+    border: 3px solid #1A1A1A; box-shadow: 0 30px 70px rgba(0,0,0,.16); overflow: hidden; }
+  .ramka .sarlavha { height: 130px; display: flex; align-items: center; gap: 24px; padding: 0 40px; border-bottom: 2px solid #EEE; font-size: 42px; font-weight: 800; }
+  .ramka .sarlavha small { display: block; font-size: 28px; font-weight: 600; color: #12B76A; }
+  .avatar { width: 80px; height: 80px; border-radius: 24px; background: linear-gradient(150deg, #FFF3B0, #FFD43B 40%, #F59F00); display: flex; align-items: center; justify-content: center; }
+  .avatar i { display: block; width: 50px; height: 22px; border-radius: 11px; background: #111; }
+  .xabar { position: absolute; max-width: 620px; padding: 24px 32px; border-radius: 36px; font-size: 38px; font-weight: 600; line-height: 1.3; opacity: 0; }
+  .xabar.mijoz { left: 40px; background: #F1F1EF; border-bottom-left-radius: 10px; }
+  .xabar.bot { right: 40px; background: #FFD43B; border-bottom-right-radius: 10px; }
+  .yozmoqda { position: absolute; right: 40px; padding: 26px 34px; border-radius: 36px; background: #FFF3C4; display: flex; gap: 12px; opacity: 0; }
+  .yozmoqda b { width: 16px; height: 16px; border-radius: 50%; background: #8A6D00; }
+  .toast { position: absolute; left: 50%; top: 1110px; transform: translateX(-50%); padding: 26px 46px; border-radius: 999px; background: #12B76A; color: #fff;
+    font-size: 46px; font-weight: 900; box-shadow: 0 20px 44px rgba(18,183,106,.4); opacity: 0; white-space: nowrap; }
+
+  .ustun { position: absolute; top: 150px; width: 262px; bottom: 30px; border-radius: 30px; background: #F6F6F4; }
+  .ustun h4 { font-size: 34px; font-weight: 900; padding: 22px 24px; }
+  .ustun h4 span { font-size: 26px; font-weight: 800; padding: 4px 12px; border-radius: 12px; margin-left: 8px; }
+  .lid { position: absolute; width: 234px; height: 150px; border-radius: 24px; background: #fff; border: 2px solid #E4E4E1; box-shadow: 0 8px 18px rgba(0,0,0,.08);
+    padding: 18px 20px; font-size: 30px; font-weight: 800; }
+  .lid small { display: block; margin-top: 8px; font-size: 24px; font-weight: 600; color: #777; }
+  .lid .chiziq { position: absolute; left: 20px; right: 20px; bottom: 18px; height: 10px; border-radius: 5px; background: #EEE; }
+  .lid .chiziq i { display: block; height: 100%; border-radius: 5px; background: #FFD43B; }
+
+  .tugma { position: absolute; left: 50%; top: 520px; transform: translateX(-50%); padding: 50px 110px; border-radius: 999px;
+    background: linear-gradient(180deg, #FFE066, #FFC21A); border: 4px solid #111; font-size: 130px; font-weight: 900; letter-spacing: 4px;
+    box-shadow: 0 16px 0 #111, 0 40px 70px rgba(0,0,0,.2); white-space: nowrap; }
+  .strelka { position: absolute; left: 50%; top: 880px; font-size: 120px; transform: translateX(-50%); }
+  .kursor { position: absolute; width: 90px; height: 90px; }
+  .w.yop { margin-left: -.1em !important; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="nik"></div></div>
+<script src="umumiy.js"></script>
+<script>
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = x => 1 - Math.pow(1 - clamp(x), 3);
+const easeIO = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const back = x => { x = clamp(x); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, p) => a + (b - a) * p;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const IKON = {
+  instagram: `<svg viewBox="0 0 100 100" class="ikon"><defs><linearGradient id="ig" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FEDA75"/><stop offset=".3" stop-color="#FA7E1E"/><stop offset=".6" stop-color="#D62976"/><stop offset="1" stop-color="#4F5BD5"/></linearGradient></defs>
+    <rect x="4" y="4" width="92" height="92" rx="26" fill="url(#ig)"/><rect x="24" y="24" width="52" height="52" rx="16" fill="none" stroke="#fff" stroke-width="7"/><circle cx="50" cy="50" r="12" fill="none" stroke="#fff" stroke-width="7"/><circle cx="67" cy="33" r="4.5" fill="#fff"/></svg>`,
+  telegram: `<svg viewBox="0 0 100 100" class="ikon"><circle cx="50" cy="50" r="46" fill="#29A9EB"/><path d="M24 49 L72 30 L64 72 L50 61 L42 69 L41 57 L64 38 L36 54 Z" fill="#fff"/></svg>`,
+  whatsapp: `<svg viewBox="0 0 100 100" class="ikon"><circle cx="50" cy="50" r="46" fill="#25D366"/><path d="M26 76 L31 62 A26 26 0 1 1 40 71 Z" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><path d="M40 38 q2 -4 5 -2 l3 6 q1 2 -1 4 l-2 2 q3 6 9 9 l2 -2 q2 -2 4 -1 l6 3 q2 3 -2 5 q-6 3 -15 -3 q-8 -6 -10 -14 q-1 -4 1 -7z" fill="#fff"/></svg>`,
+};
+
+const sozlar = (m) => { const chiq = []; let bosh = true;
+  for (const q of String(m || '').split(/(\*[^*]+\*)/)) {
+    if (!q) continue; const hl = /^\*[^*]+\*$/.test(q);
+    for (const p of q.replace(/\*/g, '').split(/(\s+)/)) { if (!p) continue; if (/^\s+$/.test(p)) { bosh = true; continue; } chiq.push({ s: p, hl, yop: !bosh && chiq.length > 0 }); bosh = false; }
+  }
+  return chiq; };
+
+// ---------- sahna turlari: qur(el, s) → yangila(lt, dur) ----------
+const TURLAR = {
+  kartalar(el, s, h) {
+    const k = s.kartalar || [];
+    const top0 = 660 - (k.length - 1) * 95;
+    el.insertAdjacentHTML('beforeend', (s.soat ? `<div class="soat">${esc(s.soat)}</div>` : '') + k.map((x, i) =>
+      `<div class="karta" style="top:${top0 + i * 190}px">${IKON[x.ikon] || ''}<div class="nom">${esc(x.nom)}</div>${x.badge ? '<div class="badge">0</div>' : ''}</div>`).join(''));
+    const kartalar = [...el.querySelectorAll('.karta')], soat = el.querySelector('.soat');
+    k.forEach((x, i) => { h.push({ t: .15 + i * .22, tur: 'pop' }); if (x.badge) h.push({ t: .5 + i * .22, tur: 'tik' }); });
+    if (s.silkinish) h.push({ t: 1, tur: 'xato' });
+    return (lt) => {
+      kartalar.forEach((c, i) => {
+        const p = (lt - 0.15 - i * 0.22) / 0.45;
+        const sil = s.silkinish && lt > 1 ? Math.sin(lt * 38 + i) * 7 * clamp((lt - 1) / .3) : 0;
+        c.style.opacity = clamp(p * 3);
+        c.style.transform = `translateX(${sil}px) scale(${lerp(.6, 1, back(p))}) rotate(${lerp(-6, 0, ease(p))}deg)`;
+        const b = c.querySelector('.badge');
+        if (b) {
+          const son = parseInt(k[i].badge, 10) || 99, q = clamp((lt - 0.5 - i * 0.22) / 1.1);
+          b.textContent = q >= 1 ? k[i].badge : Math.round(ease(q) * son);
+          b.style.transform = `scale(${lerp(0, 1, back((lt - 0.4 - i * 0.22) / .35))})`;
+        }
+      });
+      if (soat) { const p = (lt - .1) / .4; soat.style.opacity = clamp(p * 2); soat.style.transform = `translateX(-50%) scale(${lerp(.5, 1, back(p))})`; }
+    };
+  },
+
+  obyekt(el, s, h) {
+    el.insertAdjacentHTML('beforeend', `<div class="soya"></div><div class="obyekt"><div class="bosh"><div class="antenna"></div><div class="visor"><div class="koz"></div><div class="koz"></div></div></div></div>`);
+    h.push({ t: .1, tur: 'pop' });
+    const o = el.querySelector('.obyekt'), soya = el.querySelector('.soya'), kozlar = el.querySelectorAll('.koz');
+    return (lt) => {
+      const p = back((lt - .05) / .55), f = Math.sin(lt * 2.6) * 18;
+      o.style.transform = `translateY(${lerp(300, 0, ease(lt / .6)) + f}px) scale(${lerp(.4, 1, p)}) rotate(${Math.sin(lt * 1.7) * 4}deg)`;
+      soya.style.transform = `scale(${1 - f / 120})`; soya.style.opacity = clamp(lt / .5);
+      const blink = (lt % 2.2) > 2.05 ? .15 : 1;
+      kozlar.forEach(k => { k.style.transform = `scaleY(${blink})`; });
+    };
+  },
+
+  oqim(el, s, h) {
+    const tepa = (s.manbalar || ['instagram', 'telegram', 'whatsapp']);
+    const xs = tepa.map((_, i) => 540 + (i - (tepa.length - 1) / 2) * 300);
+    const Y0 = 360, M = { x: 540, y: 860 };
+    el.insertAdjacentHTML('beforeend', `<svg width="1080" height="1920" style="position:absolute;inset:0">
+      ${xs.map((x, i) => `<mask id="mk${i}"><path d="M${x} ${Y0 + 85} C ${x} ${Y0 + 330}, ${M.x} ${M.y - 260}, ${M.x} ${M.y}" stroke="#fff" stroke-width="30" fill="none" class="mp"/></mask>
+        <path d="M${x} ${Y0 + 85} C ${x} ${Y0 + 330}, ${M.x} ${M.y - 260}, ${M.x} ${M.y}" stroke="#F5A300" stroke-width="9" fill="none" stroke-dasharray="4 26" stroke-linecap="round" mask="url(#mk${i})" class="yol"/>
+        <circle r="16" fill="#FFD43B" stroke="#111" stroke-width="4" class="nuqta"/>`).join('')}</svg>
+      ${tepa.map((t, i) => `<div class="kichik" style="left:${xs[i] - 85}px;top:${Y0 - 85}px">${IKON[t] || ''}</div><div class="tik" style="left:${xs[i] - 70}px;top:${Y0 - 150}px">✓ 3 s</div>`).join('')}
+      <div class="markaz"><div class="visor"><div class="koz"></div><div class="koz"></div></div>${esc(s.markaz || 'Kotib AI')}</div>`);
+    const mp = [...el.querySelectorAll('.mp')], yol = [...el.querySelectorAll('.yol')], nuqta = [...el.querySelectorAll('.nuqta')];
+    const kichik = [...el.querySelectorAll('.kichik')], tik = [...el.querySelectorAll('.tik')], markaz = el.querySelector('.markaz');
+    const L = yol.map(y => y.getTotalLength());
+    tepa.forEach((_, i) => { h.push({ t: i * .12, tur: 'pop' }); h.push({ t: 2.2 + i * .18, tur: 'tik' }); });
+    h.push({ t: .6, tur: 'whoosh' });
+    mp.forEach((m, i) => { m.style.strokeDasharray = L[i]; });
+    return (lt) => {
+      kichik.forEach((k, i) => { const p = (lt - i * .12) / .4; k.style.opacity = clamp(p * 3); k.style.transform = `scale(${lerp(.5, 1, back(p))})`; });
+      const pm = (lt - .2) / .45; markaz.style.opacity = clamp(pm * 3); markaz.style.transform = `scale(${lerp(.5, 1, back(pm)) + Math.max(0, Math.sin((lt - 1.9) * 9)) * .05 * clamp((lt - 1.9) / .2) * clamp((2.6 - lt) / .2)})`;
+      yol.forEach((y, i) => {
+        const p = easeIO((lt - .6 - i * .15) / 1.1);
+        mp[i].style.strokeDashoffset = L[i] * (1 - p);
+        const pt = y.getPointAtLength(L[i] * p);
+        nuqta[i].setAttribute('cx', pt.x); nuqta[i].setAttribute('cy', pt.y);
+        nuqta[i].style.opacity = p > 0 && p < 1 ? 1 : 0;
+      });
+      tik.forEach((t, i) => { const p = (lt - 2.2 - i * .18) / .35; t.style.opacity = clamp(p * 3); t.style.transform = `translateY(${lerp(20, 0, ease(p))}px) scale(${lerp(.6, 1, back(p))})`; });
+    };
+  },
+
+  chat(el, s, h) {
+    const x = s.xabarlar || [];
+    el.insertAdjacentHTML('beforeend', `<div class="ramka"><div class="sarlavha"><div class="avatar"><i></i></div><div>${esc(s.nom || 'Kotib AI')}<small>● onlayn</small></div></div>
+      <div class="yozmoqda"><b></b><b></b><b></b></div>${x.map(m => `<div class="xabar ${m.kim === 'bot' ? 'bot' : 'mijoz'}">${esc(m.matn)}</div>`).join('')}</div>
+      ${s.toast ? `<div class="toast">${esc(s.toast)}</div>` : ''}`);
+    const els = [...el.querySelectorAll('.xabar')], yoz = el.querySelector('.yozmoqda'), toast = el.querySelector('.toast'), ramka = el.querySelector('.ramka');
+    // vaqt jadvali: har xabar oldidan pauza; bot xabaridan oldin "yozmoqda"
+    let t = .5; const vaqt = x.map(m => { const bosh = t + (m.kim === 'bot' ? .6 : 0); t = bosh + .95; return bosh; });
+    let balandlik = []; // joylashuv init paytida hisoblanadi
+    x.forEach((m, i) => { if (m.kim === 'bot') h.push({ t: vaqt[i] - .6, tur: 'klav', d: .55 }); h.push({ t: vaqt[i], tur: 'pop' }); });
+    if (s.toast) h.push({ t: t + .1, tur: 'ding' });
+    return (lt) => {
+      if (!balandlik.length) balandlik = els.map(e => e.offsetHeight);
+      const p = (lt) / .45; ramka.style.opacity = clamp(p * 2); ramka.style.transform = `translateY(${lerp(80, 0, ease(p))}px) scale(${lerp(.92, 1, ease(p))})`;
+      let y = 170; let yozV = -1;
+      els.forEach((e, i) => {
+        const q = (lt - vaqt[i]) / .35;
+        if (x[i].kim === 'bot' && lt > vaqt[i] - .6 && lt < vaqt[i]) yozV = y;
+        e.style.opacity = clamp(q * 3); e.style.top = y + 'px';
+        e.style.transform = `translateY(${lerp(30, 0, ease(q))}px) scale(${lerp(.85, 1, back(q))})`;
+        e.style.transformOrigin = x[i].kim === 'bot' ? 'right bottom' : 'left bottom';
+        if (lt >= vaqt[i]) y += balandlik[i] + 26;
+      });
+      yoz.style.opacity = yozV >= 0 ? 1 : 0; if (yozV >= 0) yoz.style.top = yozV + 'px';
+      [...yoz.children].forEach((b, k) => { b.style.transform = `translateY(${Math.sin(lt * 12 - k) * 6}px)`; });
+      if (toast) { const q = (lt - t - .1) / .4; toast.style.opacity = clamp(q * 3); toast.style.transform = `translateX(-50%) scale(${lerp(.4, 1, back(q))})`; }
+    };
+  },
+
+  crm(el, s, h) {
+    const us = s.ustunlar || [{ nom: 'Yangi', rang: '#FFE8A3' }, { nom: 'Suhbatda', rang: '#CFE8FF' }, { nom: 'Sotildi', rang: '#C8F5DC' }];
+    const lidlar = s.lidlar || [];
+    el.insertAdjacentHTML('beforeend', `<div class="ramka"><div class="sarlavha"><div class="avatar"><i></i></div><div>${esc(s.nom || 'Kotib CRM')}<small>● hammasi bir joyda</small></div></div>
+      ${us.map((u, i) => `<div class="ustun" style="left:${24 + i * 282}px"><h4>${esc(u.nom)}<span style="background:${u.rang}">0</span></h4></div>`).join('')}
+      ${lidlar.map(l => `<div class="lid">${esc(l.ism)}<small>${esc(l.izoh || '')}</small><div class="chiziq"><i></i></div></div>`).join('')}</div>`);
+    const ramka = el.querySelector('.ramka'), kart = [...el.querySelectorAll('.lid')], son = [...el.querySelectorAll('.ustun h4 span')];
+    lidlar.forEach(l => l.yol.forEach((q, k) => h.push({ t: q.t, tur: k ? 'tik' : 'pop' })));
+    const joy = (col, row) => ({ x: 24 + col * 282 + 14, y: 150 + 90 + row * 168 });
+    return (lt) => {
+      const p = lt / .45; ramka.style.opacity = clamp(p * 2); ramka.style.transform = `translateY(${lerp(80, 0, ease(p))}px) scale(${lerp(.92, 1, ease(p))})`;
+      const soni = us.map(() => 0);
+      kart.forEach((c, i) => {
+        const l = lidlar[i], yol = l.yol; // [{t, col}] — t soniyada shu ustunga o'tadi
+        let col = yol[0].col, from = col, pr = 1, tk = 0;
+        for (let k = 1; k < yol.length; k++) if (lt >= yol[k].t) { from = yol[k - 1].col; col = yol[k].col; tk = yol[k].t; }
+        pr = easeIO((lt - tk) / .6);
+        const qatorNom = (cc) => lidlar.slice(0, i).filter((ll, j) => ustunda(lidlar[j], lt) === cc).length;
+        const a = joy(from, qatorNom(from)), b = joy(col, qatorNom(col));
+        const kir = (lt - yol[0].t) / .35;
+        c.style.opacity = clamp(kir * 3);
+        c.style.left = lerp(a.x, b.x, pr) + 'px'; c.style.top = lerp(a.y, b.y, pr) - Math.sin(pr * Math.PI) * 60 + 'px';
+        c.style.transform = `scale(${lerp(.5, 1, back(kir)) * (1 + Math.sin(pr * Math.PI) * .08)}) rotate(${Math.sin(pr * Math.PI) * -5}deg)`;
+        c.style.zIndex = pr < 1 ? 5 : 1;
+        c.querySelector('.chiziq i').style.width = `${[25, 60, 100][col] || 100}%`;
+        c.querySelector('.chiziq i').style.background = col === us.length - 1 ? '#12B76A' : '#FFD43B';
+        if (kir > 0) soni[col]++;
+      });
+      son.forEach((sp, i) => { sp.textContent = soni[i]; });
+    };
+    function ustunda(l, lt) { let c = l.yol[0].col; for (const q of l.yol) if (lt >= q.t) c = q.col; return c; }
+  },
+
+  cta(el, s, h) {
+    el.insertAdjacentHTML('beforeend', `<div class="tugma">${esc(s.tugma || 'KOTIB')}</div><div class="strelka">👇</div>
+      <svg class="kursor" viewBox="0 0 24 24"><path d="M3 2 L20 12 L12 14 L8 22 Z" fill="#111" stroke="#fff" stroke-width="1.4"/></svg>`);
+    h.push({ t: .05, tur: 'pop' }, { t: 1.4, tur: 'klik' }, { t: 1.9, tur: 'ding' });
+    const t = el.querySelector('.tugma'), st = el.querySelector('.strelka'), k = el.querySelector('.kursor');
+    return (lt) => {
+      const p = (lt - .05) / .5;
+      const bos = lt > 1.4 && lt < 1.65 ? 1 : 0;
+      t.style.opacity = clamp(p * 3);
+      t.style.transform = `translateX(-50%) translateY(${bos * 12}px) scale(${lerp(.3, 1, back(p)) * (1 + Math.sin(lt * 5) * .03 * clamp((lt - 1.8) / .3))})`;
+      t.style.boxShadow = `0 ${16 - bos * 12}px 0 #111, 0 40px 70px rgba(0,0,0,.2)`;
+      const kp = easeIO((lt - .6) / .8);
+      k.style.left = lerp(940, 800, kp) + 'px'; k.style.top = lerp(1180, 700, kp) + 'px'; k.style.opacity = clamp((lt - .5) * 4);
+      st.style.opacity = clamp((lt - 1.9) * 3); st.style.transform = `translateX(-50%) translateY(${Math.sin(lt * 7) * 16}px)`;
+    };
+  },
+};
+
+let SAHNALAR = [], JAMI = 0, HODISALAR = [];
+window.hodisalar = () => HODISALAR.filter(x => x.t < JAMI);
+window.init = async function (data) {
+  const stage = document.getElementById('stage');
+  document.getElementById('nik').textContent = data.nik || '';
+  let t = 0;
+  SAHNALAR = data.sahnalar.map(s => {
+    const el = document.createElement('div'); el.className = 'scene'; stage.insertBefore(el, document.getElementById('nik'));
+    const h = [];
+    const yangila = (TURLAR[s.tur] || TURLAR.obyekt)(el, s, h);
+    h.forEach(x => HODISALAR.push({ ...x, t: x.t + t }));
+    if (t > 0) HODISALAR.push({ t, tur: 'whoosh' });
+    const sub = document.createElement('div'); sub.className = 'sub';
+    sub.innerHTML = sozlar(s.subtitr || '').map(w => `<span class="w${w.hl ? ' hl' : ''}${w.yop ? ' yop' : ''}">${esc(w.s)}</span>`).join('');
+    el.appendChild(sub);
+    const x = { el, yangila, sozlar: [...sub.querySelectorAll('.w')], bosh: t, dur: s.soniya || 3 };
+    t += x.dur; return x;
+  });
+  JAMI = t;
+  await document.fonts.ready;
+  return JAMI;
+};
+
+window.render = function (t) {
+  SAHNALAR.forEach((s, i) => {
+    const lt = t - s.bosh, oxirgi = i === SAHNALAR.length - 1;
+    const kir = clamp(lt / .18), chiq = oxirgi ? 1 : 1 - clamp((lt - s.dur + .12) / .12);
+    const kor = lt >= 0 && (oxirgi || lt < s.dur);
+    s.el.style.opacity = kor ? kir * chiq : 0;
+    if (!kor) return;
+    s.el.style.transform = `translateY(${lerp(50, 0, ease(lt / .3))}px)`;
+    s.yangila(lt, s.dur);
+    // subtitr: so'zlar sahnaning birinchi 55% ichida birma-bir chiqadi
+    const n = s.sozlar.length, oyna = Math.max(.6, s.dur * .55);
+    s.sozlar.forEach((w, k) => {
+      const q = (lt - .1 - (k / n) * oyna) / .16;
+      w.style.opacity = clamp(q); w.style.transform = `translateY(${lerp(26, 0, ease(q))}px) scale(${lerp(1.25, 1, ease(q))})`;
+    });
+  });
+};
+</script>
+</body>
+</html>
