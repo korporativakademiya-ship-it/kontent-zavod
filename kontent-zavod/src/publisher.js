@@ -119,8 +119,20 @@ export const imagePaths = (d) => (d.image_paths || []).filter(p => fs.existsSync
 export const hasAudio = (d) => !!d.audio_path && fs.existsSync(d.audio_path);
 export const hasVideo = (d) => !!d.video_path && fs.existsSync(d.video_path);
 
+// Hozir kanalga ketayotgan qoralamalar: ⚡ Hozir ikki marta bosilsa yoki shu payt navbatdagi chiqaruvchi ham
+// ishlab qolsa — post ikki marta chiqmasin
+const chiqyapti = new Set();
+export class AllaqachonChiqqan extends Error {}
+
 // Qaytaradi: rich format rad etilib oddiy formatda chiqqan bo'lsa — sababi (aks holda undefined)
 export async function publish(api, draft) {
+  const joriy = store.get(draft.id) || draft;
+  if (joriy.status === 'published' || chiqyapti.has(draft.id)) throw new AllaqachonChiqqan('bu post allaqachon chiqqan yoki hozir chiqyapti');
+  chiqyapti.add(draft.id);
+  try { return await publishIchki(api, joriy); } finally { chiqyapti.delete(draft.id); }
+}
+
+async function publishIchki(api, draft) {
   let fallback, msg;
   if (isRich(draft)) ({ fallback, msg } = await sendRich(api, cfg.channelId, draft));
   else if (hasVideo(draft) || imagePaths(draft).length || hasAudio(draft)) msg = await sendMediaPost(api, cfg.channelId, draft);
@@ -143,8 +155,9 @@ export async function publishDue(api, notify) {
     for (const d of due) {
       try {
         const fb = await publish(api, d);
-        await notify(`📢 Kanalga chiqdi: ${d.title}${fb ? `\n⚠️ Maqola formati o'tmadi, oddiy post bo'lib chiqdi: ${fb}` : ''}`);
+        await notify(`📢 Kanalga chiqdi: ${d.title}${fb ? `\n⚠️ Maqola formati o'tmadi, oddiy post bo'lib chiqdi: ${fb}` : ''}`).catch(() => {});
       } catch (e) {
+        if (e instanceof AllaqachonChiqqan) continue;
         const urinish = (d.publish_attempts || 0) + 1;
         const oxirgi = urinish >= MAX_URINISH;
         store.update(d.id, { publish_attempts: urinish, ...(oxirgi ? { status: 'failed', publish_error: String(e.message).slice(0, 300) } : {}) });

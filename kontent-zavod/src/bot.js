@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { Bot, InlineKeyboard, InputFile } from 'grammy';
 import { cfg } from './config.js';
 import { store } from './store.js';
@@ -7,7 +8,7 @@ import { runPipeline, renderDraftSlides, produceDraft } from './pipeline.js';
 import { revise } from './agents/copywriter.js';
 import { writeArticle } from './agents/article.js';
 import { isRich, sendRich, approvalPrefix } from './rich.js';
-import { nextSlot, fmtTime, parseTime, publish, sendMediaPost, sendSafe, imagePaths } from './publisher.js';
+import { nextSlot, fmtTime, parseTime, publish, sendMediaPost, sendSafe, imagePaths, AllaqachonChiqqan } from './publisher.js';
 import { makeVideo } from './video/make.js';
 import { renderSlides } from './video/slides.js';
 import { VIDEO_SIGNATURE } from './brand.js';
@@ -140,8 +141,11 @@ async function startRun(ctx, topic, format = null) {
     .finally(() => { busy = false; });
 }
 
+// Kunlik ish bot band paytiga to'g'ri kelsa — tashlab ketilmaydi, soatlik tekshiruv (rejaYetibOl) bo'shaganda bajaradi
+let kunlikKutyapti = false;
 export async function dailyRun() {
-  if (busy) return;
+  if (busy) { kunlikKutyapti = true; return; }
+  kunlikKutyapti = false;
   busy = true;
   try {
     // Mahsulot rejimi: har mahsulot o'z tasdiqlangan rejasidan yozadi (reja yo'q bo'lsa — kutadi)
@@ -162,6 +166,22 @@ export async function dailyRun() {
     } else await runPipeline({ log, onDraft: sendForApproval });
   }
   catch (e) { await log(`❌ Xato: ${e.message}`); }
+  finally { busy = false; }
+}
+
+// Har soat: kunlik ish qoldirilgan bo'lsa — bajariladi; aks holda tasdiqlangan rejadagi yaqin 36 soatlik,
+// hali yozilmagan bandlar yoziladi (bot qayta ishga tushgan yoki kunlik ish o'tib ketgan bo'lsa ham postlar chiqadi)
+export async function rejaYetibOl() {
+  if (busy) return;
+  if (kunlikKutyapti) return dailyRun();
+  busy = true;
+  try {
+    for (const m of rejim() ? kodlar() : [null]) await bilan(m, async () => {
+      if (!weekly.currentPlan()) return;
+      const n = await weekly.produceDue({ log, onDraft: sendForApproval });
+      if (n) await log(`🗓 Rejadan ${n} ta post yozildi.`);
+    });
+  } catch (e) { await log(`⚠️ Rejadan yozishda xato: ${e.message}`); }
   finally { busy = false; }
 }
 
@@ -518,6 +538,7 @@ bot.on('message_reaction_count', ctx => {
 });
 
 bot.command('navbat', ctx => {
+  if (!isAdmin(ctx)) return;
   const q = store.byStatus('approved').sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
   if (!q.length) return ctx.reply('Navbat bo\'sh.');
   const k = new InlineKeyboard();
@@ -554,6 +575,8 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
   const mark = (t) => ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text(t, 'noop') }).catch(() => {});
 
   if (d.status === 'published' && act !== 'scr') return ctx.answerCallbackQuery({ text: 'Bu post allaqachon chiqqan' });
+  // ✏️ Tahrirdan keyin eski versiya xabaridagi tugmalar ishlamasin — aks holda eski matn ham kanalga chiqib ketardi
+  if (d.status === 'revised' && act !== 'scr') return ctx.answerCallbackQuery({ text: "Bu eski versiya — tahrirlangan yangi qoralamadagi tugmalardan foydalaning", show_alert: true });
 
   if (act === 'vid') {
     if (videoBusy) return ctx.answerCallbackQuery({ text: 'Boshqa video yasalmoqda, biroz kuting' });
@@ -591,11 +614,17 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     return ctx.answerCallbackQuery({ text: 'Navbatdan olindi' });
   }
   if (act === 'now') {
-    if (d.status !== 'approved') store.addChoice(d, true);
-    const fb = await publish(bot.api, d);
-    await mark('📢 Chiqdi');
-    if (fb) await log(`⚠️ "${d.title}" maqola formatida chiqmadi, oddiy post bo'lib chiqdi: ${fb}`);
-    return ctx.answerCallbackQuery({ text: 'Kanalga chiqdi' });
+    await ctx.answerCallbackQuery({ text: 'Kanalga chiqarilyapti…' });
+    try {
+      const fb = await publish(bot.api, d);
+      if (d.status !== 'approved') store.addChoice(d, true);
+      await mark('📢 Chiqdi');
+      if (fb) await log(`⚠️ "${d.title}" maqola formatida chiqmadi, oddiy post bo'lib chiqdi: ${fb}`);
+    } catch (e) {
+      if (e instanceof AllaqachonChiqqan) return mark('📢 Chiqdi');
+      await log(`❌ "${d.title}" kanalga chiqmadi: ${e.message}`);
+    }
+    return;
   }
   if (act === 'no') {
     store.update(id, { status: 'rejected' });
@@ -737,10 +766,11 @@ bot.on(['message:photo', 'message:document'], async ctx => {
 
 // ---------- Zaxira ----------
 // Har kuni butun baza egasiga shaxsiy chatda (jim) fayl bo'lib keladi. Tiklash: faylga reply qilib /tiklash.
-const zaxiraNomi = () => `kontent-zaxira-${new Date(Date.now() + cfg.tzOffsetH * 3600e3).toISOString().slice(0, 10)}.json`;
+// Siqilgan (gzip) — Telegram'dagi 50 MB fayl chegarasiga baza katta bo'lganda ham sig'sin
+const zaxiraNomi = () => `kontent-zaxira-${new Date(Date.now() + cfg.tzOffsetH * 3600e3).toISOString().slice(0, 10)}.json.gz`;
 const zaxiraIzoh = (izoh = '') => `🗄 Kontent Fabrika zaxirasi${izoh}\nUslub, qoidalar, g'oyalar, rejalar, qoralamalar.\nTiklash: shu faylga reply qilib /tiklash yozing (shaxsiy chatda).`;
 export async function zaxira(izoh = '') {
-  const fayl = () => new InputFile(Buffer.from(store.snapshot()), zaxiraNomi());
+  const fayl = () => new InputFile(gzipSync(Buffer.from(store.snapshot())), zaxiraNomi());
   for (const id of cfg.admins.slice(0, 1)) {
     try { await bot.api.sendDocument(id, fayl(), { caption: zaxiraIzoh(izoh), disable_notification: true }); return true; }
     catch (e) {
@@ -760,12 +790,13 @@ bot.command('zaxira', async ctx => {
 bot.command('tiklash', async ctx => {
   if (!isAdmin(ctx) || ctx.chat.type !== 'private') return;
   const doc = ctx.message.reply_to_message?.document;
-  if (!doc || !/\.json$/i.test(doc.file_name || '')) return ctx.reply("Zaxira fayliga (kontent-zaxira-….json) reply qilib /tiklash yozing.");
+  if (!doc || !/\.json(\.gz)?$/i.test(doc.file_name || '')) return ctx.reply("Zaxira fayliga (kontent-zaxira-….json.gz) reply qilib /tiklash yozing.");
   try {
     const f = await bot.api.getFile(doc.file_id);
     const res = await fetch(`${API_ROOT}/file/bot${cfg.botToken}/${f.file_path}`);
     if (!res.ok) throw new Error(`fayl yuklanmadi (${res.status})`);
-    const obj = JSON.parse(await res.text());
+    const buf = Buffer.from(await res.arrayBuffer());
+    const obj = JSON.parse((/\.gz$/i.test(doc.file_name) ? gunzipSync(buf) : buf).toString('utf8'));
     await zaxira(' — tiklashdan OLDINGI holat (kerak bo\'lsa qaytarish uchun)');
     const r = store.restore(obj);
     await ctx.reply(`✅ Tiklandi: ${r.ideas} ta g'oya, ${r.plans} ta reja, ${r.drafts} ta qoralama, ${r.rules} ta qoida, ${r.samples} ta namuna post.`);

@@ -1,10 +1,11 @@
 import cron from 'node-cron';
 import { cfg } from './config.js';
-import { bot, dailyRun, log, weeklyReport, weeklyPlanRun, salomlash, zaxira, kalendarYoz, refreshRules, RULES_BATCH } from './bot.js';
+import { bot, dailyRun, rejaYetibOl, log, weeklyReport, weeklyPlanRun, salomlash, zaxira, kalendarYoz, refreshRules, RULES_BATCH } from './bot.js';
 import { kalendarEnabled, syncKalendar } from './kalendar.js';
 import { publishDue } from './publisher.js';
 import { apiYarat } from './api.js';
 import { store } from './store.js';
+import { tozala } from './tozalash.js';
 import * as reels from './agents/reels.js';
 import * as kontent from './agents/kontent.js';
 import * as kuzatuv from './kuzatuv.js';
@@ -12,12 +13,19 @@ import { suhbat, kunlikTarqat } from './suhbat.js';
 
 // Har kuni g'oya izlash
 cron.schedule(cfg.dailyCron, dailyRun, { timezone: cfg.tz });
+// Har soat: qoldirilgan kunlik ish va rejadagi yozilmagan yaqin postlar (qayta ishga tushish, band payt)
+cron.schedule('20 * * * *', () => rejaYetibOl().catch(e => log(`⚠️ Rejadan yozishda xato: ${e.message}`)), { timezone: cfg.tz });
 // Haftalik reja (standart: yakshanba 18:00) — tasdiqlangach har kuni ertalab (DAILY_CRON) rejadagi postlar yoziladi
 cron.schedule(cfg.planCron, weeklyPlanRun, { timezone: cfg.tz });
 // Haftalik hisobot (standart: dushanba 09:00)
 cron.schedule(cfg.reportCron, () => weeklyReport(7).catch(e => log(`⚠️ Hisobot xatosi: ${e.message}`)), { timezone: cfg.tz });
 // Kunlik zaxira (Toshkent 03:15) — egasiga shaxsiy chatda jim fayl
-cron.schedule(process.env.BACKUP_CRON || '15 3 * * *', () => zaxira().catch(e => log(`⚠️ Zaxira yuborilmadi: ${e.message}`)), { timezone: cfg.tz });
+// Zaxiradan oldin: eski qoralamalar va ularning fayllari tozalanadi (tozalash.js)
+cron.schedule(process.env.BACKUP_CRON || '15 3 * * *', async () => {
+  try { const t = tozala(); if (t.qoralama) console.log(`Tozalash: ${t.qoralama} ta eski qoralama, ${t.fayl} ta fayl`); }
+  catch (e) { console.error('Tozalash:', e.message); }
+  await zaxira().catch(e => log(`⚠️ Zaxira yuborilmadi: ${e.message}`));
+}, { timezone: cfg.tz });
 // Kotibim CRM kontent kalendari: har daqiqada sinxron; CRM'da joylangan yaqin g'oyalar darhol yoziladi
 let kalendarXato = false;
 if (kalendarEnabled()) cron.schedule('* * * * *', async () => {

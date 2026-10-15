@@ -331,7 +331,8 @@ JSON: {"goyalar":[{"goya":"1–2 gap — nima haqida va qaysi burchakdan","nega"
     .map((g, i) => ({ ...g, ...(mahsulot ? { mahsulot } : {}), n: i + 1 }));
   // Bo'sh natija kechagi dayjestni o'chirib yubormasin (raqam bilan tanlash ishlashda davom etadi)
   if (!goyalar.length) return { goyalar, kanallar_xatosi: kuzatuv.xatolar };
-  for (const g of goyalar) bilan(mKod(g.mahsulot), () => store.addIdea(g.goya));
+  // Bankka "ai" belgisi bilan (rahbar g'oyasi emas); id dayjestda saqlanadi — tanlanganda "ishlatildi" bo'ladi
+  for (const g of goyalar) g.idea_id = bilan(mKod(g.mahsulot), () => store.addIdea(g.goya, { manba: 'ai' })).id;
   store.setSetting(dayjestKalit(mahsulot), { at: new Date().toISOString(), goyalar });
   return { goyalar, kanallar_xatosi: kuzatuv.xatolar, mahsulot: mahsulot || '' };
 }
@@ -340,6 +341,8 @@ export function goyaTanla({ n, mahsulot }) {
   const k = store.setting(dayjestKalit(mahsulot), null);
   const g = k?.goyalar?.find(x => x.n === Number(n));
   if (!g) throw xato(`${n}-g'oya topilmadi (oxirgi dayjestda ${k?.goyalar?.length || 0} ta)`, 404);
+  // Tanlangan g'oya bankda ochiq qolsa, haftalik reja uni yana olib, takror post yozishi mumkin edi
+  if (g.idea_id) store.markIdeas([g.idea_id]);
   return { goya: `${g.goya}${g.tur ? ` (taklif: ${TURLAR[g.tur]?.nom || g.tur})` : ''}`, manba: g.manba || '' };
 }
 
