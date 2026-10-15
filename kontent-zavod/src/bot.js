@@ -177,6 +177,14 @@ export async function rejaYetibOl() {
   busy = true;
   try {
     for (const m of rejim() ? kodlar() : [null]) await bilan(m, async () => {
+      // Avto rejimda reja yo'q bo'lsa (yakshanba bot o'chiq bo'lgan) — o'zi tuziladi; urinish 6 soatda bir martadan ko'p emas
+      if (!weekly.currentPlan() && weekly.autoMode() && !weekly.lastDraftPlan()) {
+        const kalit = `avto_reja_urinish:${m || 'umumiy'}`;
+        if (Date.now() - store.setting(kalit, 0) < 6 * 3600e3) return;
+        store.setSetting(kalit, Date.now());
+        try { await rejaTuz(); } catch (e) { await log(`⚠️ Avto reja tuzilmadi: ${e.message}`); }
+        return;
+      }
       if (!weekly.currentPlan()) return;
       const n = await weekly.produceDue({ log, onDraft: sendForApproval });
       if (n) await log(`🗓 Rejadan ${n} ta post yozildi.`);
@@ -338,12 +346,26 @@ async function sendPlan(p, chatId = cfg.groupId, extra = { message_thread_id: te
 }
 
 // Mahsulot rejimida: topikdan chaqirilsa — shu mahsulot, jadval bo'yicha (cron) — hammasi
+// Avto rejimda reja tasdiq kutmaydi: o'zi tasdiqlanadi, yaqin postlar darhol yoziladi va o'z vaqtida chiqadi.
+// Rahbar xohlasa ✏️ bilan o'zgartiradi yoki /avto off qiladi.
+const avtoRejaKb = (id) => new InlineKeyboard().text('✏️ O\'zgartirish', `pedit:${id}`).text('🔄 Qayta tuzish', `pnew:${id}`);
+async function rejaTuz() {
+  const p = await weekly.buildPlan(log);
+  if (!weekly.autoMode()) return sendPlan(p);
+  weekly.approve(p.id);
+  const extra = { message_thread_id: tema(p.mahsulot || joriy()) };
+  await sendLong(cfg.groupId, weekly.formatPlan(p), extra);
+  await sendSafe(bot.api, cfg.groupId, "🤖 Avto rejim: reja o'zi tasdiqlandi — postlar chiqishidan ~1 kun oldin yoziladi va o'z vaqtida kanalga chiqadi.", { ...extra, reply_markup: avtoRejaKb(p.id) });
+  const n = await weekly.produceDue({ log, onDraft: sendForApproval });
+  if (n) await log(`🗓 Rejadan ${n} ta post yozildi.`);
+}
+
 export async function weeklyPlanRun(mlar = rejim() ? (joriy() ? [joriy()] : kodlar()) : [null]) {
   if (busy) return log('⏳ Haftalik reja keyinroq: hozir boshqa ish bajarilyapti. /reja_yangi bilan qayta urinib ko\'ring.');
   busy = true;
   try {
     for (const m of mlar) await bilan(m, async () => {
-      try { await sendPlan(await weekly.buildPlan(log)); }
+      try { await rejaTuz(); }
       catch (e) { await log(`⚠️ Haftalik reja tuzilmadi: ${e.message}`); }
     });
   } finally { busy = false; }
@@ -462,7 +484,7 @@ bot.command('avto', ctx => {
   else if (['off', "o'chir", 'ochir', '0'].includes(arg)) store.setSetting('avto', false);
   const on = weekly.autoMode();
   return ctx.reply(on
-    ? '🤖 Avto rejim YOQILGAN: rejadagi postlar yozilgach tasdiqlashsiz o\'z vaqtida chiqadi (tasdiqlash topigida ko\'rinadi — vaqtini o\'zgartirish yoki navbatdan olish mumkin).\nO\'chirish: /avto off'
+    ? '🤖 Avto rejim YOQILGAN: haftalik reja o\'zi tasdiqlanadi, rejadagi postlar yozilgach tasdiqlashsiz o\'z vaqtida chiqadi (topikda ko\'rinadi — vaqtini o\'zgartirish yoki navbatdan olish mumkin). Reja bo\'lmasa — o\'zi tuziladi.\nO\'chirish: /avto off'
     : '✋ Avto rejim O\'CHIQ: rejadagi har post tasdiqlashga keladi (✅ bosilsa reja vaqtida chiqadi).\nYoqish: /avto on');
 });
 
