@@ -8,6 +8,9 @@ import { review } from './agents/director.js';
 import { writeArticle } from './agents/article.js';
 import { renderSlides } from './video/slides.js';
 import { makeVideo } from './video/make.js';
+import { prodyuser, rasmPrompti } from './agents/kontent.js';
+import { rasmYoqilgan, rasmYasa } from './rasm.js';
+import { joriy } from './mahsulot.js';
 import { VIDEO_SIGNATURE } from './brand.js';
 import { uniqueCode, ensureCode, ensureLink } from './cta.js';
 import { topish } from './kontentReja.js';
@@ -23,10 +26,23 @@ export async function renderDraftSlides(draft) {
   return store.update(draft.id, { slide_paths: files });
 }
 
-// Bitta reja bandidan qoralama: kopirayting → tekshiruv → (maqola/karusel) → slaydlar.
+// Bitta reja bandidan qoralama: prodyuser TZ → kopirayting → tekshiruv → (maqola/karusel) → slaydlar → (rasm / video).
 // extra — qoralamaga qo'shimcha maydonlar (masalan reja vaqti)
 export async function produceDraft(p, { log = async () => {}, extra = {} } = {}) {
   p.format = String(p.format || 'post').toLowerCase();
+  // Prodyuser: reja bandini TZ ga aylantiradi (ilmoq, tuzilma, dalil, taqiqlar, rasm kerakmi) va ijrochilarga beradi:
+  // matn — kopirayter, rasm — rassom (Gemini), reels — video. Format va rubrika rejadagicha qoladi. O'chirish: PRODYUSER=0
+  let tz = null;
+  if (process.env.PRODYUSER !== '0' && !p.tz) {
+    try {
+      await log(`🎬 Prodyuser TZ yozmoqda: ${p.title}`);
+      tz = await prodyuser(`${p.title}${p.angle ? ` — ${p.angle}` : ''}. Format: ${p.format} (o'zgartirma)${p.rubric ? `, rubrika: ${p.rubric}` : ''}.`,
+        { mahsulot: joriy() || undefined });
+      p.tz = { taklif: tz.taklif, ilmoq: tz.ilmoq, tuzilma: tz.tuzilma, asosiy_fikr: tz.asosiy_fikr, dalil: tz.dalil,
+        taqiqlar: tz.taqiqlar, auditoriya: tz.auditoriya, ichki_format: tz.format };
+      if (!p.hook && tz.ilmoq) p.hook = tz.ilmoq;
+    } catch (e) { await log(`⚠️ Prodyuser TZ yozmadi (${p.title}): ${e.message} — reja bo'yicha yoziladi`); }
+  }
   // Tayyor rejadagi g'oya ("[qa07] ...") bo'lsa — CTA o'sha rejaning havolasiga olib boradi
   if (p.idea_id && !p.cta_havola) {
     const kod = (/^\[([a-z]{2}\d{2})\]/.exec(store.ideas().find(i => i.id === String(p.idea_id))?.text || '') || [])[1];
@@ -61,11 +77,21 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
     title: p.title, format: p.format, source_url: p.source_url || '', plan: p, cta_kod: p.cta_kod,
     post_html: texts.post_html, reels_script: copy.reels_script || '',
     article_html: texts.article_html, slides: art?.slides || [],
-    score: rev.score, notes: [rev.notes, fact].filter(Boolean).join('\n'), ...extra
+    score: rev.score, notes: [tz?.taklif ? `🎬 Prodyuser: ${String(tz.taklif).slice(0, 200)}` : '', rev.notes, fact].filter(Boolean).join('\n'),
+    ...(tz ? { tz } : {}), ...extra
   });
   if (art) {
     try { draft = await renderDraftSlides(draft); }
     catch (e) { await log(`⚠️ Slaydlar chizilmadi (${p.title}): ${e.message}`); }
+  }
+  // Rassom: prodyuser rasm so'ragan bo'lsa (matn+rasm) — AI rasm. GEMINI_API_KEY kerak; o'chirish: AVTO_RASM=0
+  const rasmKerak = tz && (tz.kontent_turi === 'matn+rasm' || String(tz.rasm_tavsif || '').trim());
+  if (rasmKerak && p.format === 'post' && rasmYoqilgan() && process.env.AVTO_RASM !== '0') {
+    try {
+      await log(`🎨 Rasm chizilmoqda: ${p.title}`);
+      const fayl = await rasmYasa(await rasmPrompti(draft), path.join(cfg.dataDir, 'images', draft.id, `ai-${Date.now()}`));
+      draft = store.update(draft.id, { image_paths: [...(draft.image_paths || []), fayl] });
+    } catch (e) { await log(`⚠️ Rasm chizilmadi (${p.title}): ${e.message}`); }
   }
   // Reels — video ham o'zi yasaladi (avto rejimda matn videosiz chiqib ketmasin). O'chirish: AVTO_VIDEO=0
   if (p.format === 'reels' && process.env.AVTO_VIDEO !== '0') {
