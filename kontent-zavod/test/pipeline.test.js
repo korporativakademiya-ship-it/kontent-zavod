@@ -59,6 +59,7 @@ test("reja bandi: prodyuser TZ yozadi, kopirayter TZ bilan yozadi, rasm so'ralga
   assert.ok(fs.existsSync(d.image_paths[0]));
   assert.equal(geminiSorov.contents[0].parts[0].text, 'A shop owner at night, phone glowing, no text');
   assert.ok(log.some(t => /🎨 Rasm chizilmoqda/.test(t)));
+  assert.match(d.notes, /^🏭 Ishladi: 🎬 Prodyuser \(TZ\) → ✍️ Kopirayter → 🧐 Rahbar tekshiruvi \(8\/10\) → 🎨 Rassom \(AI rasm\)/);
 });
 
 test('PRODYUSER=0 — prodyuser chaqirilmaydi, reja bo\'yicha yoziladi', async () => {

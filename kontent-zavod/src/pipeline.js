@@ -33,6 +33,8 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
   // Prodyuser: reja bandini TZ ga aylantiradi (ilmoq, tuzilma, dalil, taqiqlar, rasm kerakmi) va ijrochilarga beradi:
   // matn — kopirayter, rasm — rassom (Gemini), reels — video. Format va rubrika rejadagicha qoladi. O'chirish: PRODYUSER=0
   let tz = null;
+  // Kim nima qildi — prodyuser yakunda rahbarga ko'rsatadi ("falon agentlar ishladi, natija — tayyor post")
+  const ishlar = [];
   if (process.env.PRODYUSER !== '0' && !p.tz) {
     try {
       await log(`🎬 Prodyuser TZ yozmoqda: ${p.title}`);
@@ -41,6 +43,7 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
       p.tz = { taklif: tz.taklif, ilmoq: tz.ilmoq, tuzilma: tz.tuzilma, asosiy_fikr: tz.asosiy_fikr, dalil: tz.dalil,
         taqiqlar: tz.taqiqlar, auditoriya: tz.auditoriya, ichki_format: tz.format };
       if (!p.hook && tz.ilmoq) p.hook = tz.ilmoq;
+      ishlar.push('🎬 Prodyuser (TZ)');
     } catch (e) { await log(`⚠️ Prodyuser TZ yozmadi (${p.title}): ${e.message} — reja bo'yicha yoziladi`); }
   }
   // Tayyor rejadagi g'oya ("[qa07] ...") bo'lsa — CTA o'sha rejaning havolasiga olib boradi
@@ -54,11 +57,13 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
   await log(`✍️ Kopirayter yozmoqda: ${p.title}`);
   const copy = await write(p);
   const rev = await review(p, copy);
+  ishlar.push('✍️ Kopirayter', `🧐 Rahbar tekshiruvi (${rev.score ?? '-'}/10)`);
   const post_html = ensureLink(ensureCode(rev.post_html || copy.post_html, p.cta_kod), p.cta_havola, p.cta_matn);
   let art = null;
   if (RICH_FORMATS.includes(p.format)) {
     await log(`📰 Maqola/karusel yozilmoqda: ${p.title}`);
     art = await writeArticle(p, { post_html });
+    ishlar.push(p.format === 'karusel' ? `🎠 Karusel (${art?.slides?.length || 0} slayd)` : '📰 Maqola muallifi');
   }
   // Fakt tekshiruvi: raqam va da'volar internetdan tekshiriladi, noto'g'risi tuzatiladi
   let texts = { post_html, article_html: art?.article_html || '' }, fact = '';
@@ -70,6 +75,7 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
       const fixed = fc.replacements.filter(r => texts.post_html.includes(r.find) || texts.article_html.includes(r.find)).length;
       texts = { post_html: applyFixes(texts.post_html, fc.replacements).html, article_html: applyFixes(texts.article_html, fc.replacements).html };
       fact = factSummary(fc, fixed);
+      ishlar.push(`🔎 Fakt tekshiruvchi${fixed ? ` (${fixed} ta tuzatdi)` : ''}`);
     } catch (e) { fact = `🔎 Fakt tekshiruvi bajarilmadi: ${e.message}`; }
   }
   if (p.idea_id) store.markIdeas([String(p.idea_id)]); // rahbar g'oyasi ishlatildi
@@ -91,6 +97,7 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
       await log(`🎨 Rasm chizilmoqda: ${p.title}`);
       const fayl = await rasmYasa(await rasmPrompti(draft), path.join(cfg.dataDir, 'images', draft.id, `ai-${Date.now()}`));
       draft = store.update(draft.id, { image_paths: [...(draft.image_paths || []), fayl] });
+      ishlar.push('🎨 Rassom (AI rasm)');
     } catch (e) { await log(`⚠️ Rasm chizilmadi (${p.title}): ${e.message}`); }
   }
   // Reels — video ham o'zi yasaladi (avto rejimda matn videosiz chiqib ketmasin). O'chirish: AVTO_VIDEO=0
@@ -99,9 +106,10 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
       await log(`🎥 Video yasalmoqda: ${p.title}`);
       const v = await videoYasa(draft, { log });
       draft = store.update(draft.id, { video_path: v.file, video_duration: v.duration, motion: v.data });
+      ishlar.push(`🎥 Video (${Math.round(v.duration)} s${v.voiced ? ', ovozli' : ''})`);
     } catch (e) { await log(`⚠️ Video yasalmadi (${p.title}): ${e.message} — post matn bo'lib qoladi, 🎥 bilan qayta urinib ko'ring`); }
   }
-  return draft;
+  return store.update(draft.id, { ishlar, notes: [`🏭 Ishladi: ${ishlar.join(' → ')}`, draft.notes].filter(Boolean).join('\n') });
 }
 
 // Rahbar agent boshqaradigan to'liq zanjir: tadqiqot → strategiya → kopirayting → tekshiruv
