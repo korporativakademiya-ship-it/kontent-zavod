@@ -27,3 +27,19 @@ test('Gemini TTS: eng yangi model tanlanadi, PCM javob MP3 bo\'ladi', async () =
   assert.ok(Math.abs(await mediaDuration(out) - 1) < 0.2);
   assert.equal(fs.existsSync(out + '.raw'), false);
 });
+
+test('Gemini rasm: eng yangi rasm modeli, fayl mime bo\'yicha saqlanadi', async () => {
+  const { rasmYasa } = await import('../src/rasm.js');
+  const { engYangiRasm } = await import('../src/gemini.js');
+  assert.equal(engYangiRasm(['imagen-4.0', 'gemini-2.5-flash-image', 'gemini-3.0-pro-image-preview', 'gemini-3.0-flash']), 'gemini-3.0-pro-image-preview');
+  let tana = null;
+  const fetchFn = async (url, o = {}) => {
+    if (url.includes(':generateContent')) { tana = JSON.parse(o.body); return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/jpeg', data: Buffer.from('jpg').toString('base64') } }] } }] }) }; }
+    return { ok: true, json: async () => ({ models: [] }) };
+  };
+  process.env.GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
+  const f = await rasmYasa('a calm office', path.join(process.env.DATA_DIR, 'r', 'x'), { fetchFn });
+  assert.match(f, /x\.jpg$/);
+  assert.equal(fs.readFileSync(f, 'utf8'), 'jpg');
+  assert.deepEqual(tana.generationConfig, { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '4:5' } });
+});

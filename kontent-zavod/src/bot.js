@@ -20,6 +20,8 @@ import { buildReport } from './report.js';
 import * as weekly from './weekly.js';
 import { analyzeStyle, distillRules } from './agents/stylist.js';
 import { bilan, joriy, rejim, kodlar, topigi, topikdan, PROFIL } from './mahsulot.js';
+import { rasmYoqilgan, rasmYasa } from './rasm.js';
+import { rasmPrompti } from './agents/kontent.js';
 
 // TELEGRAM_API_ROOT — ixtiyoriy (lokal Bot API server yoki sinov uchun)
 const API_ROOT = process.env.TELEGRAM_API_ROOT || 'https://api.telegram.org';
@@ -628,7 +630,9 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     await ctx.answerCallbackQuery();
     const has = imagePaths(d).length;
     return ask(ctx, `🖼 "${esc(d.title)}" uchun rasm.\n• Rasm yuboring (shu xabarga reply qilib) — postga qo'shaman (bir nechta bo'lsa, albom bo'ladi)\n` +
-      `• <code>muqova</code> deb yozing — brend uslubida muqova yasayman` + (has ? `\n• <code>o'chir</code> — ${has} ta rasmni olib tashlayman` : ''), { kind: 'image', id });
+      `• <code>muqova</code> deb yozing — brend uslubida muqova yasayman` +
+      (rasmYoqilgan() ? `\n• <code>ai</code> deb yozing — post mazmuniga mos AI rasm chizaman (Gemini)` : '') +
+      (has ? `\n• <code>o'chir</code> — ${has} ta rasmni olib tashlayman` : ''), { kind: 'image', id });
   }
   if (act === 'unq') {
     store.update(id, { status: 'pending', scheduledAt: null });
@@ -723,7 +727,17 @@ bot.on('message:text', async ctx => {
       await ctx.reply('🗑 Rasmlar olib tashlandi. Yangilangan qoralama:', opt);
       return sendForApproval(nd);
     }
-    if (!t.startsWith('muqova')) return ctx.reply('Rasm yuboring yoki "muqova" deb yozing.', opt);
+    if (t === 'ai' && rasmYoqilgan()) {
+      store.takeWait(replyTo);
+      await ctx.reply('🎨 AI rasm chizilyapti (1–2 daqiqa)...', opt);
+      try {
+        const file = await rasmYasa(await rasmPrompti(d), path.join(cfg.dataDir, 'images', d.id, `ai-${Date.now()}`));
+        const nd = store.update(d.id, { image_paths: [...(d.image_paths || []), file] });
+        await ctx.reply('🖼 AI rasm tayyor. Yangilangan qoralama:', opt);
+        return sendForApproval(nd);
+      } catch (e) { return ctx.reply(`⚠️ AI rasm chizilmadi: ${e.message}`, opt); }
+    }
+    if (!t.startsWith('muqova')) return ctx.reply(`Rasm yuboring yoki "muqova"${rasmYoqilgan() ? ' / "ai"' : ''} deb yozing.`, opt);
     store.takeWait(replyTo);
     try {
       const file = await makeCover(d);

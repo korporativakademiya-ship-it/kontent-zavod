@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { cfg } from './config.js';
 import { ffmpeg, mediaDuration } from './video/ffmpeg.js';
+import { modellar, geminiMedia, engYangiTts } from './gemini.js';
 
 // Matnni ovozga aylantirish (dublyaj). Provayder .env dan: TTS_PROVIDER=azure | elevenlabs
 const t = cfg.tts;
@@ -55,40 +56,22 @@ async function synthEleven(text) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models';
-// Model nomi berilmasa — Google ro'yxatidan eng yangi TTS modeli olinadi (nomlar eskirsa ham ishlaydi)
-let geminiModel = t.geminiModel;
-export function engYangiTts(nomlar) {
-  const ver = (n) => parseFloat((n.match(/(\d+(?:\.\d+)?)/) || [0, 0])[1]);
-  return nomlar.filter(n => /tts/i.test(n)).sort((a, b) => ver(b) - ver(a) || (/flash/.test(b) - /flash/.test(a)))[0] || '';
-}
+// Model berilmasa — Google ro'yxatidan eng yangi TTS modeli (gemini.js)
+export { engYangiTts };
 async function geminiTtsModel(fetchFn) {
-  if (geminiModel) return geminiModel;
-  const res = await fetchFn(`${GEMINI}?pageSize=1000`, { headers: { 'x-goog-api-key': t.geminiKey } });
-  if (!res.ok) throw new Error(`Gemini modellar ro'yxati ${res.status}`);
-  geminiModel = engYangiTts(((await res.json()).models || []).map(m => m.name.replace('models/', '')));
-  if (!geminiModel) throw new Error('Gemini TTS modeli topilmadi');
-  return geminiModel;
+  const m = t.geminiModel || engYangiTts(await modellar(fetchFn));
+  if (!m) throw new Error('Gemini TTS modeli topilmadi');
+  return m;
 }
 
 // Gemini PCM (audio/L16, 24 kHz) qaytaradi — ffmpeg bilan MP3 ga o'giriladi
 export async function synthGemini(text, outFile, { fetchFn = fetch } = {}) {
   const model = await geminiTtsModel(fetchFn);
-  const res = await fetchFn(`${GEMINI}/${model}:generateContent`, {
-    method: 'POST',
-    headers: { 'x-goog-api-key': t.geminiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: `Brisk, confident male narrator, natural Uzbek pronunciation, no long pauses: ${text}` }] }],
-      generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: t.geminiVoice } } } }
-    }),
-    signal: AbortSignal.timeout(120e3)
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Gemini TTS ${res.status}: ${String(data?.error?.message || '').slice(0, 200)}`);
-  const part = (data?.candidates?.[0]?.content?.parts || []).find(p => p.inlineData || p.inline_data);
-  const d = part && (part.inlineData || part.inline_data);
-  if (!d?.data) throw new Error('Gemini TTS ovoz qaytarmadi');
-  const mime = d.mimeType || d.mime_type || 'audio/L16;rate=24000';
+  const d = await geminiMedia(model, {
+    contents: [{ parts: [{ text: `Brisk, confident male narrator, natural Uzbek pronunciation, no long pauses: ${text}` }] }],
+    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: t.geminiVoice } } } }
+  }, { fetchFn });
+  const mime = d.mime || 'audio/L16;rate=24000';
   const raw = outFile + '.raw';
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(raw, Buffer.from(d.data, 'base64'));

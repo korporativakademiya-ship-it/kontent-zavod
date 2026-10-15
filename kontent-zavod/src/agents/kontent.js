@@ -380,6 +380,20 @@ JSON: {"personaj_langari":"ingliz tilida bitta jumla","sahnalar":[{"rasm_prompt"
   };
 }
 
+// Tayyor post uchun bitta rasm prompti (Fabrika botidagi 🖼 → "ai"): TZ bo'lmasa post matnidan
+export async function rasmPrompti(d) {
+  const r = await askJSON({
+    maxTokens: 1200,
+    system: `Sen prompt muhandisisan: post uchun bitta rasm promptini yozasan.\n${PROMPT_SKILL}`,
+    prompt: `POST: ${toza(d.post_html).slice(0, 1500)}\n${d.tz?.rasm_tavsif ? `RASM TAVSIFI (TZ): ${d.tz.rasm_tavsif}\n` : ''}${d.tz?.vizual ? `VIZUAL: ${JSON.stringify(d.tz.vizual)}\n` : ''}
+Postning hissiyoti yoki vaziyatini ko'rsatadigan bitta kadr. Kompozitsiya: 4:5 vertikal (vertical 9:16 emas).
+JSON: {"rasm_prompt":"..."}`,
+  });
+  const p = String(r.rasm_prompt || '').trim();
+  if (!p) throw new Error('rasm prompti yozilmadi');
+  return p;
+}
+
 // Ishlab chiqarish rejasi: reels — rejissyor + prompt muhandisi; matn+rasm — bitta rasm prompti
 // kino — n8n doskasi /kino shablonlarini biladi (eski doskaga eski slayd-shou yo'li qoladi)
 export async function ishlabChiqarish({ draft_id, variant = 0, kino = false }) {
