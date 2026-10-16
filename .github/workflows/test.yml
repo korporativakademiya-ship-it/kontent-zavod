@@ -1,0 +1,43 @@
+name: Testlar
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  zavod:
+    name: kontent-zavod
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kontent-zavod
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: kontent-zavod/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  render:
+    name: kontent-render
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kontent-render
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: kontent-render/package-lock.json
+      - run: npm ci
+      - run: npm test
