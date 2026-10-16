@@ -29,6 +29,7 @@ const server = http.createServer((req, res) => {
   });
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
+test.after(() => server.close());
 Object.assign(process.env, {
   DATA_DIR: '/tmp/kz-test-pipeline-' + process.pid, LLM_MODE: 'api', ANTHROPIC_API_KEY: 'test', ANTHROPIC_BASE_URL: `http://127.0.0.1:${server.address().port}`,
   FACT_CHECK: '0', GEMINI_API_KEY: 'g', GEMINI_IMAGE_MODEL: 'gemini-test-image',
@@ -70,5 +71,4 @@ test('PRODYUSER=0 — prodyuser chaqirilmaydi, reja bo\'yicha yoziladi', async (
   assert.equal(d.tz, undefined);
   assert.deepEqual(d.image_paths || [], []);
   delete process.env.PRODYUSER;
-  server.close();
 });

@@ -436,7 +436,7 @@ export function dayjestMatni(r) {
 }
 
 // Uslubni rahbarning o'z kanalidan o'rganish: postlar namuna bo'ladi, uslubshunos tavsif yozadi
-export async function uslubKanaldan({ kanal = process.env.USLUB_KANAL || '', fetchFn } = {}) {
+export async function uslubKanaldan({ kanal = store.setting('uslub_kanal', '') || process.env.USLUB_KANAL || '', fetchFn } = {}) {
   const nk = normKanal(kanal);
   if (!nk || nk.platforma !== 'telegram') throw xato("uslub uchun Telegram kanal nomi kerak (Railway'da USLUB_KANAL=pulatovjurabek)");
   kanal = nk.nom;

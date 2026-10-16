@@ -3,6 +3,9 @@
 Tadqiqot → strategiya → kopirayting → rahbar tekshiruvi → Telegram'da tasdiqlash → kanalga avtomatik post.
 
 ## Ishga tushirish
+Boshqa mijoz (yoki yangi soha) uchun: botga `/sozla` — 6 ta savol (ism va imzo, soha, auditoriya, mahsulotlar, g'oya manbalari,
+o'z kanali). Agent brend profilini tuzadi, ✅ bosilsa agentlar shu brend bilan yozadi, kanallar kuzatuvga qo'shiladi, uslub o'rganiladi.
+
 1. @BotFather'dan bot oching, tokenni oling.
 2. Botni virtual ofis guruhiga (topiklar yoqilgan) va kanalga **admin** qilib qo'shing.
 3. Guruhda "Tasdiqlash" va "Jarayon" topiklarini oching, har birida `/id` yozing — ID'larni oling.

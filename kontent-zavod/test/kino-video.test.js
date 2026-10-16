@@ -19,6 +19,7 @@ const server = http.createServer((req, res) => {
   });
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
+test.after(() => server.close());
 const DATA = '/tmp/kz-test-kino-' + process.pid;
 Object.assign(process.env, { DATA_DIR: DATA, LLM_MODE: 'api', ANTHROPIC_API_KEY: 't', ANTHROPIC_BASE_URL: `http://127.0.0.1:${server.address().port}`,
   KONTENT_RENDER_URL: 'http://render.test:8080/' });
@@ -43,5 +44,4 @@ test('kino video: sahnalar kontent-render /kino ga ketadi, MP4 saqlanadi', async
   assert.ok(fs.existsSync(v.file));
   assert.ok(Math.abs(v.duration - 2) < 0.3);
   assert.equal(v.voiced, false, 'TTS sozlanmagan — ovozsiz');
-  server.close();
 });

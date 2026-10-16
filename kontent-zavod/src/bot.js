@@ -21,7 +21,9 @@ import * as weekly from './weekly.js';
 import { analyzeStyle, distillRules } from './agents/stylist.js';
 import { bilan, joriy, rejim, kodlar, topigi, topikdan, PROFIL } from './mahsulot.js';
 import { rasmYoqilgan, rasmYasa } from './rasm.js';
-import { rasmPrompti } from './agents/kontent.js';
+import { rasmPrompti, uslubKanaldan } from './agents/kontent.js';
+import * as onboarding from './onboarding.js';
+import { kanalQosh } from './kuzatuv.js';
 
 // TELEGRAM_API_ROOT — ixtiyoriy (lokal Bot API server yoki sinov uchun)
 const API_ROOT = process.env.TELEGRAM_API_ROOT || 'https://api.telegram.org';
@@ -244,7 +246,7 @@ bot.command('start', ctx => ctx.reply(
   '/maqola <mavzu> — Telegram maqolasi (sarlavha, ro\'yxat, jadval)\n/karusel <mavzu> — slaydli karusel\n' +
   '/rejalar [ka|qa|kf] — tayyor kontent reja (150 ta) · /reja_post qa07 — shu bo\'yicha post · /reja_bankka — g\'oyalar bankiga\n' +
   (rejim() ? "Mahsulot rejimi: har mahsulot o'z xonasida — reja, qoralama, jarayon shu yerda. /jadval — chiqish kunlari\n" : '') +
-  '/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n\"g\'oya: ...\" — g\'oyalar bankiga · /goyalar\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
+  '/sozla — soha, auditoriya, mahsulotlar va manbalarni sozlash\n/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n\"g\'oya: ...\" — g\'oyalar bankiga · /goyalar\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
 
 bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
 bot.command('goya', ctx => {
@@ -262,6 +264,49 @@ for (const [cmd, format, example] of [['maqola', 'maqola', 'xodimni ishga olish 
     startRun(ctx, topic, format);
   });
 }
+
+// ---------- /sozla: soha, auditoriya, mahsulotlar, g'oya manbalari va uslubni so'rab olish ----------
+// Javoblar reply orqali; oxirida agent brend profilini tuzadi, rahbar ✅ bosgach sozlamalarga yoziladi
+const sozlaSora = (ctx, matn) => ctx.reply(matn, { parse_mode: 'HTML', ...(ctx.msg?.message_thread_id ? { message_thread_id: ctx.msg.message_thread_id } : {}),
+  reply_markup: { force_reply: true, selective: true } }).then(m => store.setWait(m.message_id, { kind: 'sozla' }));
+
+bot.command('sozla', async ctx => {
+  if (!isAdmin(ctx)) return;
+  store.setSetting('sozla', { qadam: 0, javoblar: {} });
+  await sozlaSora(ctx, `⚙️ <b>Sozlash</b> — agentlar kim uchun va nima haqida yozishini aniqlaymiz (6 ta savol). Har savolga shu xabarga reply qilib javob bering.\n\n${onboarding.SAVOLLAR[0].savol}`);
+});
+
+async function sozlaJavob(ctx) {
+  const holat = store.setting('sozla', null);
+  if (!holat) return ctx.reply("Sozlash boshlanmagan: /sozla");
+  const r = onboarding.javobQabul(holat, ctx.message.text);
+  store.setSetting('sozla', holat);
+  if (r.keyingi) return sozlaSora(ctx, r.xato ? `${r.xato}\n\n${r.keyingi}` : r.keyingi);
+  await ctx.reply('⏳ Javoblaringizdan brend profili tuzilyapti (1–2 daqiqa)...');
+  try {
+    const n = await onboarding.brendYasa(holat.javoblar);
+    store.setSetting('sozla_natija', n);
+    const mlar = Object.entries(n.mahsulotlar).map(([k, m]) => `${m.belgi} ${esc(m.nom)} <code>${k}</code>`).join('\n') || "yo'q (umumiy kontent)";
+    await sendLong(ctx.chat.id, `🧾 <b>Brend profili</b>\n\n${esc(n.matn)}\n\n<b>Mahsulotlar:</b>\n${mlar}`, ctx.msg?.message_thread_id ? { message_thread_id: ctx.msg.message_thread_id } : {});
+    await ctx.reply('Shu profil bilan ishlaymizmi? Agentlar endi shunga qarab yozadi.', {
+      ...(ctx.msg?.message_thread_id ? { message_thread_id: ctx.msg.message_thread_id } : {}),
+      reply_markup: new InlineKeyboard().text('✅ Saqlash', 'sozla:ok').text('❌ Bekor', 'sozla:no') });
+  } catch (e) { await ctx.reply(`⚠️ Profil tuzilmadi: ${e.message}. /sozla bilan qayta urinib ko'ring.`); }
+}
+
+bot.callbackQuery(/^sozla:(ok|no)$/, async ctx => {
+  if (!isAdmin(ctx)) return ctx.answerCallbackQuery({ text: 'Faqat rahbar' });
+  const holat = store.setting('sozla', null), n = store.setting('sozla_natija', null);
+  await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text(ctx.match[1] === 'ok' ? '✅ Saqlandi' : '❌ Bekor qilindi', 'noop') }).catch(() => {});
+  await ctx.answerCallbackQuery();
+  store.setSetting('sozla', null); store.setSetting('sozla_natija', null);
+  if (ctx.match[1] !== 'ok' || !holat || !n) return;
+  const r = await onboarding.saqla(holat.javoblar, n, { kuzatuv: { kanalQosh }, uslub: (kanal) => uslubKanaldan({ kanal }) });
+  await ctx.reply(`✅ Sozlandi. Agentlar endi yangi brend bilan yozadi.` +
+    (r.qoshildi.length ? `\n👀 Kuzatuvga qo'shildi: ${r.qoshildi.join(', ')}` : '') +
+    (r.xatolar.length ? `\n⚠️ Qo'shilmadi: ${r.xatolar.join('; ')}` : '') + (r.uslubNatija ? `\n${r.uslubNatija}` : '') +
+    `\nKeyingi qadam: /reja_yangi${rejim() ? ' (mahsulot topiklari PRODUCT_TOPICS da yangi kodlar bilan bo\'lishi kerak)' : ''} yoki /avto on.`);
+});
 
 // ---------- Uslub: namuna postlar va doimiy qoidalar ----------
 export const RULES_BATCH = 5; // shuncha yangi tahrir izohi yig'ilsa — qoidalar avtomatik yangilanadi
@@ -699,6 +744,7 @@ bot.on('message:text', async ctx => {
   const replyTo = ctx.message.reply_to_message?.message_id;
   const w = replyTo && store.peekWait(replyTo);
   if (!w || !isAdmin(ctx)) return;
+  if (w.kind === 'sozla') { store.takeWait(replyTo); return sozlaJavob(ctx); }
   const opt = { message_thread_id: tema() };
   if (w.kind === 'plan') {
     store.takeWait(replyTo);
