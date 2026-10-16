@@ -67,6 +67,8 @@ bot.start({
     const avto = avtoEnvQolla();
     if (avto !== null) { console.log(`Avto rejim (AVTO_REJIM): ${avto ? 'yoqildi' : "o'chirildi"}`); log(avto ? "🤖 Avto rejim yoqildi: haftalik reja o'zi tuziladi va tasdiqlanadi, postlar o'z vaqtida o'zi chiqadi. O'chirish: /avto off" : "✋ Avto rejim o'chirildi: har post tasdiqlashga keladi."); }
     salomlash().catch(e => console.error('Salom:', e.message));
+    // Qayta ishga tushganda soatlik tekshiruvni kutmasdan: o'tkazib yuborilgan ish va avto reja bir daqiqadan keyin
+    setTimeout(() => rejaYetibOl().catch(e => log(`⚠️ Rejadan yozishda xato: ${e.message}`)), 60e3);
   } });
 // Toza to'xtash: bot va API yopiladi, cron'lar jarayonni ushlab turmaydi
 const toxta = async () => {
