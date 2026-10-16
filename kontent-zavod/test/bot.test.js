@@ -74,3 +74,17 @@ test("\"g'oya: ...\" bankka tushadi (rahbar g'oyasi), /sozla savollari reply bil
   assert.match(s2.payload.text, /2\/6/);
   assert.equal(store.setting('sozla').javoblar.muallif, 'Dilnoza — klinika asoschisi');
 });
+
+test("avto rejim: tasdiq kutayotgan amaldagi reja o'zi tasdiqlanadi (eski reja jim to'sib qo'ymaydi)", async () => {
+  const { rejaYetibOl } = await import('../src/bot.js');
+  const weekly = await import('../src/weekly.js');
+  store.setSetting('avto', true);
+  const kun = (n) => new Date(Date.now() + 5 * 3600e3 + n * 864e5).toISOString().slice(0, 10);
+  const uzoq = new Date(Date.now() + 5 * 864e5).toISOString(); // 36 soatdan keyin — hozir yozilmaydi (LLM chaqirilmaydi)
+  store.addPlan({ id: 'kutilgan1', status: 'draft', from: kun(0), to: kun(6), slots: [], items: [{ id: 'x', title: 'Band', at: uzoq, draftId: null }] });
+  assert.equal(weekly.currentPlan(), undefined);
+  await rejaYetibOl();
+  assert.equal(store.plans().find(p => p.id === 'kutilgan1').status, 'approved');
+  assert.equal(weekly.currentPlan().id, 'kutilgan1');
+  store.setSetting('avto', false);
+});

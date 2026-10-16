@@ -73,6 +73,8 @@ async function ask(ctx, text, wait) {
 // xato va ogohlantirishlar — alohida xabar.
 const jarayon = new Map();
 export const log = async (text) => {
+  // Jarayon Railway loglarida ham ko'rinsin (guruhga yetib bormasa ham nima bo'lgani bilinadi)
+  console.log(`[${joriy() || 'umumiy'}] ${String(text).replace(/\s+/g, ' ').slice(0, 300)}`);
   if (!cfg.groupId) return;
   if (!rejim()) return bot.api.sendMessage(cfg.groupId, text, { message_thread_id: cfg.logTopic }).catch(() => {});
   const m = joriy() || kodlar()[0];
@@ -181,13 +183,21 @@ export async function rejaYetibOl() {
   busy = true;
   try {
     for (const m of rejim() ? kodlar() : [null]) await bilan(m, async () => {
-      // Avto rejimda reja yo'q bo'lsa (yakshanba bot o'chiq bo'lgan) — o'zi tuziladi; urinish 6 soatda bir martadan ko'p emas
-      if (!weekly.currentPlan() && weekly.autoMode() && !weekly.lastDraftPlan()) {
-        const kalit = `avto_reja_urinish:${m || 'umumiy'}`;
-        if (Date.now() - store.setting(kalit, 0) < 6 * 3600e3) return;
-        store.setSetting(kalit, Date.now());
-        try { await rejaTuz(); } catch (e) { await log(`⚠️ Avto reja tuzilmadi: ${e.message}`); }
-        return;
+      // Avto rejimda tasdiqlangan reja yo'q: tasdiq kutayotgan reja hali amalda bo'lsa — o'zi tasdiqlanadi,
+      // bo'lmasa (yakshanba bot o'chiq bo'lgan yoki eski reja tugagan) — yangisi tuziladi (6 soatda bir urinish)
+      if (!weekly.currentPlan() && weekly.autoMode()) {
+        const kutilgan = weekly.lastDraftPlan();
+        const bugun = new Date(Date.now() + cfg.tzOffsetH * 3600e3).toISOString().slice(0, 10);
+        if (kutilgan && kutilgan.to >= bugun) {
+          weekly.approve(kutilgan.id);
+          await log(`🤖 Avto rejim: tasdiq kutayotgan reja (${kutilgan.from} – ${kutilgan.to}) o'zi tasdiqlandi.`);
+        } else {
+          const kalit = `avto_reja_urinish:${m || 'umumiy'}`;
+          if (Date.now() - store.setting(kalit, 0) < 6 * 3600e3) return;
+          store.setSetting(kalit, Date.now());
+          try { await rejaTuz(); } catch (e) { await log(`⚠️ Avto reja tuzilmadi: ${e.message}`); }
+          return;
+        }
       }
       if (!weekly.currentPlan()) return;
       const n = await weekly.produceDue({ log, onDraft: sendForApproval });
