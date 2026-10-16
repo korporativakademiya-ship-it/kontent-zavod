@@ -13,13 +13,24 @@ export function apiParams({ model, system, prompt, search, maxTokens }) {
   return params;
 }
 
+// Vaqt chegarasi: ish `ms` ichida tugamasa — bekor qilinadi (abort) va xato qaytadi.
+// Ish abort'ga javob bermay qolsa ham kutib qolinmaydi — aks holda bot "band" holatda qotib, zavod jim to'xtaydi.
+export async function vaqtBilan(ish, ms, xabar) {
+  const ac = new AbortController();
+  let vaqt;
+  const chegara = new Promise((_, rej) => { vaqt = setTimeout(() => { rej(new Error(xabar)); ac.abort(); }, ms); });
+  try { return await Promise.race([ish(ac), chegara]); }
+  finally { clearTimeout(vaqt); }
+}
+const vaqtXabari = (ms) => `Claude ${Math.round(ms / 60e3)} daqiqada javob bermadi — so'rov bekor qilindi`;
+
 let client;
-async function askApi({ system, prompt, search, maxTokens }) {
+async function askApi({ system, prompt, search, maxTokens }, ac) {
   if (!client) { const { default: Anthropic } = await import('@anthropic-ai/sdk'); client = new Anthropic(); }
   const params = apiParams({ model: cfg.model, system, prompt, search, maxTokens });
   let text = '';
   for (let i = 0; i < 4; i++) {
-    const res = await client.beta.messages.create(params);
+    const res = await client.beta.messages.create(params, { signal: ac.signal });
     if (res.stop_reason === 'refusal') throw new Error(`Claude bu so'rovni rad etdi (${res.stop_details?.category || 'xavfsizlik'})`);
     // Fikrlash bloklari matnga qo'shilmaydi; pause_turn da javob o'zgarishsiz qaytariladi
     text += res.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
@@ -30,8 +41,11 @@ async function askApi({ system, prompt, search, maxTokens }) {
 }
 
 // ---------- MAX rejimi (Claude obunasi, Agent SDK orqali) ----------
-async function askMax({ system, prompt, search }) {
-  const { query } = await import('@anthropic-ai/claude-agent-sdk');
+export async function askMax({ system, prompt, search }, { queryFn, ms = cfg.llmVaqtMin * 60e3 } = {}) {
+  const query = queryFn || (await import('@anthropic-ai/claude-agent-sdk')).query;
+  return vaqtBilan((ac) => maxSorov(query, { system, prompt, search }, ac), ms, vaqtXabari(ms));
+}
+async function maxSorov(query, { system, prompt, search }, ac) {
   const env = { ...process.env };
   delete env.ANTHROPIC_API_KEY; // obuna tokeni ishlatilsin
   const tools = search ? ['WebSearch', 'WebFetch'] : [];
@@ -44,6 +58,7 @@ async function askMax({ system, prompt, search }) {
       permissionMode: 'dontAsk',   // ruxsat berilmagan vositalar avtomatik rad
       settingSources: [],
       maxTurns: search ? 15 : 2,
+      abortController: ac,
       env
     }
   });
@@ -58,7 +73,9 @@ async function askMax({ system, prompt, search }) {
 }
 
 export function ask({ system, prompt, search = false, maxTokens = 4000 }) {
-  return cfg.mode === 'max' ? askMax({ system, prompt, search }) : askApi({ system, prompt, search, maxTokens });
+  if (cfg.mode === 'max') return askMax({ system, prompt, search });
+  const ms = cfg.llmVaqtMin * 60e3;
+  return vaqtBilan((ac) => askApi({ system, prompt, search, maxTokens }, ac), ms, vaqtXabari(ms));
 }
 
 export async function askJSON(opts) {

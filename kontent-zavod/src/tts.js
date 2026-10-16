@@ -33,7 +33,7 @@ export function speechText(html = '') {
 
 async function synthAzure(text) {
   const res = await fetch(`https://${t.azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`, {
-    method: 'POST',
+    method: 'POST', signal: AbortSignal.timeout(90e3),
     headers: {
       'Ocp-Apim-Subscription-Key': t.azureKey,
       'Content-Type': 'application/ssml+xml',
@@ -50,7 +50,8 @@ async function synthEleven(text) {
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(t.elevenVoice)}?output_format=mp3_44100_128`, {
     method: 'POST',
     headers: { 'xi-api-key': t.elevenKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, model_id: t.elevenModel })
+    body: JSON.stringify({ text, model_id: t.elevenModel }),
+    signal: AbortSignal.timeout(90e3)
   });
   if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return Buffer.from(await res.arrayBuffer());

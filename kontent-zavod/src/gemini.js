@@ -11,7 +11,7 @@ export const engYangiRasm = (nomlar) => engYangi(nomlar.filter(n => /image/i.tes
 let royxat = null;
 export async function modellar(fetchFn = fetch) {
   if (royxat) return royxat;
-  const res = await fetchFn(`${GEMINI}?pageSize=1000`, { headers: { 'x-goog-api-key': geminiKalit() } });
+  const res = await fetchFn(`${GEMINI}?pageSize=1000`, { headers: { 'x-goog-api-key': geminiKalit() }, signal: AbortSignal.timeout(30e3) });
   if (!res.ok) throw new Error(`Gemini modellar ro'yxati ${res.status}`);
   royxat = ((await res.json()).models || []).map(m => m.name.replace('models/', ''));
   return royxat;

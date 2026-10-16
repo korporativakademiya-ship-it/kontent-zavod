@@ -9,6 +9,8 @@ export const cfg = {
   mode: (process.env.LLM_MODE || 'api').toLowerCase(),   // api | max
   model: process.env.MODEL || 'claude-opus-5-5',         // api rejimi uchun (arzonroq: MODEL=claude-sonnet-5-5)
   maxModel: process.env.MAX_MODEL || 'sonnet',            // max rejimi uchun: sonnet | opus
+  // Bitta Claude chaqiruviga vaqt chegarasi (daqiqa): qotib qolsa — bekor qilinadi, zavod keyingi ishga o'tadi
+  llmVaqtMin: Number(process.env.LLM_VAQT_MIN) || 15,
   botToken: req('BOT_TOKEN'),
   admins: (process.env.ADMIN_IDS || '').split(',').map(s => Number(s.trim())).filter(Boolean),
   groupId: process.env.GROUP_ID || '',
