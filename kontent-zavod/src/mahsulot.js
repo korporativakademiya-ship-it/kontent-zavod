@@ -4,7 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 // jadvali va profili bilan ishlaydi. Muallif ovozi, uslub va qoidalar — umumiy (brand.js, style.js).
 // Joriy mahsulot AsyncLocalStorage orqali uzatiladi: agentlar va store o'zi biladi.
 
-export const PROFIL = {
+const STANDART_PROFIL = {
   ka: {
     nom: 'Kotib AI', belgi: '🤖',
     profil: `Kotib AI — Telegram va Instagram'da mijozlarga 24/7 darhol javob beradigan AI sotuvchi-kotib.
@@ -38,6 +38,16 @@ CTA: namuna reja yoki bepul konsultatsiya.`,
   },
 };
 
+// Joriy mahsulotlar: standart — yuqoridagilar; boshqa mijoz uchun bazadagi "mahsulotlar" sozlamasi (/sozla) o'rnini bosadi.
+// Obyekt joyida yangilanadi — import qilgan hamma modul yangi ro'yxatni ko'radi
+export const PROFIL = { ...STANDART_PROFIL };
+export function profillarniQollash(yangi) {
+  const manba = yangi && typeof yangi === 'object' && Object.keys(yangi).length ? yangi : STANDART_PROFIL;
+  for (const k of Object.keys(PROFIL)) delete PROFIL[k];
+  for (const [k, v] of Object.entries(manba)) if (/^[a-z]{2}$/.test(k) && v?.nom) PROFIL[k] = { belgi: '📦', profil: '', ...v };
+}
+export const mahsulotKodlari = () => Object.keys(PROFIL);
+
 // Har mahsulotning haftalik chiqish jadvali (Toshkent vaqti; kun: 0=Ya … 6=Sha).
 // Bitta kanal uchun — vaqtlar to'qnashmaydi. /jadval bilan o'zgartiriladi.
 export const STANDART_JADVAL = {
@@ -65,7 +75,11 @@ export const topigi = (m) => topiklar()[m];
 export const topikdan = (thread) => Object.entries(topiklar()).find(([, v]) => v === Number(thread))?.[0] || null;
 
 // G'oya/reja bandidagi "[qa07] ..." prefiksidan mahsulot
-export const prefiksdan = (text = '') => (/^\s*\[(ka|qa|kf)\d{2}\]/i.exec(String(text)) || [])[1]?.toLowerCase() || null;
+export const prefiksdan = (text = '') => {
+  const m = /^\s*\[([a-z]{2})\d{2}\]/i.exec(String(text));
+  const k = m?.[1]?.toLowerCase();
+  return k && PROFIL[k] ? k : null;
+};
 
 // Agentlarga: umumiy brenddan keyin shu mahsulot qatlami
 export function mahsulotQatlami(m = joriy()) {

@@ -1,5 +1,5 @@
 import { askJSON } from '../llm.js';
-import { VIDEO_SIGNATURE } from '../brand.js';
+import { imzo } from '../brand.js';
 import { brand } from '../style.js';
 
 // Motion-dizayner: ssenariyni reels shablonining sahnalariga aylantiradi (src/video/template.html)
@@ -29,5 +29,5 @@ JSON: {"scenes":[...]}`
   if (!scenes.length) throw new Error("Motion agent sahna qaytarmadi");
   // Videodagi "Direktga yozing" kodi post kodi bilan bir xil bo'lsin
   if (draft.cta_kod) scenes.filter(x => x.type === 'cta').forEach(x => { x.keyword = draft.cta_kod; });
-  return { signature: VIDEO_SIGNATURE, scenes };
+  return { signature: imzo(), scenes };
 }

@@ -1,5 +1,9 @@
-// Nisha profili — hamma agentlar shunga tayanadi. O'zingizga moslab tahrirlang.
-export const BRAND = `
+// Nisha profili — hamma agentlar shunga tayanadi. Standart — muallifning o'z brendi; boshqa mijoz uchun
+// /sozla (onboarding) bazadagi "brend" sozlamasini yozadi va u shu matn o'rniga ishlatiladi (kod o'zgarmaydi).
+import { store } from './store.js';
+import { PROFIL } from './mahsulot.js';
+
+export const STANDART_BRAND = `
 MUALLIF: Joʻrabek — biznesni tizimlashtirish, boshqaruv va AI-avtomatlashtirish bo'yicha amaliyotchi va konsultant (O'zbekiston).
 YO'NALISH (kontent shu haqida — faqat mahsulot reklamasi emas): biznesni "dehqoncha" boshqaruvdan tizimga o'tkazish —
 jarayonlar, lavozim yo'riqnomalari, org sxema, KPI, nazorat, xodimlar va jamoa, rahbarning vaqti, AI vositalar va avtomatlashtirish,
@@ -21,4 +25,11 @@ Mijoz natijalari va raqamlarni o'ylab topma: aniq raqam bo'lmasa, umumiy yoz yok
 `;
 
 // Video oxiridagi imzo (reels shabloni)
-export const VIDEO_SIGNATURE = { name: 'Joʻrabek', role: 'Biznesni tizimga solaman' };
+export const STANDART_IMZO = { name: 'Joʻrabek', role: 'Biznesni tizimga solaman' };
+
+const sozlama = () => store.setting('brend', null) || {};
+export const brendMatni = () => sozlama().matn || STANDART_BRAND;
+export const imzo = () => ({ ...STANDART_IMZO, ...(sozlama().imzo || {}) });
+export const muallif = () => sozlama().muallif || 'Joʻrabek';
+export const yonalish = () => sozlama().yonalish || 'biznesni tizimlashtirish, boshqaruv, xodimlar, AI';
+export const mahsulotNomlari = () => Object.values(PROFIL).map(p => p.nom).join(', ');

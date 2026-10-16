@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { cfg } from './config.js';
-import { joriy, prefiksdan } from './mahsulot.js';
+import { joriy, prefiksdan, profillarniQollash } from './mahsulot.js';
 
 const file = path.join(cfg.dataDir, 'db.json');
 const MAX_IDEAS = 300;
@@ -9,6 +9,7 @@ fs.mkdirSync(cfg.dataDir, { recursive: true });
 
 let db = { drafts: [], usedTitles: [], waits: {}, style: {}, plans: [], rubrics: null, settings: {}, ideas: [], mahsulot: {} };
 try { db = { ...db, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch {}
+profillarniQollash(db.settings?.mahsulotlar);
 
 function save() {
   const tmp = file + '.tmp';
@@ -75,7 +76,7 @@ export const store = {
   mSetting: (k, def) => db.mahsulot[joriy()]?.[k] ?? def,
   setMSetting(k, v) { (db.mahsulot[joriy()] ||= {})[k] = v; save(); },
   setting: (k, def) => db.settings[k] ?? def,
-  setSetting(k, v) { db.settings[k] = v; save(); },
+  setSetting(k, v) { db.settings[k] = v; save(); if (k === 'mahsulotlar') profillarniQollash(v); },
   // Rahbar tanlovlari: qaysi postni tasdiqladi / rad etdi (mahsulot bo'yicha) — agentlar shundan o'rganadi
   addChoice(d, ok, sabab = '') {
     db.choices = [...(db.choices || []), { mahsulot: d.mahsulot || null, title: d.title, format: d.format, ok, sabab: String(sabab).slice(0, 300), at: new Date().toISOString() }].slice(-300);
@@ -103,6 +104,7 @@ export const store = {
       throw new Error("bu Kontent Fabrika zaxirasi emas");
     db = { drafts: [], usedTitles: [], waits: {}, style: {}, plans: [], rubrics: null, settings: {}, ideas: [], mahsulot: {}, ...obj };
     save();
+    profillarniQollash(db.settings?.mahsulotlar);
     return { drafts: db.drafts.length, ideas: db.ideas.length, plans: db.plans.length, rules: db.style?.rules?.length || 0, samples: db.style?.samples?.length || 0 };
   },
   takeWait(msgId) { const w = db.waits[msgId]; if (w) { delete db.waits[msgId]; save(); } return w; }

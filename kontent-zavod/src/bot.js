@@ -11,7 +11,7 @@ import { isRich, sendRich, approvalPrefix } from './rich.js';
 import { nextSlot, fmtTime, parseTime, publish, sendMediaPost, sendSafe, imagePaths, AllaqachonChiqqan } from './publisher.js';
 import { videoYasa } from './video/kino.js';
 import { renderSlides } from './video/slides.js';
-import { VIDEO_SIGNATURE } from './brand.js';
+import { imzo } from './brand.js';
 import { ttsEnabled, TTS_SETUP, synth, speechText, toVoiceNote } from './tts.js';
 import { addSample, addFeedback } from './style.js';
 import { ensureCode, ensureLink } from './cta.js';
@@ -586,7 +586,7 @@ async function saveTelegramFile(fileId, draftId) {
 // Brend uslubidagi muqova (karusel shablonining "cover" slaydi)
 async function makeCover(d) {
   const kicker = { maqola: 'Maqola', karusel: 'Karusel', reels: 'Video' }[d.format] || 'Rahbar uchun';
-  const [file] = await renderSlides({ signature: VIDEO_SIGNATURE, slides: [{ type: 'cover', kicker, title: d.title }] },
+  const [file] = await renderSlides({ signature: imzo(), slides: [{ type: 'cover', kicker, title: d.title }] },
     path.join(cfg.dataDir, 'images', d.id, `cover-${Date.now()}`));
   return file;
 }

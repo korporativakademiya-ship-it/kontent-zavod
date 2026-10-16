@@ -30,7 +30,7 @@ export const REELS_RUBRIKALAR = [
   { kod: '1-daqiqa-dars', nom: '1 daqiqalik dars', mahsulot: null, voronka: 'ekspertlik', format: 'doska',
     tavsif: "Bitta amaliy usul (KPI, SOP, javob skripti) 3 qadamda — saqlanadigan kontent." },
   { kod: 'parda-ortida', nom: 'Parda ortida', mahsulot: null, voronka: 'ishonch', format: 'hikoya',
-    tavsif: "Jo'rabek mijozga tizim/agentni qanday qurayotgani — shaxsiy brend." },
+    tavsif: "Muallif mijozga tizim/agentni qanday qurayotgani — shaxsiy brend." },
 ];
 
 export function rubrikaMatni() {
