@@ -408,6 +408,7 @@ async function sendPlan(p, chatId = cfg.groupId, extra = { message_thread_id: te
 const avtoRejaKb = (id) => new InlineKeyboard().text('✏️ O\'zgartirish', `pedit:${id}`).text('🔄 Qayta tuzish', `pnew:${id}`);
 async function rejaTuz() {
   const p = await weekly.buildPlan(log);
+  console.log(`[${joriy() || 'umumiy'}] 🗓 Reja tuzildi: ${p.items?.length || 0} ta post (${p.from} – ${p.to})${weekly.autoMode() ? ', avto tasdiqlandi' : ', tasdiq kutadi'}`);
   if (!weekly.autoMode()) return sendPlan(p);
   weekly.approve(p.id);
   const extra = { message_thread_id: tema(p.mahsulot || joriy()) };
@@ -629,7 +630,7 @@ bot.command('navbat', ctx => {
 // Qoralamaga rasm: Telegram'dan yuklab olib saqlaydi
 async function saveTelegramFile(fileId, draftId) {
   const f = await bot.api.getFile(fileId);
-  const res = await fetch(`${API_ROOT}/file/bot${cfg.botToken}/${f.file_path}`);
+  const res = await fetch(`${API_ROOT}/file/bot${cfg.botToken}/${f.file_path}`, { signal: AbortSignal.timeout(60e3) });
   if (!res.ok) throw new Error(`Rasm yuklanmadi (${res.status})`);
   const dir = path.join(cfg.dataDir, 'images', draftId);
   fs.mkdirSync(dir, { recursive: true });
@@ -885,7 +886,7 @@ bot.command('tiklash', async ctx => {
   if (!doc || !/\.json(\.gz)?$/i.test(doc.file_name || '')) return ctx.reply("Zaxira fayliga (kontent-zaxira-….json.gz) reply qilib /tiklash yozing.");
   try {
     const f = await bot.api.getFile(doc.file_id);
-    const res = await fetch(`${API_ROOT}/file/bot${cfg.botToken}/${f.file_path}`);
+    const res = await fetch(`${API_ROOT}/file/bot${cfg.botToken}/${f.file_path}`, { signal: AbortSignal.timeout(60e3) });
     if (!res.ok) throw new Error(`fayl yuklanmadi (${res.status})`);
     const buf = Buffer.from(await res.arrayBuffer());
     const obj = JSON.parse((/\.gz$/i.test(doc.file_name) ? gunzipSync(buf) : buf).toString('utf8'));
