@@ -22,6 +22,8 @@ Tadqiqot → strategiya → kopirayting → rahbar tekshiruvi → Telegram'da ta
 ## Max obuna bilan ishlatish
 Kompyuteringizda (Claude Code o'rnatilgan): `claude setup-token` → chiqqan tokenni `.env` dagi
 `CLAUDE_CODE_OAUTH_TOKEN` ga qo'ying, `LLM_MODE=max`. API'ga o'tish: `LLM_MODE=api` + `ANTHROPIC_API_KEY`.
+Mijozlarga xizmat sifatida ishlatish uchun — API kaliti (`LLM_MODE=api`): obuna tokeni shaxsiy foydalanish uchun.
+API rejimida standart model `claude-opus-5-5` (arzonroq: `MODEL=claude-sonnet-5-5`); xavfsizlik rad etsa, so'rov o'zi tavsiya etilgan modelda qayta ishlaydi.
 
 ## Railway
 GitHub'ga yuklang → Railway'da New Project → repo'ni tanlang → Variables'ga `.env` qiymatlarini kiriting.

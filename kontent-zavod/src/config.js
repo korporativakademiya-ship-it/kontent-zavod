@@ -7,7 +7,7 @@ if ((process.env.LLM_MODE || 'api').toLowerCase() === 'max' && !process.env.CLAU
 
 export const cfg = {
   mode: (process.env.LLM_MODE || 'api').toLowerCase(),   // api | max
-  model: process.env.MODEL || 'claude-sonnet-5',          // api rejimi uchun
+  model: process.env.MODEL || 'claude-opus-5-5',         // api rejimi uchun (arzonroq: MODEL=claude-sonnet-5-5)
   maxModel: process.env.MAX_MODEL || 'sonnet',            // max rejimi uchun: sonnet | opus
   botToken: req('BOT_TOKEN'),
   admins: (process.env.ADMIN_IDS || '').split(',').map(s => Number(s.trim())).filter(Boolean),

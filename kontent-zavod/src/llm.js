@@ -1,18 +1,30 @@
 import { cfg } from './config.js';
 
 // ---------- API rejimi (Anthropic API kaliti) ----------
+// Joriy modellar (Opus 5.5, Sonnet 5.5, Fable) — fikrlash doim yoqiq (u ham max_tokens dan oladi), qidiruv — web_search_20260209,
+// xavfsizlik rad etsa — server o'zi tavsiya etilgan modelda qayta ishlaydi (fallbacks: "default").
+// Eski modellar (MODEL=... bilan tanlansa) — oddiy qidiruv vositasi, fallbacks'siz.
+const eskiModel = (m) => /claude-3|haiku-4|-4-5\b|-4-1\b|-4-0\b|sonnet-4$|opus-4$/.test(m);
+const fallbackMumkin = (m) => /opus-5|fable-5|sonnet-5-5/.test(m);
+export function apiParams({ model, system, prompt, search, maxTokens }) {
+  const params = { model, max_tokens: Math.max(maxTokens, 16000), system, messages: [{ role: 'user', content: prompt }] };
+  if (search) params.tools = [{ type: eskiModel(model) ? 'web_search_20250305' : 'web_search_20260209', name: 'web_search', max_uses: 6 }];
+  if (fallbackMumkin(model)) Object.assign(params, { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+  return params;
+}
+
 let client;
 async function askApi({ system, prompt, search, maxTokens }) {
   if (!client) { const { default: Anthropic } = await import('@anthropic-ai/sdk'); client = new Anthropic(); }
-  const messages = [{ role: 'user', content: prompt }];
-  const params = { model: cfg.model, max_tokens: maxTokens, system, messages };
-  if (search) params.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }];
+  const params = apiParams({ model: cfg.model, system, prompt, search, maxTokens });
   let text = '';
   for (let i = 0; i < 4; i++) {
-    const res = await client.messages.create(params);
+    const res = await client.beta.messages.create(params);
+    if (res.stop_reason === 'refusal') throw new Error(`Claude bu so'rovni rad etdi (${res.stop_details?.category || 'xavfsizlik'})`);
+    // Fikrlash bloklari matnga qo'shilmaydi; pause_turn da javob o'zgarishsiz qaytariladi
     text += res.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
     if (res.stop_reason !== 'pause_turn') break;
-    messages.push({ role: 'assistant', content: res.content });
+    params.messages.push({ role: 'assistant', content: res.content });
   }
   return text;
 }
