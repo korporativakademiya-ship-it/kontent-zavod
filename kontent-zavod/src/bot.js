@@ -50,6 +50,14 @@ const tema = (m = joriy()) => (rejim() ? topigi(m) ?? topigi(kodlar()[0]) : cfg.
 
 const esc = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const isAdmin = (ctx) => cfg.admins.includes(ctx.from?.id);
+// Rahbar ro'yxatida (ADMIN_IDS) bo'lmagan odam shaxsiy chatda buyruq yozsa — jim qolinmaydi: ID raqami aytiladi
+bot.use(async (ctx, next) => {
+  const t = ctx.message?.text || '';
+  if (ctx.chat?.type !== 'private' || !t.startsWith('/') || /^\/(start|id)(@\w+)?(\s|$)/.test(t) || isAdmin(ctx)) return next();
+  console.log(`Ruxsatsiz buyruq: ${ctx.from?.id} ${t.split(/\s/)[0]}`);
+  return ctx.reply(`⛔ Bu buyruq faqat rahbar uchun. Sizning Telegram ID: ${ctx.from?.id}\n` +
+    "Siz rahbar bo'lsangiz, bot egasi shu raqamni ADMIN_IDS sozlamasiga qo'shishi kerak (bir nechta bo'lsa vergul bilan).");
+});
 const kb = (id) => new InlineKeyboard()
   .text('✅ Tasdiqlash', `ok:${id}`).text('🕒 Vaqt belgilash', `time:${id}`).row()
   .text('⚡ Hozir', `now:${id}`).text('✏️ Tahrir', `edit:${id}`).text('🎬 Ssenariy', `scr:${id}`).row()

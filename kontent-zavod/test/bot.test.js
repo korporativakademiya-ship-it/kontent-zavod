@@ -54,7 +54,13 @@ test('✅ Tasdiqlash — keyingi bo\'sh vaqtga navbat; /navbat begona odamga ko\
   assert.ok(new Date(store.get(d.id).scheduledAt).getTime() > Date.now());
   chaqiruvlar.length = 0;
   await xabar('/navbat', { from: 99, chat: { id: 99, type: 'private' } });
-  assert.equal(qayerga('sendMessage').length, 0);
+  assert.equal(qayerga('sendMessage').length, 1);
+  assert.match(qayerga('sendMessage')[0].payload.text, /faqat rahbar uchun\. Sizning Telegram ID: 99/, "begona odam jim qolmaydi — ID'si aytiladi");
+  assert.doesNotMatch(qayerga('sendMessage')[0].payload.text, /Rejalashtirilgan postlar/);
+  chaqiruvlar.length = 0;
+  await xabar('/id', { from: 99, chat: { id: 99, type: 'private' } });
+  assert.match(qayerga('sendMessage')[0].payload.text, /sizning id: 99/, '/id hammaga ishlaydi');
+  chaqiruvlar.length = 0;
   await xabar('/navbat');
   assert.match(qayerga('sendMessage')[0].payload.text, /Rejalashtirilgan postlar/);
 });
