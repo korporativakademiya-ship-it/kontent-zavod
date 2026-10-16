@@ -10,6 +10,7 @@ import { renderSlides } from './video/slides.js';
 import { videoYasa } from './video/kino.js';
 import { prodyuser, rasmPrompti } from './agents/kontent.js';
 import { rasmYoqilgan, rasmYasa } from './rasm.js';
+import { muqovaYasa } from './muqova.js';
 import { joriy } from './mahsulot.js';
 import { imzo } from './brand.js';
 import { uniqueCode, ensureCode, ensureLink } from './cta.js';
@@ -90,15 +91,26 @@ export async function produceDraft(p, { log = async () => {}, extra = {} } = {})
     try { draft = await renderDraftSlides(draft); }
     catch (e) { await log(`⚠️ Slaydlar chizilmadi (${p.title}): ${e.message}`); }
   }
-  // Rassom: prodyuser rasm so'ragan bo'lsa (matn+rasm) — AI rasm. GEMINI_API_KEY kerak; o'chirish: AVTO_RASM=0
+  // Rassom: prodyuser rasm so'ragan bo'lsa (matn+rasm). GEMINI_API_KEY bo'lsa — AI rasm; kalit yo'q yoki AI rasm
+  // chizilmasa — Claude dizayner kartochkasi (kalit kerak emas). O'chirish: AVTO_RASM=0
   const rasmKerak = tz && (tz.kontent_turi === 'matn+rasm' || String(tz.rasm_tavsif || '').trim());
-  if (rasmKerak && p.format === 'post' && rasmYoqilgan() && process.env.AVTO_RASM !== '0') {
-    try {
-      await log(`🎨 Rasm chizilmoqda: ${p.title}`);
-      const fayl = await rasmYasa(await rasmPrompti(draft), path.join(cfg.dataDir, 'images', draft.id, `ai-${Date.now()}`));
-      draft = store.update(draft.id, { image_paths: [...(draft.image_paths || []), fayl] });
-      ishlar.push('🎨 Rassom (AI rasm)');
-    } catch (e) { await log(`⚠️ Rasm chizilmadi (${p.title}): ${e.message}`); }
+  if (rasmKerak && p.format === 'post' && process.env.AVTO_RASM !== '0') {
+    let fayl = null;
+    if (rasmYoqilgan()) {
+      try {
+        await log(`🎨 Rasm chizilmoqda: ${p.title}`);
+        fayl = await rasmYasa(await rasmPrompti(draft), path.join(cfg.dataDir, 'images', draft.id, `ai-${Date.now()}`));
+        ishlar.push('🎨 Rassom (AI rasm)');
+      } catch (e) { await log(`⚠️ AI rasm chizilmadi (${p.title}): ${e.message} — dizayn kartochka yasaladi`); }
+    }
+    if (!fayl) {
+      try {
+        await log(`🎨 Dizayner kartochka yasamoqda: ${p.title}`);
+        fayl = (await muqovaYasa(draft)).file;
+        ishlar.push('🎨 Dizayner (kartochka)');
+      } catch (e) { await log(`⚠️ Kartochka yasalmadi (${p.title}): ${e.message}`); }
+    }
+    if (fayl) draft = store.update(draft.id, { image_paths: [...(draft.image_paths || []), fayl] });
   }
   // Reels — video ham o'zi yasaladi (avto rejimda matn videosiz chiqib ketmasin). O'chirish: AVTO_VIDEO=0
   if (p.format === 'reels' && process.env.AVTO_VIDEO !== '0') {

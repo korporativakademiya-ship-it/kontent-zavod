@@ -10,8 +10,6 @@ import { writeArticle } from './agents/article.js';
 import { isRich, sendRich, approvalPrefix } from './rich.js';
 import { nextSlot, fmtTime, parseTime, publish, sendMediaPost, sendSafe, imagePaths, AllaqachonChiqqan } from './publisher.js';
 import { videoYasa } from './video/kino.js';
-import { renderSlides } from './video/slides.js';
-import { imzo } from './brand.js';
 import { ttsEnabled, TTS_SETUP, synth, speechText, toVoiceNote } from './tts.js';
 import { addSample, addFeedback } from './style.js';
 import { ensureCode, ensureLink } from './cta.js';
@@ -21,6 +19,7 @@ import * as weekly from './weekly.js';
 import { analyzeStyle, distillRules } from './agents/stylist.js';
 import { bilan, joriy, rejim, kodlar, topigi, topikdan, PROFIL } from './mahsulot.js';
 import { rasmYoqilgan, rasmYasa } from './rasm.js';
+import { muqovaYasa } from './muqova.js';
 import { rasmPrompti, uslubKanaldan } from './agents/kontent.js';
 import * as onboarding from './onboarding.js';
 import { kanalQosh } from './kuzatuv.js';
@@ -639,14 +638,6 @@ async function saveTelegramFile(fileId, draftId) {
   return file;
 }
 
-// Brend uslubidagi muqova (karusel shablonining "cover" slaydi)
-async function makeCover(d) {
-  const kicker = { maqola: 'Maqola', karusel: 'Karusel', reels: 'Video' }[d.format] || 'Rahbar uchun';
-  const [file] = await renderSlides({ signature: imzo(), slides: [{ type: 'cover', kicker, title: d.title }] },
-    path.join(cfg.dataDir, 'images', d.id, `cover-${Date.now()}`));
-  return file;
-}
-
 bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx => {
   if (!isAdmin(ctx)) return ctx.answerCallbackQuery({ text: 'Faqat rahbar tasdiqlaydi' });
   const [, act, id] = ctx.match;
@@ -686,7 +677,7 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     await ctx.answerCallbackQuery();
     const has = imagePaths(d).length;
     return ask(ctx, `🖼 "${esc(d.title)}" uchun rasm.\n• Rasm yuboring (shu xabarga reply qilib) — postga qo'shaman (bir nechta bo'lsa, albom bo'ladi)\n` +
-      `• <code>muqova</code> deb yozing — brend uslubida muqova yasayman` +
+      `• <code>muqova</code> deb yozing — dizayner post mazmunidan brend uslubida kartochka chizadi (muqova, raqam yoki iqtibos)` +
       (rasmYoqilgan() ? `\n• <code>ai</code> deb yozing — post mazmuniga mos AI rasm chizaman (Gemini)` : '') +
       (has ? `\n• <code>o'chir</code> — ${has} ta rasmni olib tashlayman` : ''), { kind: 'image', id });
   }
@@ -796,8 +787,9 @@ bot.on('message:text', async ctx => {
     }
     if (!t.startsWith('muqova')) return ctx.reply(`Rasm yuboring yoki "muqova"${rasmYoqilgan() ? ' / "ai"' : ''} deb yozing.`, opt);
     store.takeWait(replyTo);
+    await ctx.reply('🎨 Dizayner kartochka chizyapti...', opt);
     try {
-      const file = await makeCover(d);
+      const { file } = await muqovaYasa(d);
       const nd = store.update(d.id, { image_paths: [...(d.image_paths || []), file] });
       await ctx.reply('🖼 Muqova tayyor. Yangilangan qoralama:', opt);
       return sendForApproval(nd);

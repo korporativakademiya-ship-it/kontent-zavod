@@ -14,6 +14,7 @@ const javob = (system) => {
   if (/kuchli kopirayterisan/.test(system)) return { post_html: '<b>Tungi 02:47.</b> Mijoz yozdi, javob yo\'q.', reels_script: '' };
   if (/kontent bo'limi rahbarisan/.test(system)) return { score: 8, notes: 'hook kuchaytirildi', post_html: '<b>Tungi 02:47.</b> Mijoz yozdi — javob kelmadi.' };
   if (/prompt muhandisisan/.test(system)) return { rasm_prompt: 'A shop owner at night, phone glowing, no text' };
+  if (/grafik dizaynersan/.test(system)) return { type: 'cover', kicker: 'Sotuv', title: 'Mijoz 02:47 da yozdi', accent: 'Javob kelmadi' };
   return {};
 };
 const server = http.createServer((req, res) => {
@@ -44,6 +45,7 @@ globalThis.fetch = async (url, o) => {
   return asl(url, o);
 };
 const { produceDraft } = await import('../src/pipeline.js');
+const muqova = await import('../src/muqova.js');
 
 test("reja bandi: prodyuser TZ yozadi, kopirayter TZ bilan yozadi, rasm so'ralgani uchun AI rasm chiziladi", async () => {
   const log = [];
@@ -71,4 +73,22 @@ test('PRODYUSER=0 — prodyuser chaqirilmaydi, reja bo\'yicha yoziladi', async (
   assert.equal(d.tz, undefined);
   assert.deepEqual(d.image_paths || [], []);
   delete process.env.PRODYUSER;
+});
+
+test("kalitsiz rejim: Gemini kaliti yo'q — Claude dizayner kartochka chizadi (rasm baribir chiqadi)", async () => {
+  const asli = process.env.GEMINI_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+  const chizildi = [];
+  muqova.ichki.render = async (data, dir) => { chizildi.push(data); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/01.png`, 'png'); return [`${dir}/01.png`]; };
+  chaqiruvlar.length = 0;
+  geminiSorov = null;
+  const log = [];
+  const d = await produceDraft({ title: 'Kechasi yozgan mijoz', format: 'post' }, { log: async (t) => log.push(t) });
+  assert.equal(geminiSorov, null, "Gemini'ga so'rov ketmaydi");
+  assert.ok(chaqiruvlar.some(c => /grafik dizaynersan/.test(c.system)));
+  assert.deepEqual(chizildi[0].slides, [{ type: 'cover', kicker: 'Sotuv', title: 'Mijoz 02:47 da yozdi', accent: 'Javob kelmadi' }]);
+  assert.equal(d.image_paths.length, 1);
+  assert.match(d.notes, /🎨 Dizayner \(kartochka\)/);
+  assert.ok(log.some(t => /Dizayner kartochka yasamoqda/.test(t)));
+  process.env.GEMINI_API_KEY = asli;
 });
