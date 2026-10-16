@@ -5,4 +5,5 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY . .
-CMD ["npm", "start"]
+# node to'g'ridan-to'g'ri: SIGTERM npm emas, botning o'ziga yetib borsin (toza to'xtash)
+CMD ["node", "src/index.js"]

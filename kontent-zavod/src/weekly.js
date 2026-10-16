@@ -120,6 +120,13 @@ export async function produceDue({ hours = 36, log = async () => {}, onDraft, fa
   let n = 0;
   for (const p of store.plans().filter(x => x.status === 'approved' && (!faqat || faqat(x)))) {
     for (const it of p.items) {
+      // Vaqti o'tib ketgan, yozilmay qolgan band — jim yo'qolmasin, bir marta xabar beriladi
+      // (2 kundan eskilari — eski rejalar qoldig'i — jim belgilanadi)
+      if (!it.draftId && it.at <= now && !it.otkazildi) {
+        it.otkazildi = true; store.savePlans();
+        if (Date.now() - new Date(it.at).getTime() < 48 * H) await log(`⚠️ Reja bandi "${it.title}" (${it.date} ${it.time}) vaqtida yozilmadi — o'tkazib yuborildi.`);
+        continue;
+      }
       if (it.draftId || it.at <= now || it.at > until) continue;
       try {
         const auto = autoMode();
@@ -138,11 +145,15 @@ export async function produceDue({ hours = 36, log = async () => {}, onDraft, fa
 export function formatPlan(p) {
   const esc = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   let out = `🗓 <b>Haftalik reja: ${short(p.from)}–${short(p.to)}</b>${p.status === 'approved' ? ' · ✅ tasdiqlangan' : ''}\n`;
-  if (p.items.some(i => i.idea_id)) out += `💡 — sizning g'oyangiz\n`;
+  // 💡 — rahbar g'oyasi, 🔭 — g'oya ovchisi topgani (kuzatilgan kanallar / internet)
+  const aiIds = new Set(store.allIdeas().filter(i => i.manba === 'ai').map(i => i.id));
+  const belgi = (it) => (!it.idea_id ? '' : aiIds.has(String(it.idea_id)) ? '🔭 ' : '💡 ');
+  if (p.items.some(i => i.idea_id && !aiIds.has(String(i.idea_id)))) out += `💡 — sizning g'oyangiz\n`;
+  if (p.items.some(i => aiIds.has(String(i.idea_id)))) out += `🔭 — g'oya ovchisi topgan\n`;
   let day = '';
   for (const it of p.items) {
     if (it.date !== day) { day = it.date; out += `\n<b>${it.dayName} ${short(it.date)}</b>\n`; }
-    out += `${it.time} · ${it.idea_id ? '💡 ' : ''}${it.rubric ? `🔁 ${esc(it.rubric)} · ` : ''}${esc(it.format)} — <b>${esc(it.title)}</b>${it.draftId ? ' ✍️' : ''}\n` +
+    out += `${it.time} · ${belgi(it)}${it.rubric ? `🔁 ${esc(it.rubric)} · ` : ''}${esc(it.format)} — <b>${esc(it.title)}</b>${it.draftId ? ' ✍️' : ''}\n` +
       (it.angle ? `   <i>${esc(String(it.angle).slice(0, 90))}</i>\n` : '');
   }
   return out;

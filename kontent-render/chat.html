@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Chat shablon</title>
+<style>
+  @font-face { font-family: 'InterL'; font-weight: 400; src: url(fonts/inter400.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 600; src: url(fonts/inter600.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 800; src: url(fonts/inter800.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 900; src: url(fonts/inter900.ttf); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; }
+  body { font-family: 'InterL', 'Noto Color Emoji', 'DejaVu Sans'; color: #111; }
+  #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden;
+    background: radial-gradient(rgba(255,255,255,.35) 3px, transparent 3.5px) 0 0 / 60px 60px,
+                radial-gradient(rgba(255,255,255,.2) 2px, transparent 2.5px) 30px 30px / 60px 60px,
+                linear-gradient(160deg, #B6D8A5 0%, #8FC3A6 45%, #7DB5B9 100%); }
+  #holat { position: absolute; left: 0; right: 0; top: 0; height: 70px; background: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 48px;
+    font-size: 34px; font-weight: 800; z-index: 3; }
+  #bosh { position: absolute; left: 0; right: 0; top: 70px; height: 150px; background: #fff; border-bottom: 2px solid #E6E6E6; display: flex; align-items: center; gap: 26px; padding: 0 34px; z-index: 3; }
+  #bosh .orqa { font-size: 64px; color: #2AABEE; font-weight: 400; width: 40px; }
+  #bosh .av { width: 104px; height: 104px; border-radius: 50%; background: linear-gradient(150deg, #7DD3FC, #2563EB); color: #fff; font-size: 48px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; background-size: cover; }
+  #bosh .ism { font-size: 46px; font-weight: 800; }
+  #bosh .hol { font-size: 32px; font-weight: 600; color: #8A8A8A; margin-top: 4px; }
+  #bosh .hol.faol { color: #2AABEE; }
+  #oyna { position: absolute; left: 0; right: 0; top: 220px; bottom: 250px; overflow: hidden; }
+  #lenta { position: absolute; left: 0; right: 0; top: 0; }
+  .x { position: absolute; max-width: 780px; padding: 22px 30px 18px; border-radius: 34px; font-size: 44px; font-weight: 600; line-height: 1.28;
+    box-shadow: 0 2px 2px rgba(0,0,0,.08); opacity: 0; }
+  .x.kir { left: 34px; background: #fff; border-bottom-left-radius: 10px; transform-origin: 0 100%; }
+  .x.chiq { right: 34px; background: #E1FFC7; border-bottom-right-radius: 10px; transform-origin: 100% 100%; }
+  .x .v { display: inline-block; margin-left: 18px; font-size: 26px; font-weight: 600; color: #7A9C6E; vertical-align: -6px; float: right; margin-top: 20px; }
+  .x.kir .v { color: #9A9A9A; }
+  .x .tk { color: #4FAE4E; margin-left: 6px; }
+  .x .tk.oqildi { color: #2AABEE; }
+  .ovozx { display: flex; align-items: center; gap: 22px; min-width: 560px; }
+  .ovozx .play { flex: none; width: 96px; height: 96px; border-radius: 50%; background: #2AABEE; display: flex; align-items: center; justify-content: center; }
+  .x.chiq .ovozx .play { background: #4FAE4E; }
+  .ovozx .bars { display: flex; align-items: center; gap: 6px; height: 70px; }
+  .ovozx .bars i { display: block; width: 8px; border-radius: 4px; background: #B9C6D0; }
+  .ovozx .dav { font-size: 30px; font-weight: 600; color: #7A8A99; margin-top: 6px; }
+  .rasmx { width: 620px; height: 460px; border-radius: 24px; background: #ddd center / cover no-repeat; margin: -6px -14px 10px; }
+  .karta { min-width: 640px; }
+  .karta .kb { font-size: 40px; font-weight: 900; margin-bottom: 14px; }
+  .karta .q { display: flex; justify-content: space-between; font-size: 38px; font-weight: 600; padding: 8px 0; border-bottom: 2px dashed #CFE7BA; }
+  .karta .ok { margin-top: 18px; padding: 16px; border-radius: 20px; background: #12B76A; color: #fff; text-align: center; font-size: 40px; font-weight: 900; }
+  .sana { position: absolute; left: 50%; transform: translateX(-50%); padding: 10px 26px; border-radius: 999px; background: rgba(0,0,0,.22); color: #fff; font-size: 32px; font-weight: 800; opacity: 0; }
+  .yozm { position: absolute; left: 34px; padding: 26px 34px; border-radius: 34px; border-bottom-left-radius: 10px; background: #fff; display: flex; gap: 12px; opacity: 0; }
+  .yozm b { width: 18px; height: 18px; border-radius: 50%; background: #9AA7B1; }
+  #kotibYoz { position: absolute; left: 34px; bottom: 262px; padding: 12px 24px; border-radius: 999px; background: rgba(17,17,17,.82); color: #FFD43B; font-size: 32px; font-weight: 800; opacity: 0; z-index: 3; }
+  #kirit { position: absolute; left: 0; right: 0; bottom: 110px; height: 140px; background: #fff; display: flex; align-items: center; gap: 26px; padding: 0 34px; z-index: 3; }
+  #kirit .m { flex: 1; height: 90px; border-radius: 45px; background: #F1F1F1; display: flex; align-items: center; padding: 0 34px; font-size: 38px; color: #9A9A9A; font-weight: 600; }
+  #kirit .ic { font-size: 50px; color: #8A8A8A; }
+  #pastki { position: absolute; left: 0; right: 0; bottom: 0; height: 110px; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 800; color: #9A9A9A; z-index: 3; }
+  .banner { position: absolute; left: 60px; right: 60px; top: 250px; text-align: center; z-index: 4; opacity: 0; }
+  .banner > span { display: inline-block; padding: 20px 34px; border-radius: 30px; background: #111; color: #fff; font-size: 52px; font-weight: 900; line-height: 1.16; letter-spacing: -1px; box-shadow: 0 16px 40px rgba(0,0,0,.25); }
+  .banner .w { display: inline-block; opacity: 0; margin: 0 .1em; }
+  .banner .hl { color: #111; background: #FFD43B; padding: 0 .12em; border-radius: .12em; }
+  .w.yop { margin-left: -.1em !important; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="holat"><span id="soat">23:47</span><span>📶 🔋</span></div>
+  <div id="bosh"><div class="orqa">‹</div><div class="av" id="av">A</div><div><div class="ism" id="ism">Aziz</div><div class="hol" id="hol">onlayn</div></div></div>
+  <div id="oyna"><div id="lenta"></div></div>
+  <div id="kotibYoz">🤖 Kotib AI yozmoqda…</div>
+  <div id="kirit"><span class="ic">📎</span><div class="m">Xabar</div><span class="ic">🎤</span></div>
+  <div id="pastki"></div>
+</div>
+<script src="umumiy.js"></script>
+<script>
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = x => 1 - Math.pow(1 - clamp(x), 3);
+const back = x => { x = clamp(x); const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, p) => a + (b - a) * p;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const rasmUrl = (u) => /^(https:\/\/|data:image\/)/.test(u || '') ? `url('${String(u).replace(/'/g, '%27').replace(/"/g, '%22')}')` : '';
+const sozlar = (m) => { const chiq = []; let bosh = true;
+  for (const q of String(m || '').split(/(\*[^*]+\*)/)) {
+    if (!q) continue; const hl = /^\*[^*]+\*$/.test(q);
+    for (const p of q.replace(/\*/g, '').split(/(\s+)/)) { if (!p) continue; if (/^\s+$/.test(p)) { bosh = true; continue; } chiq.push({ s: p, hl, yop: !bosh && chiq.length > 0 }); bosh = false; }
+  }
+  return chiq; };
+const PLAY = '<svg width="40" height="44" viewBox="0 0 40 44"><path d="M6 4 L36 22 L6 40 Z" fill="#fff"/></svg>';
+
+let XABAR = [], BANNER = [], YOZISH = [], JAMI = 0, HODISALAR = [], OYNA_H = 0;
+window.hodisalar = () => HODISALAR.filter(x => x.t < JAMI);
+window.sahnaVaqtlari = () => BANNER.map(b => b.bosh);
+
+function xabarHTML(m, vaqt) {
+  const chiq = m.kim !== 'mijoz';
+  const v = `<span class="v">${esc(vaqt)}${chiq ? '<span class="tk">✓✓</span>' : ''}</span>`;
+  if (m.tur === 'ovoz') {
+    const bars = Array.from({ length: 28 }, (_, i) => `<i style="height:${16 + Math.abs(Math.sin(i * 1.7) * Math.cos(i * .6)) * 54}px"></i>`).join('');
+    return `<div class="x ${chiq ? 'chiq' : 'kir'}"><div class="ovozx"><div class="play">${PLAY}</div><div><div class="bars">${bars}</div><div class="dav">${esc(m.davom || '0:07')}</div></div></div>${v}</div>`;
+  }
+  if (m.tur === 'rasm') return `<div class="x ${chiq ? 'chiq' : 'kir'}"><div class="rasmx" style="background-image:${rasmUrl(m.rasm)}"></div>${esc(m.matn || '')}${v}</div>`;
+  if (m.tur === 'buyurtma') {
+    const b = m.buyurtma || {};
+    return `<div class="x ${chiq ? 'chiq' : 'kir'} karta"><div class="kb">🧾 ${esc(b.sarlavha || 'Buyurtma')}</div>
+      ${(b.qatorlar || []).map(([a, c]) => `<div class="q"><span>${esc(a)}</span><b>${esc(c)}</b></div>`).join('')}
+      <div class="ok">${esc(b.holat || '✅ Qabul qilindi')}</div>${v}</div>`;
+  }
+  return `<div class="x ${chiq ? 'chiq' : 'kir'}">${esc(m.matn)}${v}</div>`;
+}
+
+window.init = async function (data) {
+  await Promise.all(['900 60px InterL', '800 40px InterL', '600 40px InterL'].map(f => document.fonts.load(f)));
+  const s0 = data.sahnalar[0] || {};
+  document.getElementById('ism').textContent = s0.ism || 'Mijoz';
+  const av = document.getElementById('av');
+  if (s0.avatar) { av.style.backgroundImage = rasmUrl(s0.avatar); av.textContent = ''; } else av.textContent = (s0.ism || 'M')[0].toUpperCase();
+  document.getElementById('pastki').textContent = data.nik || '';
+  if (s0.soat) document.getElementById('soat').textContent = s0.soat;
+  const lenta = document.getElementById('lenta'), stage = document.getElementById('stage');
+  OYNA_H = document.getElementById('oyna').offsetHeight;
+  const kutish = [];
+  let t = 0, soat = s0.soat || '23:47';
+  data.sahnalar.forEach((s, si) => {
+    const dur = s.soniya || 5;
+    // sahna ichidagi tabiiy jadval
+    const jadval = []; let q = .45;
+    if (s.sana) jadval.push({ sana: s.sana, t: .2 });
+    (s.xabarlar || []).forEach(m => {
+      const chiq = m.kim !== 'mijoz', uz = String(m.matn || '').length;
+      const yoz = m.tur === 'ovoz' ? .9 : clamp(uz * .022, .5, 1.5);
+      jadval.push({ m, yoz: chiq ? yoz : yoz * .7, t: q + yoz }); q += yoz + .55 + clamp(uz * .012, 0, .8);
+    });
+    const k = Math.min(1, (dur * .9) / Math.max(q, .1));
+    jadval.forEach(j => { j.t *= k; if (j.yoz) j.yoz *= k; });
+    jadval.forEach(j => {
+      if (j.sana) {
+        lenta.insertAdjacentHTML('beforeend', `<div class="sana">${esc(j.sana)}</div>`);
+        XABAR.push({ el: lenta.lastElementChild, t: t + j.t, sana: true }); return;
+      }
+      soat = j.m.soat || soat;
+      lenta.insertAdjacentHTML('beforeend', xabarHTML(j.m, soat));
+      const el = lenta.lastElementChild, chiq = j.m.kim !== 'mijoz';
+      XABAR.push({ el, t: t + j.t, chiq });
+      YOZISH.push({ bosh: t + j.t - j.yoz, oxir: t + j.t, chiq });
+      if (chiq) { HODISALAR.push({ t: t + j.t - j.yoz, tur: 'klav', d: j.yoz * .9 }, { t: t + j.t, tur: 'tik' }); }
+      else HODISALAR.push({ t: t + j.t, tur: j.m.tur === 'buyurtma' ? 'ding' : 'pop' });
+      if (j.m.tur === 'buyurtma') HODISALAR.push({ t: t + j.t + .3, tur: 'ding' });
+      const bg = /url\('([^']+)'\)/.exec(el.innerHTML); if (bg) kutish.push(new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = bg[1]; }));
+    });
+    if (s.subtitr) {
+      stage.insertAdjacentHTML('beforeend', `<div class="banner"><span>${sozlar(s.subtitr).map(w => `<span class="w${w.hl ? ' hl' : ''}${w.yop ? ' yop' : ''}">${esc(w.s)}</span>`).join('')}</span></div>`);
+      const b = stage.lastElementChild; BANNER.push({ el: b, ws: [...b.querySelectorAll('.w')], bosh: t, dur });
+    } else BANNER.push({ el: null, bosh: t, dur });
+    t += dur;
+  });
+  JAMI = t;
+  // joylashuv: ketma-ket, orasi 22px
+  let y = BANNER.some(b => b.el) ? 140 : 20; // tepadagi banner xabarlarni yopmasin
+  XABAR.forEach(x => { x.el.style.top = y + 'px'; x.y = y; x.h = x.el.offsetHeight; x.past = y + x.h; y += x.h + 22; });
+  await Promise.race([Promise.all(kutish), new Promise(r => setTimeout(r, 20000))]);
+  return JAMI;
+};
+
+window.render = function (t) {
+  let skrol = 0;
+  XABAR.forEach((x, i) => {
+    const p = (t - x.t) / .3;
+    x.el.style.opacity = clamp(p * 3);
+    x.el.style.transform = `${x.sana ? 'translateX(-50%) ' : ''}scale(${lerp(.7, 1, back(p))})`;
+    if (t >= x.t) {
+      const oldin = i ? Math.max(0, XABAR[i - 1].past + 30 - OYNA_H) : 0, keyin = Math.max(0, x.past + 30 - OYNA_H);
+      skrol = lerp(oldin, keyin, ease((t - x.t) / .35));
+    }
+    // o'qildi belgisi: keyingi mijoz xabari kelganda yoki 1.2 s dan keyin
+    const tk = x.el.querySelector('.tk'); if (tk) tk.classList.toggle('oqildi', t > x.t + 1.2);
+    const bars = x.el.querySelectorAll('.bars i'); if (bars.length) { const pr = clamp((t - x.t - .5) / 2.5); bars.forEach((b, k) => { b.style.background = k / bars.length < pr ? (x.chiq ? '#4FAE4E' : '#2AABEE') : '#B9C6D0'; }); }
+  });
+  document.getElementById('lenta').style.transform = `translateY(${-skrol}px)`;
+  const hol = document.getElementById('hol'), kotib = document.getElementById('kotibYoz');
+  const mijozYoz = YOZISH.some(y => !y.chiq && t >= y.bosh && t < y.oxir), bizYoz = YOZISH.some(y => y.chiq && t >= y.bosh && t < y.oxir);
+  hol.textContent = mijozYoz ? 'yozmoqda…' : 'onlayn'; hol.classList.toggle('faol', mijozYoz);
+  kotib.style.opacity = bizYoz ? 1 : 0;
+  BANNER.forEach(b => {
+    if (!b.el) return;
+    const lt = t - b.bosh, kor = lt >= 0 && lt < b.dur;
+    b.el.style.opacity = kor ? clamp(lt / .2) * clamp((b.dur - lt) / .2) : 0;
+    if (!kor) return;
+    b.el.style.transform = `translateY(${lerp(-30, 0, ease(lt / .3))}px)`;
+    const n = b.ws.length, oyna = Math.max(.5, b.dur * .35);
+    b.ws.forEach((w, k) => { const q = (lt - .1 - (k / n) * oyna) / .15; w.style.opacity = clamp(q); w.style.transform = `translateY(${lerp(16, 0, ease(q))}px)`; });
+  });
+};
+</script>
+</body>
+</html>

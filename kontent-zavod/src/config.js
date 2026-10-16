@@ -7,7 +7,7 @@ if ((process.env.LLM_MODE || 'api').toLowerCase() === 'max' && !process.env.CLAU
 
 export const cfg = {
   mode: (process.env.LLM_MODE || 'api').toLowerCase(),   // api | max
-  model: process.env.MODEL || 'claude-sonnet-5',          // api rejimi uchun
+  model: process.env.MODEL || 'claude-opus-5-5',         // api rejimi uchun (arzonroq: MODEL=claude-sonnet-5-5)
   maxModel: process.env.MAX_MODEL || 'sonnet',            // max rejimi uchun: sonnet | opus
   botToken: req('BOT_TOKEN'),
   admins: (process.env.ADMIN_IDS || '').split(',').map(s => Number(s.trim())).filter(Boolean),
@@ -35,7 +35,11 @@ export const cfg = {
     azureVoice: process.env.AZURE_VOICE || 'uz-UZ-SardorNeural',
     elevenKey: process.env.ELEVENLABS_API_KEY || '',
     elevenVoice: process.env.ELEVENLABS_VOICE_ID || '',
-    elevenModel: process.env.ELEVENLABS_MODEL || 'eleven_v3'
+    elevenModel: process.env.ELEVENLABS_MODEL || 'eleven_v3',
+    // Gemini TTS (n8n doska ham shu ovozni ishlatadi): kalit GEMINI_API_KEY, diktor — erkak ovoz
+    geminiKey: process.env.GEMINI_API_KEY || '',
+    geminiVoice: process.env.GEMINI_VOICE || 'Charon',
+    geminiModel: process.env.GEMINI_TTS_MODEL || ''
   },
   tz: 'Asia/Tashkent',
   tzOffsetH: 5

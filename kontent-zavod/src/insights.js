@@ -30,10 +30,15 @@ Shunga tayan: yaxshi ishlagan mavzu, og'riq va formatlarni ko'proq, sustlarini k
 Lekin bir xillikka tushma — yangi mavzularni ham sina.\n`;
 }
 
-// Rahbarning ishlatilmagan g'oyalari — reja va strategiyada birinchi navbatda
-export function ideaBank(limit = 15) {
-  const list = store.ideas().filter(i => !i.used).slice(-limit);
-  if (!list.length) return '';
-  return `\nRAHBARNING O'Z G'OYALARI (BIRINCHI NAVBATDA ishlat, har biri bitta postga; ishlatganingda "idea_id" ni yoz):
-${list.map(i => `- [${i.id}] ${i.text}`).join('\n')}\n`;
+// Rahbarning ishlatilmagan g'oyalari — reja va strategiyada birinchi navbatda.
+// G'oya ovchisi topganlari (manba: 'ai') — alohida, ixtiyoriy ro'yxat: ular rahbar g'oyasi deb ko'rsatilmaydi
+export function ideaBank(limit = 15, aiLimit = 8) {
+  const ochiq = store.ideas().filter(i => !i.used);
+  const list = ochiq.filter(i => i.manba !== 'ai').slice(-limit);
+  const ai = ochiq.filter(i => i.manba === 'ai').slice(-aiLimit);
+  if (!list.length && !ai.length) return '';
+  return (list.length ? `\nRAHBARNING O'Z G'OYALARI (BIRINCHI NAVBATDA ishlat, har biri bitta postga; ishlatganingda "idea_id" ni yoz):
+${list.map(i => `- [${i.id}] ${i.text}`).join('\n')}\n` : '') +
+    (ai.length ? `\nG'OYA OVCHISI TOPGANLARI (kuzatilgan kanallar va internetdan; mos kelsa ishlat, "idea_id" ni yoz):
+${ai.map(i => `- [${i.id}] ${i.text}`).join('\n')}\n` : '');
 }

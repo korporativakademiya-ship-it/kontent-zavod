@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { cfg } from './config.js';
 import { ffmpeg, mediaDuration } from './video/ffmpeg.js';
+import { modellar, geminiMedia, engYangiTts } from './gemini.js';
 
 // Matnni ovozga aylantirish (dublyaj). Provayder .env dan: TTS_PROVIDER=azure | elevenlabs
 const t = cfg.tts;
@@ -9,10 +10,11 @@ const t = cfg.tts;
 export function ttsEnabled() {
   if (t.provider === 'azure') return !!t.azureKey;
   if (t.provider === 'elevenlabs') return !!(t.elevenKey && t.elevenVoice);
+  if (t.provider === 'gemini') return !!t.geminiKey;
   return false;
 }
 
-export const TTS_SETUP = "Ovoz sozlanmagan. .env ga TTS_PROVIDER=azure + AZURE_SPEECH_KEY (+ AZURE_SPEECH_REGION) " +
+export const TTS_SETUP = "Ovoz sozlanmagan. .env ga TTS_PROVIDER=gemini + GEMINI_API_KEY, TTS_PROVIDER=azure + AZURE_SPEECH_KEY " +
   "yoki TTS_PROVIDER=elevenlabs + ELEVENLABS_API_KEY + ELEVENLABS_VOICE_ID qo'shing.";
 
 const xml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -54,11 +56,41 @@ async function synthEleven(text) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// Model berilmasa — Google ro'yxatidan eng yangi TTS modeli (gemini.js)
+export { engYangiTts };
+async function geminiTtsModel(fetchFn) {
+  const m = t.geminiModel || engYangiTts(await modellar(fetchFn));
+  if (!m) throw new Error('Gemini TTS modeli topilmadi');
+  return m;
+}
+
+// Gemini PCM (audio/L16, 24 kHz) qaytaradi — ffmpeg bilan MP3 ga o'giriladi
+export async function synthGemini(text, outFile, { fetchFn = fetch } = {}) {
+  const model = await geminiTtsModel(fetchFn);
+  const d = await geminiMedia(model, {
+    contents: [{ parts: [{ text: `Brisk, confident male narrator, natural Uzbek pronunciation, no long pauses: ${text}` }] }],
+    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: t.geminiVoice } } } }
+  }, { fetchFn });
+  const mime = d.mime || 'audio/L16;rate=24000';
+  const raw = outFile + '.raw';
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  fs.writeFileSync(raw, Buffer.from(d.data, 'base64'));
+  try {
+    const pcm = /L16|pcm/i.test(mime);
+    const rate = (/rate=(\d+)/.exec(mime) || [0, '24000'])[1];
+    await ffmpeg(['-y', ...(pcm ? ['-f', 's16le', '-ar', rate, '-ac', '1'] : []), '-i', raw, '-c:a', 'libmp3lame', '-b:a', '128k', outFile]);
+  } finally { fs.rmSync(raw, { force: true }); }
+}
+
 // Matn → MP3 fayl; davomiylikni (soniya) qaytaradi
 export async function synth(text, outFile) {
   if (!ttsEnabled()) throw new Error(TTS_SETUP);
   const clean = text.trim();
   if (!clean) throw new Error("Ovoz uchun matn bo'sh");
+  if (t.provider === 'gemini') {
+    await synthGemini(clean, outFile);
+    return mediaDuration(outFile);
+  }
   const buf = t.provider === 'azure' ? await synthAzure(clean) : await synthEleven(clean);
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, buf);

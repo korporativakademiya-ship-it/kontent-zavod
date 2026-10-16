@@ -25,8 +25,16 @@ export async function muxVoice(videoFile, clips, duration, outFile) {
     '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-t', String(duration), '-movflags', '+faststart', outFile]);
 }
 
+// Render og'ir (Chromium + ffmpeg): rejadan avtomatik yasalayotgan va tugma bilan so'ralgan videolar navbat bilan
+let navbat = Promise.resolve();
+export function makeVideo(draft, opts) {
+  const ish = navbat.then(() => makeVideoIchki(draft, opts));
+  navbat = ish.catch(() => {});
+  return ish;
+}
+
 // Qoralamadan reels video: motion agent sahnalarni yozadi → (ovoz) → shablon kadrma-kadr MP4 ga render qilinadi
-export async function makeVideo(draft, { voice = ttsEnabled() } = {}) {
+async function makeVideoIchki(draft, { voice = ttsEnabled() } = {}) {
   const data = await storyboard(draft);
   const dir = path.join(cfg.dataDir, 'videos');
   const file = path.join(dir, `${draft.id}.mp4`);

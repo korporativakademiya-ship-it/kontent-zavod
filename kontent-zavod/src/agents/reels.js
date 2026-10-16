@@ -11,8 +11,7 @@ import { TABIIY } from '../tabiiy.js';
 // Prodyuser (g'oya → TZ) → Ssenariychi + Tanqidchi (≥ 8/10) → Rejissyor + SMM (storibord, rasm tavsifi, post matni).
 // Hamma agent umumiy brend, uslub, qoidalar va mahsulot qatlamiga (brand()) tayanadi.
 
-const MAHSULOTLAR = Object.keys(PROFIL);
-const mKod = (m) => (MAHSULOTLAR.includes(m) ? m : null);
+const mKod = (m) => (PROFIL[m] ? m : null);
 const MAQSADLAR = ['lid', 'ishonch', 'ekspertlik', 'obunachi'];
 
 // Instagram'da ishlagan ilmoq turlari — prodyuser va ssenariychi uchun
@@ -46,7 +45,7 @@ Qoidalar:
 - O'zbek tili (lotin).
 
 JSON:
-{"sarlavha":"ishchi nom","mahsulot":"ka|qa|kf|umumiy","rubrika":"kod yoki erkin","rubrika_nomi":"...",
+{"sarlavha":"ishchi nom","mahsulot":"${[...Object.keys(PROFIL), 'umumiy'].join('|')}","rubrika":"kod yoki erkin","rubrika_nomi":"...",
 "format":"${Object.keys(FORMATLAR).join('|')}","format_sababi":"1 gap",
 "maqsad":"${MAQSADLAR.join('|')}","voronka":"sovuq|iliq|issiq|ekspertlik|ishonch",
 "auditoriya":"kim, qaysi biznes","ogriq":"...","etiroz":"asosiy e'tiroz","asosiy_fikr":"tomoshabin eslab qoladigan 1 fikr","burchak":"qaysi tomondan yoritamiz",

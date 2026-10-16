@@ -190,3 +190,14 @@ test("topiklar: bog'lanmagan topik so'raydi, 'topik: ka' bog'laydi, ofis topigi 
   const x = await kunlikTarqat(k);
   assert.deepEqual(x.map(m => [m.chatId, m.thread]).sort(), [['-100500', '869'], [G, '12']].sort());
 });
+
+test("bir topikda ikki bot: /buyruq va \"g'oya: ...\" doskada g'oya bo'lib ketmaydi", async () => {
+  const { k, log } = agentlar();
+  for (const text of ['/reja', '/jadval Du 09:00', "g'oya: xodimlar kechikishi", 'Goya — yangi mavzu']) {
+    const r = await suhbat({ chatId: 'B2', text }, k);
+    assert.deepEqual(r.xabarlar, [], text);
+  }
+  assert.equal(log.filter(x => x[0] === 'prodyuser').length, 0);
+  const r = await suhbat({ chatId: 'B2', text: '/start' }, k);
+  assert.match(r.xabarlar[0].matn, /kontent bo'limingizman/);
+});

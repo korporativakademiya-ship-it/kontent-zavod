@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Kontent render</title>
+<style>
+  @font-face { font-family: 'InterL'; font-weight: 400; src: url(fonts/inter400.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 600; src: url(fonts/inter600.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 800; src: url(fonts/inter800.ttf); }
+  @font-face { font-family: 'InterL'; font-weight: 900; src: url(fonts/inter900.ttf); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #070B18; }
+  body { font-family: 'InterL', 'DejaVu Sans', 'Noto Color Emoji'; color: #fff; }
+  #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; }
+  .scene { position: absolute; inset: 0; opacity: 0; overflow: hidden; }
+  .bg { position: absolute; inset: -40px; background-size: cover; background-position: center; will-change: transform; }
+  .grad-bg { background: radial-gradient(900px 700px at 20% 10%, #2A1F6B 0%, transparent 60%),
+                         radial-gradient(900px 800px at 90% 90%, #0E4B6E 0%, transparent 60%), #070B18; }
+  .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(7,11,24,.35) 0%, rgba(7,11,24,.15) 28%, rgba(7,11,24,.8) 52%, rgba(7,11,24,.94) 100%); }
+  .txt { position: absolute; left: 80px; right: 80px; top: 980px; }
+  .scene.bare .txt { top: 640px; }
+  .m { font-size: 78px; font-weight: 800; line-height: 1.14; letter-spacing: -1.5px; text-shadow: 0 6px 30px rgba(0,0,0,.45); }
+  .w { display: inline-block; opacity: 0; margin-right: .24em; }
+  .hl { background: linear-gradient(90deg, #A78BFA, #38BDF8); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
+  .scene.photo .hl { background: none; color: #FDE047; -webkit-text-fill-color: #FDE047; text-shadow: 0 6px 30px rgba(0,0,0,.45); }
+  .i { margin-top: 34px; font-size: 42px; font-weight: 600; line-height: 1.35; color: #C7D2FE; opacity: 0; }
+  .scene.photo .i { color: #E2E8F0; }
+  .pill { display: inline-block; margin-top: 64px; font-size: 60px; font-weight: 900; padding: 26px 52px; border-radius: 999px;
+    background: linear-gradient(90deg, #8B5CF6, #0EA5E9); box-shadow: 0 20px 60px rgba(14,165,233,.35); opacity: 0; }
+  #bar { position: absolute; top: 0; left: 0; height: 8px; background: linear-gradient(90deg, #8B5CF6, #0EA5E9); }
+</style>
+</head>
+<body>
+<div id="stage"><div id="bar"></div></div>
+<script>
+  const clamp = x => Math.max(0, Math.min(1, x));
+  const ease = x => 1 - Math.pow(1 - x, 3);
+  const FADE = 0.4;
+  let SAHNALAR = [], JAMI = 0;
+
+  function sozlar(matn) {
+    // *so'z* — ajratib ko'rsatiladi. Oldida bo'shliq yo'q bo'lak (masalan "*02:47*.") oldingi so'zga yopishadi.
+    const chiq = [];
+    let bosh = true;
+    for (const q of matn.split(/(\*[^*]+\*)/)) {
+      if (!q) continue;
+      const hl = /^\*[^*]+\*$/.test(q);
+      const toza = q.replace(/\*/g, '');
+      const qismlar = toza.split(/(\s+)/);
+      qismlar.forEach(p => {
+        if (!p) return;
+        if (/^\s+$/.test(p)) { bosh = true; return; }
+        chiq.push({ s: p, hl, yopish: !bosh && chiq.length > 0 });
+        bosh = false;
+      });
+    }
+    return chiq;
+  }
+
+  window.init = async function (data) {
+    const stage = document.getElementById('stage');
+    let t0 = 0;
+    const hammasi = [...data.sahnalar];
+    if (data.yakun.matn) hammasi.push({ ...data.yakun, yakun: true });
+    const kutish = [];
+    hammasi.forEach((s, k) => {
+      const el = document.createElement('div');
+      el.className = 'scene ' + (s.rasm ? 'photo' : 'bare');
+      const bg = document.createElement('div');
+      bg.className = 'bg' + (s.rasm ? '' : ' grad-bg');
+      if (s.rasm) {
+        bg.style.backgroundImage = `url("${s.rasm.replace(/"/g, '%22')}")`;
+        kutish.push(new Promise(res => { const im = new Image(); im.onload = im.onerror = res; im.src = s.rasm; }));
+      }
+      el.appendChild(bg);
+      if (s.rasm) { const sh = document.createElement('div'); sh.className = 'shade'; el.appendChild(sh); }
+      const txt = document.createElement('div'); txt.className = 'txt';
+      const m = document.createElement('div'); m.className = 'm';
+      const words = sozlar(s.matn).map(({ s: w, hl, yopish }) => {
+        const sp = document.createElement('span'); sp.className = 'w' + (hl ? ' hl' : ''); sp.textContent = w;
+        if (yopish && m.lastChild) m.lastChild.style.marginRight = '0';
+        m.appendChild(sp); return sp;
+      });
+      txt.appendChild(m);
+      let izoh = null, pill = null;
+      if (s.izoh) { izoh = document.createElement('div'); izoh.className = 'i'; izoh.textContent = s.izoh; txt.appendChild(izoh); }
+      if (s.yakun) { pill = document.createElement('div'); pill.className = 'pill'; pill.textContent = s.tugma; txt.appendChild(pill); }
+      el.appendChild(txt);
+      stage.appendChild(el);
+      SAHNALAR.push({ el, bg, words, izoh, pill, bosh: t0, oxir: t0 + s.soniya, k, songgi: k === hammasi.length - 1 });
+      t0 += s.soniya;
+    });
+    JAMI = t0;
+    await Promise.race([Promise.all(kutish), new Promise(r => setTimeout(r, 20000))]);
+    await document.fonts.ready;
+    return JAMI;
+  };
+
+  window.render = function (t) {
+    document.getElementById('bar').style.width = (clamp(t / JAMI) * 100) + '%';
+    for (const s of SAHNALAR) {
+      const kir = s.k === 0 ? 1 : ease(clamp((t - s.bosh) / FADE));
+      const chiq = s.songgi ? 1 : 1 - ease(clamp((t - s.oxir + FADE / 2) / FADE));
+      const o = kir * chiq;
+      s.el.style.opacity = o;
+      s.el.style.display = o > 0.001 ? 'block' : 'none';
+      if (o <= 0.001) continue;
+      const lt = t - s.bosh, dur = s.oxir - s.bosh;
+      const p = clamp(lt / dur);
+      const yon = s.k % 2 ? -1 : 1;
+      s.bg.style.transform = `scale(${1.04 + 0.1 * p}) translate(${yon * 18 * p}px, ${-12 * p}px)`;
+      const qadam = Math.min(0.22, 1.6 / Math.max(1, s.words.length));
+      s.words.forEach((w, j) => {
+        const q = ease(clamp((lt - 0.15 - j * qadam) / 0.35));
+        w.style.opacity = q;
+        w.style.transform = `translateY(${(1 - q) * 28}px) scale(${0.92 + 0.08 * q})`;
+      });
+      const keyin = 0.15 + s.words.length * qadam + 0.2;
+      if (s.izoh) { const q = ease(clamp((lt - keyin) / 0.45)); s.izoh.style.opacity = q; s.izoh.style.transform = `translateY(${(1 - q) * 24}px)`; }
+      if (s.pill) {
+        const q = ease(clamp((lt - keyin - 0.3) / 0.45));
+        const puls = 1 + 0.035 * Math.sin(Math.max(0, lt - keyin - 0.8) * 5);
+        s.pill.style.opacity = q; s.pill.style.transform = `translateY(${(1 - q) * 30}px) scale(${puls})`;
+      }
+    }
+  };
+</script>
+</body>
+</html>

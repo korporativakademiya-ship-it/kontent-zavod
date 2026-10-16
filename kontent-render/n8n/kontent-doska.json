@@ -1,0 +1,1582 @@
+{
+  "name": "Kontent bo'limi — suhbat (tugmalar bilan)",
+  "nodes": [
+    {
+      "id": "61f6dd6f-39ec-4737-ae12-ed14dd7527d0",
+      "name": "Har kuni 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "da27da21-6c27-4839-b59d-ff7c6a79cc31",
+      "name": "Kunlik g'oyalar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        -300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FABRIKA_URL + '/api/goyalar/kunlik' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-kalit",
+              "value": "={{ $env.FABRIKA_API_KALIT }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tarqat: true }) }}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "267a4e5d-8b7e-4ca2-aaec-639fd3b3e4c0",
+      "name": "Topiklarga",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -300
+      ],
+      "parameters": {
+        "jsCode": "// Kunlik g'oyalar: Fabrika har topik uchun alohida xabar qaytaradi\nreturn ($json.xabarlar || []).filter(x => x && x.matn && x.chatId && x.thread).map(x => ({ json: { chatId: String(x.chatId), thread: String(x.thread), matn: x.matn } }));"
+      }
+    },
+    {
+      "id": "ede74c96-0dfa-4243-abfe-ef155a8e0c64",
+      "name": "Dayjest",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        -300
+      ],
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.matn }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "message_thread_id": "={{ $json.thread }}"
+        }
+      }
+    },
+    {
+      "id": "53ced9a3-8705-4b63-99bb-1334eb689d03",
+      "name": "Dayjest xatosi",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        480,
+        -120
+      ],
+      "parameters": {
+        "chatId": "8815205589",
+        "text": "={{ '❌ Kunlik g\\'oyalar tayyorlanmadi: ' + String($json.error?.message || JSON.stringify($json.error || $json)).slice(0, 500) }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      }
+    },
+    {
+      "id": "51e679e1-08d0-4bf4-8f99-a7c8a4749b36",
+      "name": "Telegram: xabar",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      }
+    },
+    {
+      "id": "53a07957-d621-48a4-8d6f-c2da77175d29",
+      "name": "Kiruvchi",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Guruh topigidagi xabar yoki tugma. Kim yozishi mumkin — foydalanuvchi ID (guruhda boshqalar ham yozadi)\nconst RUXSAT = ['8815205589'];\nconst cb = $json.callback_query;\nconst msg = cb ? cb.message : $json.message;\nconst kim = String((cb ? cb.from : $json.message?.from)?.id || '');\nconst chatId = String(msg?.chat?.id || '');\n// Faqat forum topigi: topiksiz (General) va shaxsiy chatga javob yozilmaydi — javob doim o'sha topikka qaytadi\nconst thread = msg?.message_thread_id && (msg.is_topic_message || cb) ? String(msg.message_thread_id) : '';\nif (!chatId || !thread || (RUXSAT.length && !RUXSAT.includes(kim))) return [];\nconst text = cb ? '' : String($json.message?.text || $json.message?.caption || '').trim();\nif (!cb && !text) return [];\nreturn [{ json: { chatId, thread, text, tugma: cb ? String(cb.data || '') : '', callbackId: cb ? String(cb.id) : '' } }];"
+      }
+    },
+    {
+      "id": "38bd848d-3046-49e9-b0af-05f1be502cd3",
+      "name": "Tugmami",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "e06f1335-46ac-415c-a821-bc578ac136ec",
+              "leftValue": "={{ $json.callbackId ? 'ha' : '' }}",
+              "rightValue": "ha",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9edcd132-4ff4-4556-bb59-4850e9fc0182",
+      "name": "Tugmaga javob",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "resource": "callback",
+        "queryId": "={{ $json.callbackId }}",
+        "additionalFields": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "fbb701e3-0165-4d90-9a52-6734776f0de4",
+      "name": "Suhbat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        260
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FABRIKA_URL + '/api/suhbat' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-kalit",
+              "value": "={{ $env.FABRIKA_API_KALIT }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chatId: $('Kiruvchi').first().json.chatId, text: $('Kiruvchi').first().json.text, tugma: $('Kiruvchi').first().json.tugma, thread: $('Kiruvchi').first().json.thread, kino: true }) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "e948301a-b5ee-4126-a6ce-fb7f22f88a15",
+      "name": "Xabarlar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        260
+      ],
+      "parameters": {
+        "jsCode": "// Fabrika javobidagi xabarlar — har biri alohida, o'sha topikka; klaviatura nomi bo'yicha tugmalar qo'yiladi\nconst { chatId, thread } = $('Kiruvchi').first().json;\nreturn ($json.xabarlar || []).filter(x => x && x.matn).map(x => ({ json: { chatId, thread, matn: x.matn, klaviatura: x.klaviatura || '', kollaj: x.kollaj || '' } }));"
+      }
+    },
+    {
+      "id": "904f96b4-517d-4fe2-92e0-dc2b2c7acfeb",
+      "name": "Kollajmi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "29cf2b80-0c64-41f3-9899-ed17d3eed14b",
+              "leftValue": "={{ $json.kollaj ? 'ha' : '' }}",
+              "rightValue": "ha",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aa0abd87-f484-4482-8636-54ed95e16a89",
+      "name": "Slaydlar kollaji",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        -40
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FABRIKA_URL + '/api/kontent/kollaj' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-kalit",
+              "value": "={{ $env.FABRIKA_API_KALIT }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ draft_id: $json.kollaj }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "7ad4339d-ab2c-4327-b5bd-dab44cd95612",
+      "name": "Kollaj → rasm",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { chatId: $('Kiruvchi').first().json.chatId, thread: $('Kiruvchi').first().json.thread },\n  binary: { data: { data: $json.b64, mimeType: $json.mime || 'image/jpeg', fileName: 'slaydlar.jpg' } } }];"
+      }
+    },
+    {
+      "id": "e34ad883-b18b-4e52-b014-d55b55fba3b1",
+      "name": "Yuborish: slaydlar",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        -40
+      ],
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $json.chatId }}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "appendAttribution": false,
+          "message_thread_id": "={{ $json.thread }}",
+          "caption": "={{ $('Xabarlar').first().json.matn }}"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "494b877e-8f55-4d9f-91c0-071d1584f5e9",
+      "name": "TZ tugmalarimi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        360
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "492c5cec-567b-4837-8fa4-220536b6d7ad",
+              "leftValue": "={{ $json.klaviatura }}",
+              "rightValue": "tz",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4076e61a-aeaa-4a63-9923-2484f2384dd6",
+      "name": "Yuborish: TZ",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        120
+      ],
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.matn }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Tasdiqlash",
+                    "additionalFields": {
+                      "callback_data": "tz_ok"
+                    }
+                  },
+                  {
+                    "text": "✏️ Tuzatish",
+                    "additionalFields": {
+                      "callback_data": "tz_edit"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🛑 To'xtatish",
+                    "additionalFields": {
+                      "callback_data": "stop"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "message_thread_id": "={{ $json.thread }}"
+        }
+      }
+    },
+    {
+      "id": "f206e35f-0622-44e5-ac74-068cd2ab609f",
+      "name": "Matn tugmalarimi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        360
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "377de867-57ee-4b7a-af80-9e9187187073",
+              "leftValue": "={{ $json.klaviatura }}",
+              "rightValue": "matn",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "854e416e-6544-464d-8509-102cec64efb3",
+      "name": "Yuborish: matn",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1680,
+        260
+      ],
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.matn }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Tasdiqlash",
+                    "additionalFields": {
+                      "callback_data": "m_ok"
+                    }
+                  },
+                  {
+                    "text": "✏️ O'zim tuzataman",
+                    "additionalFields": {
+                      "callback_data": "m_edit"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🔄 Izoh bilan qayta",
+                    "additionalFields": {
+                      "callback_data": "m_izoh"
+                    }
+                  },
+                  {
+                    "text": "🛑 To'xtatish",
+                    "additionalFields": {
+                      "callback_data": "stop"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "message_thread_id": "={{ $json.thread }}"
+        }
+      }
+    },
+    {
+      "id": "2161070b-ca61-4154-80b9-58df9a7dae33",
+      "name": "Joylash tugmalarimi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        460
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9ffa5ff0-4ea8-4b2b-be2a-7f6234c87284",
+              "leftValue": "={{ $json.klaviatura }}",
+              "rightValue": "joyla",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ca6b2222-fcb4-4e06-9a78-47d3bded2b05",
+      "name": "Yuborish: joylash",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        400
+      ],
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.matn }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📢 Keyingi bo'sh vaqtga",
+                    "additionalFields": {
+                      "callback_data": "j_ok"
+                    }
+                  },
+                  {
+                    "text": "🕒 Vaqtni yozaman",
+                    "additionalFields": {
+                      "callback_data": "j_vaqt"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "❌ Joylamaslik",
+                    "additionalFields": {
+                      "callback_data": "j_no"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "message_thread_id": "={{ $json.thread }}"
+        }
+      }
+    },
+    {
+      "id": "db985d1c-4e84-4dca-9dbc-496538903ebf",
+      "name": "Yuborish: oddiy",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        560
+      ],
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.matn }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "message_thread_id": "={{ $json.thread }}"
+        }
+      }
+    },
+    {
+      "id": "d807b1d4-5fac-4730-bfc9-8bd981eb0749",
+      "name": "Reelsmi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        700
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d5ef2559-140d-459a-a48d-cfb708978788",
+              "leftValue": "={{ ['reels', 'kino'].includes($('Suhbat').first().json.keyingi?.tur || '') ? 'ha' : '' }}",
+              "rightValue": "ha",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c5777bd1-4980-4a7a-8bef-c1be3a0d5813",
+      "name": "Rasm kerakmi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        900
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9fdf368e-92d3-48d8-8b67-794df88714ca",
+              "leftValue": "={{ $('Suhbat').first().json.keyingi?.tur || '' }}",
+              "rightValue": "matn+rasm",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a831fb8c-c099-4bbd-b9e4-6c8900a8b9a8",
+      "name": "Modellar ro'yxati",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        700
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {}
+      },
+      "executeOnce": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "bd66777f-8fb6-44aa-a413-19793cc97a56",
+      "name": "Sahnalarni ajrat",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        700
+      ],
+      "parameters": {
+        "jsCode": "// Modellar Google ro'yxatidan: nomlar eskirsa ham eng yangisi olinadi\nconst barchasi = ($('Modellar ro\\'yxati').first().json.models || []).map(m => m.name.replace('models/', ''));\nconst ver = n => parseFloat((n.match(/(\\d+(?:\\.\\d+)?)/) || [0, 0])[1]);\nconst eng = (arr) => arr.sort((a, b) => ver(b) - ver(a) || (/flash/.test(b) - /flash/.test(a)))[0] || '';\nconst RASM_MODEL = eng(barchasi.filter(n => /image/i.test(n) && !/imagen/i.test(n)));\nconst TTS_MODEL = eng(barchasi.filter(n => /tts/i.test(n)));\n// Diktor — erkak ovoz. Boshqasini sinash: Puck (jonli), Fenrir, Orus\nconst OVOZ = 'Charon';\nconst ic = $('Suhbat').first().json.keyingi;\n// Kino: rasm kerak emas (shablonlar o'zi chizadi) — faqat har sahna ovozi\nif (ic.tur === 'kino') return (ic.sahnalar || []).map((s, i) => ({ json: { i, s, kino: true, rasm_prompt: '', ovoz_matn: s.ovoz || '', rejissura: s.rejissura || '',\n  RASM_MODEL, TTS_MODEL, OVOZ, jami: ic.sahnalar.length } }));\nconst hammasi = [...(ic.sahnalar || []).map(s => ({ ...s, yakun: false })), { ...(ic.yakun || {}), yakun: true }];\nconst zaxira = 'Abstract soft-focus modern office background, deep blue and violet, gentle bokeh, cinematic, vertical 9:16, no text, no letters, no logos.';\nreturn hammasi.map((s, i) => ({ json: { i, s, rasm_prompt: s.rasm_prompt || zaxira, ovoz_matn: s.ovoz || '', rejissura: s.ovoz_rejissura || '',\n  RASM_MODEL, TTS_MODEL, OVOZ, jami: hammasi.length } }));"
+      }
+    },
+    {
+      "id": "8cb51786-f5f9-4388-8e8e-96f89b26b04b",
+      "name": "Nano Banana: sahnalar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        700
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + ($json.rasm_prompt ? $json.RASM_MODEL : 'rasm-yoq') + ':generateContent' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $json.rasm_prompt }] }], generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '9:16' } } }) }}",
+        "options": {
+          "timeout": 180000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2500
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "e8199d5a-9640-49c7-bf18-e4a40b4b0821",
+      "name": "Gemini: ovoz",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        700
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + ($('Sahnalarni ajrat').all()[$itemIndex].json.ovoz_matn.trim() ? $('Sahnalarni ajrat').all()[$itemIndex].json.TTS_MODEL : 'ovoz-yoq') + ':generateContent' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const s = $('Sahnalarni ajrat').all()[$itemIndex].json; return JSON.stringify({ contents: [{ parts: [{ text: (s.rejissura || 'Brisk, energetic, confident narrator, natural Uzbek pronunciation, no long pauses') + ': ' + s.ovoz_matn }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: s.OVOZ } } } } }); })() }}",
+        "options": {
+          "timeout": 180000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2500
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "0ccfb3da-36e8-49ca-b3f6-86bd68e9637b",
+      "name": "Renderga yig'",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        700
+      ],
+      "parameters": {
+        "jsCode": "const manba = $('Sahnalarni ajrat').all().map(x => x.json);\nconst rasmlar = $('Nano Banana: sahnalar').all();\nconst ovozlar = $input.all();\nconst qism = (x) => (x?.json?.candidates?.[0]?.content?.parts || []).find(p => p.inlineData || p.inline_data);\nconst ol = (p, def) => { const d = p.inlineData || p.inline_data; return { mime: d.mimeType || d.mime_type || def, b64: d.data }; };\nfunction wav({ mime, b64 }) {\n  if (!/L16|pcm/i.test(mime)) return `data:${mime.split(';')[0]};base64,${b64}`;\n  const pcm = Buffer.from(b64, 'base64');\n  const rate = Number((/rate=(\\d+)/.exec(mime) || [0, 24000])[1]);\n  const h = Buffer.alloc(44);\n  h.write('RIFF', 0); h.writeUInt32LE(36 + pcm.length, 4); h.write('WAVE', 8);\n  h.write('fmt ', 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22);\n  h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 2, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34);\n  h.write('data', 36); h.writeUInt32LE(pcm.length, 40);\n  return 'data:audio/wav;base64,' + Buffer.concat([h, pcm]).toString('base64');\n}\nif (manba[0]?.kino) {\n  let ovozli = 0;\n  const sahnalar = manba.map((m, k) => {\n    const o = qism(ovozlar[k]); if (o) ovozli++;\n    const { ovoz, rejissura, ...s } = m.s;\n    return { ...s, ...(o ? { audio: wav(ol(o, 'audio/L16;rate=24000')) } : {}) };\n  });\n  return [{ json: { yol: 'kino', payload: { nik: '@pulatovjurabek', musiqa: true, effektlar: true, sahnalar }, rasmli: 0, ovozli, jami: manba.length } }];\n}\nlet rasmli = 0, ovozli = 0;\nconst tayyor = manba.map((m, k) => {\n  const r = qism(rasmlar[k]), o = qism(ovozlar[k]);\n  if (r) rasmli++; if (o) ovozli++;\n  const rd = r ? ol(r, 'image/png') : null;\n  return { yakun: m.s.yakun, matn: String(m.s.matn || '').slice(0, 200), izoh: String(m.s.izoh || '').slice(0, 250), tugma: String(m.s.tugma || '').slice(0, 58), soniya: m.s.soniya || 4,\n    rasm: rd ? `data:${rd.mime};base64,${rd.b64}` : '', audio: o ? wav(ol(o, 'audio/L16;rate=24000')) : '' };\n});\nconst sahnalar = tayyor.filter(x => !x.yakun && x.matn).map(({ yakun, tugma, ...x }) => x);\nconst y = tayyor.find(x => x.yakun) || {};\nreturn [{ json: { yol: 'render', payload: { sahnalar, yakun: { matn: y.matn || \"Direct'ga yozing\", tugma: y.tugma || \"Direct'ga yozing 👇\", izoh: y.izoh, audio: y.audio } },\n  rasmli, ovozli, jami: manba.length } }];"
+      }
+    },
+    {
+      "id": "c5df1cea-825f-40c7-9200-0c038fe6e81a",
+      "name": "Xabar: video",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2400,
+        560
+      ],
+      "parameters": {
+        "chatId": "={{ $('Kiruvchi').first().json.chatId }}",
+        "text": "={{ ($json.yol === 'kino' ? '🎬 ' + $json.jami + ' ta sahna, ovoz: ' + $json.ovozli + '/' + $json.jami : '🎬 Rasm: ' + $json.rasmli + '/' + $json.jami + ', ovoz: ' + $json.ovozli + '/' + $json.jami) + '. Video yig\\'ilyapti…' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "message_thread_id": "={{ $('Kiruvchi').first().json.thread }}"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "759fe964-d291-4b1b-822f-fc4d942416ce",
+      "name": "Video yig' (render)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        700
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.yol === 'kino' ? 'http://kontent-render.railway.internal:8080/kino' : 'http://kontent-render.railway.internal:8080/render' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "timeout": 1800000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "a8304852-40e8-42cb-bf16-2145b2895757",
+      "name": "Video → base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        700
+      ],
+      "parameters": {
+        "jsCode": "const buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nreturn [{ json: { draft_id: $('Suhbat').first().json.keyingi.draft_id, b64: buf.toString('base64') },\n  binary: $input.first().binary }];"
+      }
+    },
+    {
+      "id": "a2a92844-f6a6-4a62-8378-7887f1731b23",
+      "name": "Telegram: video",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2880,
+        560
+      ],
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "={{ $('Kiruvchi').first().json.chatId }}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "appendAttribution": false,
+          "message_thread_id": "={{ $('Kiruvchi').first().json.thread }}",
+          "caption": "🎬 Tayyor video"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e1188e79-ca8d-453b-bbdb-f5ef9921f9d1",
+      "name": "Video → Fabrika",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2880,
+        760
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FABRIKA_URL + '/api/kontent/media' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-kalit",
+              "value": "={{ $env.FABRIKA_API_KALIT }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ draft_id: $json.draft_id, turi: 'video', mime: 'video/mp4', b64: $json.b64 }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "68a16805-9bdd-49d0-a3f1-039b818e159e",
+      "name": "Modellar (rasm)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        1000
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {}
+      },
+      "executeOnce": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "d96910cf-1bf0-42b7-a6c6-7c17d813549f",
+      "name": "Nano Banana: rasm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        1000
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ (() => { const m = ($json.models || []).map(x => x.name.replace('models/', '')).filter(n => /image/i.test(n) && !/imagen/i.test(n)).sort().reverse()[0]; return 'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent'; })() }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $('Suhbat').first().json.keyingi.rasm_prompt }] }], generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '4:5' } } }) }}",
+        "options": {
+          "timeout": 180000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2500
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "2f0f84ad-09b9-4ce3-a3ef-5e77c340ac58",
+      "name": "Rasm → base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        1000
+      ],
+      "parameters": {
+        "jsCode": "const p = ($json.candidates?.[0]?.content?.parts || []).find(x => x.inlineData || x.inline_data);\nif (!p) return [{ json: { ok: false, draft_id: $('Suhbat').first().json.keyingi.draft_id } }];\nconst d = p.inlineData || p.inline_data;\nreturn [{ json: { ok: true, draft_id: $('Suhbat').first().json.keyingi.draft_id, b64: d.data, mime: (d.mimeType || d.mime_type || 'image/png').split(';')[0] },\n  binary: { data: { data: d.data, mimeType: (d.mimeType || d.mime_type || 'image/png').split(';')[0], fileName: 'rasm.png' } } }];"
+      }
+    },
+    {
+      "id": "bd5e81db-4d8c-4fc7-bdc7-42c857c54dd5",
+      "name": "Telegram: rasm",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2160,
+        900
+      ],
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Kiruvchi').first().json.chatId }}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "appendAttribution": false,
+          "message_thread_id": "={{ $('Kiruvchi').first().json.thread }}",
+          "caption": "🖼 Post rasmi"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "66b5e7d1-dbaa-46ba-a0db-441f1ca553c2",
+      "name": "Rasm → Fabrika",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        1060
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FABRIKA_URL + '/api/kontent/media' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-kalit",
+              "value": "={{ $env.FABRIKA_API_KALIT }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ draft_id: $json.draft_id, turi: 'rasm', mime: $json.mime, b64: $json.b64 }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "aefee5b2-262b-4c5c-b24f-607f081e19e5",
+      "name": "Suhbat: media tayyor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        900
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FABRIKA_URL + '/api/suhbat' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-kalit",
+              "value": "={{ $env.FABRIKA_API_KALIT }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chatId: $('Kiruvchi').first().json.chatId, thread: $('Kiruvchi').first().json.thread, hodisa: 'media_tayyor', draft_id: $('Suhbat').first().json.keyingi.draft_id }) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "17d82b29-ce2e-47dc-939a-88984d53aefe",
+      "name": "Suhbat: media xato",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        1150
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FABRIKA_URL + '/api/suhbat' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-kalit",
+              "value": "={{ $env.FABRIKA_API_KALIT }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chatId: $('Kiruvchi').first().json.chatId, thread: $('Kiruvchi').first().json.thread, hodisa: 'media_xato', draft_id: $('Suhbat').first().json.keyingi.draft_id, xato: String($json.error?.message || $json.error?.description || $json.xato || 'rasm chiqmadi').slice(0, 400) }) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "d2dd56eb-74f7-4a0d-8435-21e3ae7debc3",
+      "name": "Rasm chiqdimi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2040,
+        1000
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "8ec1e4ac-1cf0-41eb-b1d7-540f3fe5d4dd",
+              "leftValue": "={{ String($json.ok) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f9d7f581-89f0-41b6-b411-d008097760cc",
+      "name": "Xato xabari",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        1250
+      ],
+      "parameters": {
+        "chatId": "={{ $('Kiruvchi').first().json.chatId }}",
+        "text": "={{ (/API key not valid|API_KEY_INVALID/.test(JSON.stringify($json)) ? '🔑 Gemini kaliti noto\\'g\\'ri: Query Auth credential\\'ini tekshiring (Name: key).\\n\\n' : '') + '❌ Xato: ' + String($json.error?.message || $json.error?.description || JSON.stringify($json.error || $json)).slice(0, 600) + '\\n\\nQaytadan urinib ko\\'ring yoki \"bekor\" deb yozing.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "message_thread_id": "={{ $('Kiruvchi').first().json.thread }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Har kuni 09:00": {
+      "main": [
+        [
+          {
+            "node": "Kunlik g'oyalar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kunlik g'oyalar": {
+      "main": [
+        [
+          {
+            "node": "Topiklarga",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dayjest xatosi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Topiklarga": {
+      "main": [
+        [
+          {
+            "node": "Dayjest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: xabar": {
+      "main": [
+        [
+          {
+            "node": "Kiruvchi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kiruvchi": {
+      "main": [
+        [
+          {
+            "node": "Tugmami",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Suhbat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tugmami": {
+      "main": [
+        [
+          {
+            "node": "Tugmaga javob",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suhbat": {
+      "main": [
+        [
+          {
+            "node": "Xabarlar",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reelsmi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Xato xabari",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Xabarlar": {
+      "main": [
+        [
+          {
+            "node": "Kollajmi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kollajmi": {
+      "main": [
+        [
+          {
+            "node": "Slaydlar kollaji",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TZ tugmalarimi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slaydlar kollaji": {
+      "main": [
+        [
+          {
+            "node": "Kollaj → rasm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kollaj → rasm": {
+      "main": [
+        [
+          {
+            "node": "Yuborish: slaydlar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TZ tugmalarimi": {
+      "main": [
+        [
+          {
+            "node": "Yuborish: TZ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Matn tugmalarimi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Matn tugmalarimi": {
+      "main": [
+        [
+          {
+            "node": "Yuborish: matn",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Joylash tugmalarimi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Joylash tugmalarimi": {
+      "main": [
+        [
+          {
+            "node": "Yuborish: joylash",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Yuborish: oddiy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reelsmi": {
+      "main": [
+        [
+          {
+            "node": "Modellar ro'yxati",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rasm kerakmi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modellar ro'yxati": {
+      "main": [
+        [
+          {
+            "node": "Sahnalarni ajrat",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Suhbat: media xato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sahnalarni ajrat": {
+      "main": [
+        [
+          {
+            "node": "Nano Banana: sahnalar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nano Banana: sahnalar": {
+      "main": [
+        [
+          {
+            "node": "Gemini: ovoz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: ovoz": {
+      "main": [
+        [
+          {
+            "node": "Renderga yig'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Renderga yig'": {
+      "main": [
+        [
+          {
+            "node": "Xabar: video",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Video yig' (render)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video yig' (render)": {
+      "main": [
+        [
+          {
+            "node": "Video → base64",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Suhbat: media xato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video → base64": {
+      "main": [
+        [
+          {
+            "node": "Telegram: video",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Video → Fabrika",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video → Fabrika": {
+      "main": [
+        [
+          {
+            "node": "Suhbat: media tayyor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Suhbat: media xato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rasm kerakmi": {
+      "main": [
+        [
+          {
+            "node": "Modellar (rasm)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modellar (rasm)": {
+      "main": [
+        [
+          {
+            "node": "Nano Banana: rasm",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Suhbat: media xato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nano Banana: rasm": {
+      "main": [
+        [
+          {
+            "node": "Rasm → base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rasm → base64": {
+      "main": [
+        [
+          {
+            "node": "Rasm chiqdimi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rasm chiqdimi": {
+      "main": [
+        [
+          {
+            "node": "Telegram: rasm",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Rasm → Fabrika",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Suhbat: media xato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rasm → Fabrika": {
+      "main": [
+        [
+          {
+            "node": "Suhbat: media tayyor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Suhbat: media xato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suhbat: media tayyor": {
+      "main": [
+        [
+          {
+            "node": "Xabarlar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Xato xabari",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suhbat: media xato": {
+      "main": [
+        [
+          {
+            "node": "Xabarlar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Xato xabari",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Tashkent"
+  },
+  "pinData": {}
+}

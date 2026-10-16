@@ -42,3 +42,26 @@ test('kuzatuv xulosasi: eng ko\'p ko\'rilganlari, xato bo\'lsa qolganlari davom 
   assert.equal(r.natija[0].postlar[0].korish, 12400);
   assert.match(r.xatolar[0], /yopiq_kanal: t\.me\/s\/yopiq_kanal: 404/);
 });
+
+test("Instagram: token berilsa profillar Business Discovery orqali o'qiladi, eng faol post birinchi", async () => {
+  for (const x of k.kanallar()) k.kanalOchir('@' + x.nom);
+  k.kanalQosh('instagram.com/raqobatchi');
+  const env = { IG_ACCESS_TOKEN: 'T', IG_USER_ID: '1789' };
+  const hozir = new Date().toISOString();
+  let soralgan = '';
+  const fetchFn = async (url) => {
+    soralgan = url;
+    return { ok: true, json: async () => ({ business_discovery: { media: { data: [
+      { caption: 'Kam faol', like_count: 5, comments_count: 0, timestamp: hozir, permalink: 'https://instagram.com/p/a' },
+      { caption: "Mijoz yo'qotish — 3 sabab", like_count: 40, comments_count: 10, timestamp: hozir, permalink: 'https://instagram.com/p/b' },
+      { caption: '', like_count: 999, comments_count: 0, timestamp: hozir },
+    ] } } }) };
+  };
+  const r = await k.kuzatuvXulosasi({ harKanaldan: 2, fetchFn, env });
+  assert.match(decodeURIComponent(soralgan), /business_discovery\.username\(raqobatchi\)/);
+  assert.equal(r.natija[0].kanal, 'instagram @raqobatchi');
+  assert.deepEqual(r.natija[0].postlar.map(p => p.korish), [70, 5], 'izohsiz post tashlanadi');
+  // Token bo'lmasa — Instagram o'qilmaydi
+  const r2 = await k.kuzatuvXulosasi({ fetchFn: async () => { throw new Error('chaqirilmasligi kerak'); }, env: {} });
+  assert.deepEqual(r2, { natija: [], xatolar: [] });
+});

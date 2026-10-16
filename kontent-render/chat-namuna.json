@@ -1,0 +1,90 @@
+{
+ "nik": "@pulatovjurabek",
+ "sahnalar": [
+  {
+   "shablon": "chat",
+   "ism": "Aziz",
+   "soat": "23:47",
+   "sana": "Bugun",
+   "soniya": 6,
+   "subtitr": "Soat *23:47*. Egasi uxlayapti…",
+   "xabarlar": [
+    {
+     "kim": "mijoz",
+     "matn": "Assalomu alaykum 👋"
+    },
+    {
+     "kim": "mijoz",
+     "matn": "Reklama xizmati narxi qancha? Ertaga boshlasa bo'ladimi?"
+    },
+    {
+     "kim": "bot",
+     "matn": "Va alaykum assalom, Aziz! 😊 Albatta. Qaysi platforma kerak: Instagram yoki Telegram?"
+    }
+   ]
+  },
+  {
+   "shablon": "chat",
+   "soniya": 6.5,
+   "subtitr": "…lekin *Kotib AI* uxlamaydi",
+   "xabarlar": [
+    {
+     "kim": "mijoz",
+     "tur": "ovoz",
+     "davom": "0:09"
+    },
+    {
+     "kim": "bot",
+     "matn": "Tushundim: Instagram, oyiga 12 ta post va reels. Paket narxi — 3 500 000 so'm."
+    },
+    {
+     "kim": "mijoz",
+     "matn": "Zo'r, ishlarizdan namuna bormi?"
+    },
+    {
+     "kim": "bot",
+     "tur": "rasm",
+     "rasm": "https://example.com/namuna.png",
+     "matn": "Mana, oxirgi loyihalardan biri 👆"
+    }
+   ]
+  },
+  {
+   "shablon": "chat",
+   "soniya": 6,
+   "subtitr": "Ertalab egasi *tayyor buyurtmani* ko'radi",
+   "xabarlar": [
+    {
+     "kim": "mijoz",
+     "matn": "Kelishdik, boshlaymiz!"
+    },
+    {
+     "kim": "bot",
+     "tur": "buyurtma",
+     "buyurtma": {
+      "sarlavha": "Buyurtma #1024",
+      "qatorlar": [
+       [
+        "Xizmat",
+        "Instagram paket"
+       ],
+       [
+        "Narx",
+        "3 500 000 so'm"
+       ],
+       [
+        "Telefon",
+        "+998 90 123 45 67"
+       ]
+      ],
+      "holat": "✅ Qabul qilindi"
+     }
+    },
+    {
+     "kim": "bot",
+     "matn": "Rahmat, Aziz! Menejerimiz ertalab 9:00 da qo'ng'iroq qiladi 🤝"
+    }
+   ]
+  }
+ ]
+}

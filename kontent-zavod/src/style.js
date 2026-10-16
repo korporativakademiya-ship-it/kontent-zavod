@@ -1,5 +1,5 @@
 import { store } from './store.js';
-import { BRAND } from './brand.js';
+import { brendMatni } from './brand.js';
 import { mahsulotQatlami } from './mahsulot.js';
 
 // Uslub xotirasi: rahbarning namuna postlari, ulardan chiqarilgan uslub tavsifi
@@ -27,7 +27,7 @@ export function addFeedback(fb, draft) {
 // Agentlar uchun: brend profili + uslub tavsifi + doimiy qoidalar
 export function brand() {
   const st = store.style();
-  let out = BRAND;
+  let out = brendMatni();
   if (st.guide) out += `\nMUALLIF USLUBI (namuna postlardan o'rganilgan — shunga qat'iy amal qil):\n${st.guide}\n`;
   if (st.rules.length) out += `\nRAHBARNING DOIMIY QOIDALARI (tahrirlardan yig'ilgan — buzma):\n${st.rules.map((r, i) => `${i + 1}. ${r}`).join('\n')}\n`;
   return out + mahsulotQatlami() + tanlovlar();

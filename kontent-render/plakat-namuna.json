@@ -1,0 +1,171 @@
+{
+ "nik": "@pulatovjurabek",
+ "sahnalar": [
+  {
+   "shablon": "plakat",
+   "tur": "kinetik",
+   "soniya": 3.4,
+   "emoji": "🤯",
+   "matn": "Mijozlarning *78%* birinchi javob berganidan sotib oladi",
+   "bob": "Fakt"
+  },
+  {
+   "shablon": "plakat",
+   "tur": "raqam",
+   "soniya": 4,
+   "qiymat": 78,
+   "belgi": "%",
+   "matn": "mijoz *birinchi* javob bergan kompaniyani tanlaydi",
+   "manba": "Lead response study",
+   "subtitr": "Kim birinchi javob bersa — o'sha sotadi",
+   "bob": "Fakt"
+  },
+  {
+   "shablon": "plakat",
+   "tur": "grafik",
+   "soniya": 4.5,
+   "sarlavha": "Javob tezligi va sotuv",
+   "birlik": "%",
+   "ustunlar": [
+    {
+     "nom": "5 daqiqa",
+     "qiymat": 21
+    },
+    {
+     "nom": "1 soat",
+     "qiymat": 9
+    },
+    {
+     "nom": "1 kun",
+     "qiymat": 3
+    },
+    {
+     "nom": "Kotib AI 3 s",
+     "qiymat": 34
+    }
+   ],
+   "subtitr": "Tez javob = *ko'p sotuv*",
+   "bob": "Fakt"
+  },
+  {
+   "shablon": "plakat",
+   "tur": "royxat",
+   "soniya": 6,
+   "sarlavha": "Mijoz yo'qotadigan 5 ta xato",
+   "bandlar": [
+    "Kechasi javob bermaslik",
+    "Narxni yashirish",
+    "\"Keyinroq yozaman\" deb unutish",
+    "Lidni daftarga yozish",
+    "Bir savolga 3 xil javob"
+   ],
+   "subtitr": "Qaysi biri sizda bor?",
+   "bob": "Xatolar"
+  },
+  {
+   "shablon": "plakat",
+   "tur": "test",
+   "soniya": 5,
+   "savol": "Mijoz yozdi. Qancha vaqtda javob berasiz?",
+   "variantlar": [
+    "5 daqiqada",
+    "1 soatda",
+    "Ertaga ertalab"
+   ],
+   "subtitr": "Rostini yozing — *izohda*",
+   "bob": "Test"
+  },
+  {
+   "shablon": "plakat",
+   "tur": "ikki",
+   "soniya": 5.5,
+   "chap": {
+    "sarlavha": "Egasi o'zi",
+    "emoji": "😩",
+    "bandlar": [
+     "Kechasi uxlamaydi",
+     "Lidlar yo'qoladi",
+     "Dam olish yo'q"
+    ]
+   },
+   "ong": {
+    "sarlavha": "Kotib AI bilan",
+    "emoji": "😎",
+    "bandlar": [
+     "24/7 javob",
+     "Hammasi CRM'da",
+     "Siz faqat sotasiz"
+    ]
+   },
+   "subtitr": "Farqini ko'ryapsizmi?",
+   "bob": "Yechim"
+  },
+  {
+   "shablon": "plakat",
+   "tur": "yol",
+   "soniya": 5,
+   "sarlavha": "Kotib AI ni ulash",
+   "bosqichlar": [
+    {
+     "vaqt": "1-kun",
+     "matn": "Biznesingiz haqida ma'lumot beramiz"
+    },
+    {
+     "vaqt": "2-kun",
+     "matn": "Kotib Instagram va Telegramga ulanadi"
+    },
+    {
+     "vaqt": "3-kun",
+     "matn": "Birinchi lidlar CRM'da"
+    }
+   ],
+   "subtitr": "Hammasi *3 kunda*",
+   "bob": "Yechim"
+  },
+  {
+   "shablon": "plakat",
+   "tur": "meme",
+   "soniya": 4.5,
+   "yuqori": {
+    "yorliq": "Kutilgan",
+    "emoji": "🧘",
+    "matn": "Kechqurun dam olaman"
+   },
+   "pastki": {
+    "yorliq": "Haqiqat",
+    "emoji": "📱😵",
+    "matn": "23:47 — yana 15 ta xabar"
+   },
+   "subtitr": "Tanishmi? 😅",
+   "bob": "Hayot"
+  },
+  {
+   "shablon": "plakat",
+   "tur": "slaydlar",
+   "soniya": 5,
+   "rasmlar": [
+    "https://example.com/slayd1.png",
+    "https://example.com/slayd2.png"
+   ],
+   "subtitr": "Karusel ham videoga aylanadi",
+   "bob": "Bonus"
+  },
+  {
+   "shablon": "plakat",
+   "tur": "audiogramma",
+   "soniya": 5,
+   "muallif": "Jo'rabek Pulatov",
+   "matn": "Biznes egasi mijozga javob yozish uchun emas, *biznesni o'stirish* uchun kerak.",
+   "bob": "Xulosa"
+  },
+  {
+   "shablon": "plakat",
+   "tur": "kinetik",
+   "soniya": 3.5,
+   "rang": "sariq",
+   "emoji": "👇",
+   "matn": "Direct'ga *KOTIB* deb yozing",
+   "bob": "Xulosa"
+  }
+ ]
+}

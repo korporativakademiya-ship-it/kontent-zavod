@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { Bot, InlineKeyboard, InputFile } from 'grammy';
 import { cfg } from './config.js';
 import { store } from './store.js';
@@ -7,10 +8,10 @@ import { runPipeline, renderDraftSlides, produceDraft } from './pipeline.js';
 import { revise } from './agents/copywriter.js';
 import { writeArticle } from './agents/article.js';
 import { isRich, sendRich, approvalPrefix } from './rich.js';
-import { nextSlot, fmtTime, parseTime, publish, sendMediaPost, sendSafe, imagePaths } from './publisher.js';
-import { makeVideo } from './video/make.js';
+import { nextSlot, fmtTime, parseTime, publish, sendMediaPost, sendSafe, imagePaths, AllaqachonChiqqan } from './publisher.js';
+import { videoYasa } from './video/kino.js';
 import { renderSlides } from './video/slides.js';
-import { VIDEO_SIGNATURE } from './brand.js';
+import { imzo } from './brand.js';
 import { ttsEnabled, TTS_SETUP, synth, speechText, toVoiceNote } from './tts.js';
 import { addSample, addFeedback } from './style.js';
 import { ensureCode, ensureLink } from './cta.js';
@@ -19,6 +20,10 @@ import { buildReport } from './report.js';
 import * as weekly from './weekly.js';
 import { analyzeStyle, distillRules } from './agents/stylist.js';
 import { bilan, joriy, rejim, kodlar, topigi, topikdan, PROFIL } from './mahsulot.js';
+import { rasmYoqilgan, rasmYasa } from './rasm.js';
+import { rasmPrompti, uslubKanaldan } from './agents/kontent.js';
+import * as onboarding from './onboarding.js';
+import { kanalQosh } from './kuzatuv.js';
 
 // TELEGRAM_API_ROOT — ixtiyoriy (lokal Bot API server yoki sinov uchun)
 const API_ROOT = process.env.TELEGRAM_API_ROOT || 'https://api.telegram.org';
@@ -99,7 +104,7 @@ async function videoRun(d) {
   videoBusy = true;
   try {
     await reply(`🎥 "${d.title}" — video yasalmoqda (1–3 daqiqa)...`);
-    const v = await makeVideo(d);
+    const v = await videoYasa(d, { log: reply });
     const nd = store.update(d.id, { video_path: v.file, video_duration: v.duration, motion: v.data });
     const cap = `<b>🎥 Video</b> | ${esc(d.title)} | ${Math.round(v.duration)} s${v.voiced ? ' | 🎙 dublyaj' : ''}\n<i>${isRich(d) ? 'Tasdiqlansa, video maqola ichida chiqadi.' : 'Tasdiqlansa, kanalga shu video post matni bilan chiqadi.'}</i>`;
     await bot.api.sendVideo(cfg.groupId, new InputFile(v.file), {
@@ -140,8 +145,11 @@ async function startRun(ctx, topic, format = null) {
     .finally(() => { busy = false; });
 }
 
+// Kunlik ish bot band paytiga to'g'ri kelsa — tashlab ketilmaydi, soatlik tekshiruv (rejaYetibOl) bo'shaganda bajaradi
+let kunlikKutyapti = false;
 export async function dailyRun() {
-  if (busy) return;
+  if (busy) { kunlikKutyapti = true; return; }
+  kunlikKutyapti = false;
   busy = true;
   try {
     // Mahsulot rejimi: har mahsulot o'z tasdiqlangan rejasidan yozadi (reja yo'q bo'lsa — kutadi)
@@ -162,6 +170,30 @@ export async function dailyRun() {
     } else await runPipeline({ log, onDraft: sendForApproval });
   }
   catch (e) { await log(`❌ Xato: ${e.message}`); }
+  finally { busy = false; }
+}
+
+// Har soat: kunlik ish qoldirilgan bo'lsa — bajariladi; aks holda tasdiqlangan rejadagi yaqin 36 soatlik,
+// hali yozilmagan bandlar yoziladi (bot qayta ishga tushgan yoki kunlik ish o'tib ketgan bo'lsa ham postlar chiqadi)
+export async function rejaYetibOl() {
+  if (busy) return;
+  if (kunlikKutyapti) return dailyRun();
+  busy = true;
+  try {
+    for (const m of rejim() ? kodlar() : [null]) await bilan(m, async () => {
+      // Avto rejimda reja yo'q bo'lsa (yakshanba bot o'chiq bo'lgan) — o'zi tuziladi; urinish 6 soatda bir martadan ko'p emas
+      if (!weekly.currentPlan() && weekly.autoMode() && !weekly.lastDraftPlan()) {
+        const kalit = `avto_reja_urinish:${m || 'umumiy'}`;
+        if (Date.now() - store.setting(kalit, 0) < 6 * 3600e3) return;
+        store.setSetting(kalit, Date.now());
+        try { await rejaTuz(); } catch (e) { await log(`⚠️ Avto reja tuzilmadi: ${e.message}`); }
+        return;
+      }
+      if (!weekly.currentPlan()) return;
+      const n = await weekly.produceDue({ log, onDraft: sendForApproval });
+      if (n) await log(`🗓 Rejadan ${n} ta post yozildi.`);
+    });
+  } catch (e) { await log(`⚠️ Rejadan yozishda xato: ${e.message}`); }
   finally { busy = false; }
 }
 
@@ -214,7 +246,7 @@ bot.command('start', ctx => ctx.reply(
   '/maqola <mavzu> — Telegram maqolasi (sarlavha, ro\'yxat, jadval)\n/karusel <mavzu> — slaydli karusel\n' +
   '/rejalar [ka|qa|kf] — tayyor kontent reja (150 ta) · /reja_post qa07 — shu bo\'yicha post · /reja_bankka — g\'oyalar bankiga\n' +
   (rejim() ? "Mahsulot rejimi: har mahsulot o'z xonasida — reja, qoralama, jarayon shu yerda. /jadval — chiqish kunlari\n" : '') +
-  '/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n\"g\'oya: ...\" — g\'oyalar bankiga · /goyalar\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
+  '/sozla — soha, auditoriya, mahsulotlar va manbalarni sozlash\n/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n\"g\'oya: ...\" — g\'oyalar bankiga · /goyalar\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
 
 bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
 bot.command('goya', ctx => {
@@ -232,6 +264,49 @@ for (const [cmd, format, example] of [['maqola', 'maqola', 'xodimni ishga olish 
     startRun(ctx, topic, format);
   });
 }
+
+// ---------- /sozla: soha, auditoriya, mahsulotlar, g'oya manbalari va uslubni so'rab olish ----------
+// Javoblar reply orqali; oxirida agent brend profilini tuzadi, rahbar ✅ bosgach sozlamalarga yoziladi
+const sozlaSora = (ctx, matn) => ctx.reply(matn, { parse_mode: 'HTML', ...(ctx.msg?.message_thread_id ? { message_thread_id: ctx.msg.message_thread_id } : {}),
+  reply_markup: { force_reply: true, selective: true } }).then(m => store.setWait(m.message_id, { kind: 'sozla' }));
+
+bot.command('sozla', async ctx => {
+  if (!isAdmin(ctx)) return;
+  store.setSetting('sozla', { qadam: 0, javoblar: {} });
+  await sozlaSora(ctx, `⚙️ <b>Sozlash</b> — agentlar kim uchun va nima haqida yozishini aniqlaymiz (6 ta savol). Har savolga shu xabarga reply qilib javob bering.\n\n${onboarding.SAVOLLAR[0].savol}`);
+});
+
+async function sozlaJavob(ctx) {
+  const holat = store.setting('sozla', null);
+  if (!holat) return ctx.reply("Sozlash boshlanmagan: /sozla");
+  const r = onboarding.javobQabul(holat, ctx.message.text);
+  store.setSetting('sozla', holat);
+  if (r.keyingi) return sozlaSora(ctx, r.xato ? `${r.xato}\n\n${r.keyingi}` : r.keyingi);
+  await ctx.reply('⏳ Javoblaringizdan brend profili tuzilyapti (1–2 daqiqa)...');
+  try {
+    const n = await onboarding.brendYasa(holat.javoblar);
+    store.setSetting('sozla_natija', n);
+    const mlar = Object.entries(n.mahsulotlar).map(([k, m]) => `${m.belgi} ${esc(m.nom)} <code>${k}</code>`).join('\n') || "yo'q (umumiy kontent)";
+    await sendLong(ctx.chat.id, `🧾 <b>Brend profili</b>\n\n${esc(n.matn)}\n\n<b>Mahsulotlar:</b>\n${mlar}`, ctx.msg?.message_thread_id ? { message_thread_id: ctx.msg.message_thread_id } : {});
+    await ctx.reply('Shu profil bilan ishlaymizmi? Agentlar endi shunga qarab yozadi.', {
+      ...(ctx.msg?.message_thread_id ? { message_thread_id: ctx.msg.message_thread_id } : {}),
+      reply_markup: new InlineKeyboard().text('✅ Saqlash', 'sozla:ok').text('❌ Bekor', 'sozla:no') });
+  } catch (e) { await ctx.reply(`⚠️ Profil tuzilmadi: ${e.message}. /sozla bilan qayta urinib ko'ring.`); }
+}
+
+bot.callbackQuery(/^sozla:(ok|no)$/, async ctx => {
+  if (!isAdmin(ctx)) return ctx.answerCallbackQuery({ text: 'Faqat rahbar' });
+  const holat = store.setting('sozla', null), n = store.setting('sozla_natija', null);
+  await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text(ctx.match[1] === 'ok' ? '✅ Saqlandi' : '❌ Bekor qilindi', 'noop') }).catch(() => {});
+  await ctx.answerCallbackQuery();
+  store.setSetting('sozla', null); store.setSetting('sozla_natija', null);
+  if (ctx.match[1] !== 'ok' || !holat || !n) return;
+  const r = await onboarding.saqla(holat.javoblar, n, { kuzatuv: { kanalQosh }, uslub: (kanal) => uslubKanaldan({ kanal }) });
+  await ctx.reply(`✅ Sozlandi. Agentlar endi yangi brend bilan yozadi.` +
+    (r.qoshildi.length ? `\n👀 Kuzatuvga qo'shildi: ${r.qoshildi.join(', ')}` : '') +
+    (r.xatolar.length ? `\n⚠️ Qo'shilmadi: ${r.xatolar.join('; ')}` : '') + (r.uslubNatija ? `\n${r.uslubNatija}` : '') +
+    `\nKeyingi qadam: /reja_yangi${rejim() ? ' (mahsulot topiklari PRODUCT_TOPICS da yangi kodlar bilan bo\'lishi kerak)' : ''} yoki /avto on.`);
+});
 
 // ---------- Uslub: namuna postlar va doimiy qoidalar ----------
 export const RULES_BATCH = 5; // shuncha yangi tahrir izohi yig'ilsa — qoidalar avtomatik yangilanadi
@@ -318,12 +393,26 @@ async function sendPlan(p, chatId = cfg.groupId, extra = { message_thread_id: te
 }
 
 // Mahsulot rejimida: topikdan chaqirilsa — shu mahsulot, jadval bo'yicha (cron) — hammasi
+// Avto rejimda reja tasdiq kutmaydi: o'zi tasdiqlanadi, yaqin postlar darhol yoziladi va o'z vaqtida chiqadi.
+// Rahbar xohlasa ✏️ bilan o'zgartiradi yoki /avto off qiladi.
+const avtoRejaKb = (id) => new InlineKeyboard().text('✏️ O\'zgartirish', `pedit:${id}`).text('🔄 Qayta tuzish', `pnew:${id}`);
+async function rejaTuz() {
+  const p = await weekly.buildPlan(log);
+  if (!weekly.autoMode()) return sendPlan(p);
+  weekly.approve(p.id);
+  const extra = { message_thread_id: tema(p.mahsulot || joriy()) };
+  await sendLong(cfg.groupId, weekly.formatPlan(p), extra);
+  await sendSafe(bot.api, cfg.groupId, "🤖 Avto rejim: reja o'zi tasdiqlandi — postlar chiqishidan ~1 kun oldin yoziladi va o'z vaqtida kanalga chiqadi.", { ...extra, reply_markup: avtoRejaKb(p.id) });
+  const n = await weekly.produceDue({ log, onDraft: sendForApproval });
+  if (n) await log(`🗓 Rejadan ${n} ta post yozildi.`);
+}
+
 export async function weeklyPlanRun(mlar = rejim() ? (joriy() ? [joriy()] : kodlar()) : [null]) {
   if (busy) return log('⏳ Haftalik reja keyinroq: hozir boshqa ish bajarilyapti. /reja_yangi bilan qayta urinib ko\'ring.');
   busy = true;
   try {
     for (const m of mlar) await bilan(m, async () => {
-      try { await sendPlan(await weekly.buildPlan(log)); }
+      try { await rejaTuz(); }
       catch (e) { await log(`⚠️ Haftalik reja tuzilmadi: ${e.message}`); }
     });
   } finally { busy = false; }
@@ -442,7 +531,7 @@ bot.command('avto', ctx => {
   else if (['off', "o'chir", 'ochir', '0'].includes(arg)) store.setSetting('avto', false);
   const on = weekly.autoMode();
   return ctx.reply(on
-    ? '🤖 Avto rejim YOQILGAN: rejadagi postlar yozilgach tasdiqlashsiz o\'z vaqtida chiqadi (tasdiqlash topigida ko\'rinadi — vaqtini o\'zgartirish yoki navbatdan olish mumkin).\nO\'chirish: /avto off'
+    ? '🤖 Avto rejim YOQILGAN: haftalik reja o\'zi tasdiqlanadi, rejadagi postlar yozilgach tasdiqlashsiz o\'z vaqtida chiqadi (topikda ko\'rinadi — vaqtini o\'zgartirish yoki navbatdan olish mumkin). Reja bo\'lmasa — o\'zi tuziladi.\nO\'chirish: /avto off'
     : '✋ Avto rejim O\'CHIQ: rejadagi har post tasdiqlashga keladi (✅ bosilsa reja vaqtida chiqadi).\nYoqish: /avto on');
 });
 
@@ -518,6 +607,7 @@ bot.on('message_reaction_count', ctx => {
 });
 
 bot.command('navbat', ctx => {
+  if (!isAdmin(ctx)) return;
   const q = store.byStatus('approved').sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
   if (!q.length) return ctx.reply('Navbat bo\'sh.');
   const k = new InlineKeyboard();
@@ -541,7 +631,7 @@ async function saveTelegramFile(fileId, draftId) {
 // Brend uslubidagi muqova (karusel shablonining "cover" slaydi)
 async function makeCover(d) {
   const kicker = { maqola: 'Maqola', karusel: 'Karusel', reels: 'Video' }[d.format] || 'Rahbar uchun';
-  const [file] = await renderSlides({ signature: VIDEO_SIGNATURE, slides: [{ type: 'cover', kicker, title: d.title }] },
+  const [file] = await renderSlides({ signature: imzo(), slides: [{ type: 'cover', kicker, title: d.title }] },
     path.join(cfg.dataDir, 'images', d.id, `cover-${Date.now()}`));
   return file;
 }
@@ -554,6 +644,8 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
   const mark = (t) => ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text(t, 'noop') }).catch(() => {});
 
   if (d.status === 'published' && act !== 'scr') return ctx.answerCallbackQuery({ text: 'Bu post allaqachon chiqqan' });
+  // ✏️ Tahrirdan keyin eski versiya xabaridagi tugmalar ishlamasin — aks holda eski matn ham kanalga chiqib ketardi
+  if (d.status === 'revised' && act !== 'scr') return ctx.answerCallbackQuery({ text: "Bu eski versiya — tahrirlangan yangi qoralamadagi tugmalardan foydalaning", show_alert: true });
 
   if (act === 'vid') {
     if (videoBusy) return ctx.answerCallbackQuery({ text: 'Boshqa video yasalmoqda, biroz kuting' });
@@ -583,7 +675,9 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     await ctx.answerCallbackQuery();
     const has = imagePaths(d).length;
     return ask(ctx, `🖼 "${esc(d.title)}" uchun rasm.\n• Rasm yuboring (shu xabarga reply qilib) — postga qo'shaman (bir nechta bo'lsa, albom bo'ladi)\n` +
-      `• <code>muqova</code> deb yozing — brend uslubida muqova yasayman` + (has ? `\n• <code>o'chir</code> — ${has} ta rasmni olib tashlayman` : ''), { kind: 'image', id });
+      `• <code>muqova</code> deb yozing — brend uslubida muqova yasayman` +
+      (rasmYoqilgan() ? `\n• <code>ai</code> deb yozing — post mazmuniga mos AI rasm chizaman (Gemini)` : '') +
+      (has ? `\n• <code>o'chir</code> — ${has} ta rasmni olib tashlayman` : ''), { kind: 'image', id });
   }
   if (act === 'unq') {
     store.update(id, { status: 'pending', scheduledAt: null });
@@ -591,11 +685,17 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     return ctx.answerCallbackQuery({ text: 'Navbatdan olindi' });
   }
   if (act === 'now') {
-    if (d.status !== 'approved') store.addChoice(d, true);
-    const fb = await publish(bot.api, d);
-    await mark('📢 Chiqdi');
-    if (fb) await log(`⚠️ "${d.title}" maqola formatida chiqmadi, oddiy post bo'lib chiqdi: ${fb}`);
-    return ctx.answerCallbackQuery({ text: 'Kanalga chiqdi' });
+    await ctx.answerCallbackQuery({ text: 'Kanalga chiqarilyapti…' });
+    try {
+      const fb = await publish(bot.api, d);
+      if (d.status !== 'approved') store.addChoice(d, true);
+      await mark('📢 Chiqdi');
+      if (fb) await log(`⚠️ "${d.title}" maqola formatida chiqmadi, oddiy post bo'lib chiqdi: ${fb}`);
+    } catch (e) {
+      if (e instanceof AllaqachonChiqqan) return mark('📢 Chiqdi');
+      await log(`❌ "${d.title}" kanalga chiqmadi: ${e.message}`);
+    }
+    return;
   }
   if (act === 'no') {
     store.update(id, { status: 'rejected' });
@@ -644,6 +744,7 @@ bot.on('message:text', async ctx => {
   const replyTo = ctx.message.reply_to_message?.message_id;
   const w = replyTo && store.peekWait(replyTo);
   if (!w || !isAdmin(ctx)) return;
+  if (w.kind === 'sozla') { store.takeWait(replyTo); return sozlaJavob(ctx); }
   const opt = { message_thread_id: tema() };
   if (w.kind === 'plan') {
     store.takeWait(replyTo);
@@ -672,7 +773,17 @@ bot.on('message:text', async ctx => {
       await ctx.reply('🗑 Rasmlar olib tashlandi. Yangilangan qoralama:', opt);
       return sendForApproval(nd);
     }
-    if (!t.startsWith('muqova')) return ctx.reply('Rasm yuboring yoki "muqova" deb yozing.', opt);
+    if (t === 'ai' && rasmYoqilgan()) {
+      store.takeWait(replyTo);
+      await ctx.reply('🎨 AI rasm chizilyapti (1–2 daqiqa)...', opt);
+      try {
+        const file = await rasmYasa(await rasmPrompti(d), path.join(cfg.dataDir, 'images', d.id, `ai-${Date.now()}`));
+        const nd = store.update(d.id, { image_paths: [...(d.image_paths || []), file] });
+        await ctx.reply('🖼 AI rasm tayyor. Yangilangan qoralama:', opt);
+        return sendForApproval(nd);
+      } catch (e) { return ctx.reply(`⚠️ AI rasm chizilmadi: ${e.message}`, opt); }
+    }
+    if (!t.startsWith('muqova')) return ctx.reply(`Rasm yuboring yoki "muqova"${rasmYoqilgan() ? ' / "ai"' : ''} deb yozing.`, opt);
     store.takeWait(replyTo);
     try {
       const file = await makeCover(d);
@@ -737,10 +848,11 @@ bot.on(['message:photo', 'message:document'], async ctx => {
 
 // ---------- Zaxira ----------
 // Har kuni butun baza egasiga shaxsiy chatda (jim) fayl bo'lib keladi. Tiklash: faylga reply qilib /tiklash.
-const zaxiraNomi = () => `kontent-zaxira-${new Date(Date.now() + cfg.tzOffsetH * 3600e3).toISOString().slice(0, 10)}.json`;
+// Siqilgan (gzip) — Telegram'dagi 50 MB fayl chegarasiga baza katta bo'lganda ham sig'sin
+const zaxiraNomi = () => `kontent-zaxira-${new Date(Date.now() + cfg.tzOffsetH * 3600e3).toISOString().slice(0, 10)}.json.gz`;
 const zaxiraIzoh = (izoh = '') => `🗄 Kontent Fabrika zaxirasi${izoh}\nUslub, qoidalar, g'oyalar, rejalar, qoralamalar.\nTiklash: shu faylga reply qilib /tiklash yozing (shaxsiy chatda).`;
 export async function zaxira(izoh = '') {
-  const fayl = () => new InputFile(Buffer.from(store.snapshot()), zaxiraNomi());
+  const fayl = () => new InputFile(gzipSync(Buffer.from(store.snapshot())), zaxiraNomi());
   for (const id of cfg.admins.slice(0, 1)) {
     try { await bot.api.sendDocument(id, fayl(), { caption: zaxiraIzoh(izoh), disable_notification: true }); return true; }
     catch (e) {
@@ -760,12 +872,13 @@ bot.command('zaxira', async ctx => {
 bot.command('tiklash', async ctx => {
   if (!isAdmin(ctx) || ctx.chat.type !== 'private') return;
   const doc = ctx.message.reply_to_message?.document;
-  if (!doc || !/\.json$/i.test(doc.file_name || '')) return ctx.reply("Zaxira fayliga (kontent-zaxira-….json) reply qilib /tiklash yozing.");
+  if (!doc || !/\.json(\.gz)?$/i.test(doc.file_name || '')) return ctx.reply("Zaxira fayliga (kontent-zaxira-….json.gz) reply qilib /tiklash yozing.");
   try {
     const f = await bot.api.getFile(doc.file_id);
     const res = await fetch(`${API_ROOT}/file/bot${cfg.botToken}/${f.file_path}`);
     if (!res.ok) throw new Error(`fayl yuklanmadi (${res.status})`);
-    const obj = JSON.parse(await res.text());
+    const buf = Buffer.from(await res.arrayBuffer());
+    const obj = JSON.parse((/\.gz$/i.test(doc.file_name) ? gunzipSync(buf) : buf).toString('utf8'));
     await zaxira(' — tiklashdan OLDINGI holat (kerak bo\'lsa qaytarish uchun)');
     const r = store.restore(obj);
     await ctx.reply(`✅ Tiklandi: ${r.ideas} ta g'oya, ${r.plans} ta reja, ${r.drafts} ta qoralama, ${r.rules} ta qoida, ${r.samples} ta namuna post.`);

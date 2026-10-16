@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { askJSON } from '../llm.js';
 import { brand, examples, addSample, addFeedback } from '../style.js';
+import { muallif as muallifIsmi, yonalish, mahsulotNomlari } from '../brand.js';
 import { bilan, PROFIL } from '../mahsulot.js';
 import { store } from '../store.js';
 import { cfg } from '../config.js';
@@ -34,12 +35,12 @@ export const TURLAR = {
 };
 const VIDEOLI = ['reels', 'video'];
 export const videomi = (t) => VIDEOLI.includes(t);
-const MAHSULOTLAR = Object.keys(PROFIL);
-const mKod = (m) => (MAHSULOTLAR.includes(m) ? m : null);
+const mKod = (m) => (PROFIL[m] ? m : null);
+const kodlarSxema = () => [...Object.keys(PROFIL), 'umumiy'].join('|');
 // Topik yo'nalishi: ka | qa | kf — mahsulot; umumiy — shaxsiy brend (tizimlashtirish, boshqaruv, tajriba)
-export const YONALISHLAR = { ...Object.fromEntries(Object.entries(PROFIL).map(([k, v]) => [k, v.nom])), umumiy: 'Shaxsiy brend' };
+export const yonalishlar = () => ({ ...Object.fromEntries(Object.entries(PROFIL).map(([k, v]) => [k, v.nom])), umumiy: 'Shaxsiy brend' });
 const yonalishQatlami = (y) => !y ? '' : y === 'umumiy'
-  ? `\nBU TOPIK: SHAXSIY BREND — Jo'rabekning yo'nalishi (tizimlashtirish, boshqaruv, xodimlar, AI, o'z tajribasi). Mahsulotni reklama qilma; mos kelsa, oxirida bir gap bilan eslatish mumkin.\n`
+  ? `\nBU TOPIK: SHAXSIY BREND — ${muallifIsmi()}ning yo'nalishi (${yonalish()}, o'z tajribasi). Mahsulotni reklama qilma; mos kelsa, oxirida bir gap bilan eslatish mumkin.\n`
   : `\nBU TOPIK: ${PROFIL[y]?.nom} — g'oya va kontent shu mahsulot auditoriyasi va mavzulari uchun (profil yuqorida). Har postda sotma: ko'p post foydali fikr, mahsulot — tabiiy yechim sifatida.\n`;
 const xato = (msg, kod = 400) => Object.assign(new Error(msg), { kod });
 
@@ -64,10 +65,10 @@ const rubrikaRoyxati = () => [
   ...REELS_RUBRIKALAR.map(r => `- "${r.nom}" (reels, ${r.format}): ${r.tavsif}`),
 ].join('\n');
 
-const TZ_SXEMA = `{"sarlavha":"ishchi nom",
+const tzSxema = () => `{"sarlavha":"ishchi nom",
 "taklif":"2–3 gap, rahbarga: 'Bu g'oyani men … deb tasavvur qilaman, … formatida qilishni taklif qilaman, chunki …'",
 "strategiya":"bu kontent nimaga xizmat qiladi va voronkaning qaysi bosqichi (sovuq/iliq/issiq)",
-"mahsulot":"ka|qa|kf|umumiy","auditoriya":"kim, qaysi biznes, qanday holatda","kontent_turi":"${Object.keys(TURLAR).join('|')}",
+"mahsulot":"${kodlarSxema()}","auditoriya":"kim, qaysi biznes, qanday holatda","kontent_turi":"${Object.keys(TURLAR).join('|')}",
 "rubrika":"rubrika nomi yoki 'erkin'","format":"ichki format: hikoya / ro'yxat / taqqoslash / qo'llanma / keys / savol-javob ...",
 "ilmoq":"birinchi qator yoki birinchi 3 soniya — aynan matni","ilmoq_variantlari":["yana 2 ta muqobil"],
 "tuzilma":["1-qism: ...","2-qism: ..."],"asosiy_fikr":"o'quvchi eslab qoladigan 1 fikr",
@@ -82,8 +83,8 @@ export async function prodyuser(goya, { izoh = '', oldingi = null, mahsulot } = 
   const tz = await bilan(mKod(mahsulot), () => askJSON({
     maxTokens: 4000,
     system: `Sen kontent prodyuserisan. Rahbarning g'oyasini uning biznes maqsadiga moslab o'raysan va texnik topshiriq (TZ) yozasan.
-Maqsad — Jo'rabekning yo'nalishi (biznesni tizimlashtirish, boshqaruv, AI) bo'yicha ekspertlik va ishonch, shaxsiy brend; mahsulotlar
-(Kotib AI, Qadam AI, Kontent Fabrika) — faqat mavzuga tabiiy mos kelsa. Hamma kontent mahsulot reklamasi bo'lmasin.
+Maqsad — ${muallifIsmi()}ning yo'nalishi (${yonalish()}) bo'yicha ekspertlik va ishonch, shaxsiy brend; mahsulotlar
+(${mahsulotNomlari()}) — faqat mavzuga tabiiy mos kelsa. Hamma kontent mahsulot reklamasi bo'lmasin.
 Kontent turini g'oyaga qarab tanla: hamma narsa video emas. Matn — tez fikr; matn+rasm — hissiy yoki vaziyatli fikr;
 karusel — qadamlar, ro'yxat, taqqoslash (saqlanadigan); maqola — chuqur qo'llanma; reels — hikoya, e'tiroz, demo (30–40 s);
 video — 1–3 daqiqalik tushuntiruvchi video (hisob-kitob, bosqichma-bosqich yechim, keys) Telegram kanal va YouTube uchun.
@@ -95,7 +96,7 @@ ${yonalishQatlami(mahsulot)}${oldingi ? `\nOLDINGI TZ (rahbar ko'rib chiqdi):\n$
 RUBRIKALAR:\n${rubrikaRoyxati()}
 ${muvozanat()}${performanceSummary()}
 Soxta raqam, mijoz natijasi yoki narx to'qima. O'zbek tili (lotin).
-JSON: ${TZ_SXEMA}`,
+JSON: ${tzSxema()}`,
   }));
   if (!TURLAR[tz.kontent_turi]) tz.kontent_turi = 'matn';
   tz.mahsulot = mahsulot ? (mKod(mahsulot) || 'umumiy') : (mKod(tz.mahsulot) || 'umumiy');
@@ -120,7 +121,7 @@ function rejaga(tz) {
 }
 
 // Reels TZ (reels.js ssenariy/storibord kutgan shakl)
-function reelsTz(tz) {
+export function reelsTz(tz) {
   return {
     sarlavha: tz.sarlavha, mahsulot: tz.mahsulot, rubrika: tz.rubrika, format: 'motion', maqsad: 'lid',
     auditoriya: tz.auditoriya, asosiy_fikr: tz.asosiy_fikr, burchak: tz.taklif, dalil: tz.dalil,
@@ -324,14 +325,15 @@ Boshqalarni ko'chirmaysan — ilhom olib, o'z auditoriyamizga va mahsulotlarimiz
 \nINTERNET:\n${JSON.stringify(internet).slice(0, 5000)}
 ${ideaBank(8)}${mahsulot ? yonalishQatlami(mahsulot) : muvozanat()}
 Aynan ${soni} ta g'oya tanla: ${mahsulot ? 'hammasi shu topik uchun' : "mahsulotlar va shaxsiy brend aralash"}; kontent turlari aralash (hammasi video emas), takrorlanmasin.
-JSON: {"goyalar":[{"goya":"1–2 gap — nima haqida va qaysi burchakdan","nega":"nega hozir / nega kuchli","manba":"kanal @nom, havola yoki 'internet'","mahsulot":"ka|qa|kf|umumiy","tur":"${Object.keys(TURLAR).join('|')}"}]}`,
+JSON: {"goyalar":[{"goya":"1–2 gap — nima haqida va qaysi burchakdan","nega":"nega hozir / nega kuchli","manba":"kanal @nom, havola yoki 'internet'","mahsulot":"${kodlarSxema()}","tur":"${Object.keys(TURLAR).join('|')}"}]}`,
   });
   const royxat = Array.isArray(r) ? r : Array.isArray(r?.goyalar) ? r.goyalar : [];
   const goyalar = royxat.filter(g => g && typeof g.goya === 'string' && g.goya.trim()).slice(0, soni)
     .map((g, i) => ({ ...g, ...(mahsulot ? { mahsulot } : {}), n: i + 1 }));
   // Bo'sh natija kechagi dayjestni o'chirib yubormasin (raqam bilan tanlash ishlashda davom etadi)
   if (!goyalar.length) return { goyalar, kanallar_xatosi: kuzatuv.xatolar };
-  for (const g of goyalar) bilan(mKod(g.mahsulot), () => store.addIdea(g.goya));
+  // Bankka "ai" belgisi bilan (rahbar g'oyasi emas); id dayjestda saqlanadi — tanlanganda "ishlatildi" bo'ladi
+  for (const g of goyalar) g.idea_id = bilan(mKod(g.mahsulot), () => store.addIdea(g.goya, { manba: 'ai' })).id;
   store.setSetting(dayjestKalit(mahsulot), { at: new Date().toISOString(), goyalar });
   return { goyalar, kanallar_xatosi: kuzatuv.xatolar, mahsulot: mahsulot || '' };
 }
@@ -340,6 +342,8 @@ export function goyaTanla({ n, mahsulot }) {
   const k = store.setting(dayjestKalit(mahsulot), null);
   const g = k?.goyalar?.find(x => x.n === Number(n));
   if (!g) throw xato(`${n}-g'oya topilmadi (oxirgi dayjestda ${k?.goyalar?.length || 0} ta)`, 404);
+  // Tanlangan g'oya bankda ochiq qolsa, haftalik reja uni yana olib, takror post yozishi mumkin edi
+  if (g.idea_id) store.markIdeas([g.idea_id]);
   return { goya: `${g.goya}${g.tur ? ` (taklif: ${TURLAR[g.tur]?.nom || g.tur})` : ''}`, manba: g.manba || '' };
 }
 
@@ -375,6 +379,20 @@ JSON: {"personaj_langari":"ingliz tilida bitta jumla","sahnalar":[{"rasm_prompt"
       ovoz_rejissura: ps[i]?.ovoz_rejissura || '', video_prompt: ps[i]?.video_prompt || '' })),
     yakun: { ...yakun, rasm_prompt: r.yakun?.rasm_prompt || '', ovoz: r.yakun?.ovoz_matn || yakun.ovoz, ovoz_rejissura: r.yakun?.ovoz_rejissura || '' },
   };
+}
+
+// Tayyor post uchun bitta rasm prompti (Fabrika botidagi 🖼 → "ai"): TZ bo'lmasa post matnidan
+export async function rasmPrompti(d) {
+  const r = await askJSON({
+    maxTokens: 1200,
+    system: `Sen prompt muhandisisan: post uchun bitta rasm promptini yozasan.\n${PROMPT_SKILL}`,
+    prompt: `POST: ${toza(d.post_html).slice(0, 1500)}\n${d.tz?.rasm_tavsif ? `RASM TAVSIFI (TZ): ${d.tz.rasm_tavsif}\n` : ''}${d.tz?.vizual ? `VIZUAL: ${JSON.stringify(d.tz.vizual)}\n` : ''}
+Postning hissiyoti yoki vaziyatini ko'rsatadigan bitta kadr. Kompozitsiya: 4:5 vertikal (vertical 9:16 emas).
+JSON: {"rasm_prompt":"..."}`,
+  });
+  const p = String(r.rasm_prompt || '').trim();
+  if (!p) throw new Error('rasm prompti yozilmadi');
+  return p;
 }
 
 // Ishlab chiqarish rejasi: reels — rejissyor + prompt muhandisi; matn+rasm — bitta rasm prompti
@@ -413,12 +431,12 @@ export function dayjestMatni(r) {
   const xato = (r.kanallar_xatosi || []).length ? `\n\n⚠️ O'qilmagan kanallar: ${r.kanallar_xatosi.join('; ').slice(0, 300)}` : '';
   if (!(r.goyalar || []).length) return `😕 Bugun yangi g'oya topa olmadim — keyinroq "goyalar" deb yozing yoki o'z g'oyangizni yozing.${xato}`;
   const qator = r.goyalar.map(x => `${x.n}) ${TUR[x.tur] || '•'} ${x.goya}${x.nega ? `\n   💡 ${String(x.nega).slice(0, 140)}` : ''}`).join('\n\n');
-  const nom = r.mahsulot ? `${YONALISHLAR[r.mahsulot] || ''} — ` : '';
+  const nom = r.mahsulot ? `${yonalishlar()[r.mahsulot] || ''} — ` : '';
   return `☀️ ${nom}bugungi ${r.goyalar.length} ta g'oya:\n\n${qator}\n\n👉 Raqamini yozing yoki o'z g'oyangizni yozing.${xato}`.slice(0, 4000);
 }
 
 // Uslubni rahbarning o'z kanalidan o'rganish: postlar namuna bo'ladi, uslubshunos tavsif yozadi
-export async function uslubKanaldan({ kanal = process.env.USLUB_KANAL || '', fetchFn } = {}) {
+export async function uslubKanaldan({ kanal = store.setting('uslub_kanal', '') || process.env.USLUB_KANAL || '', fetchFn } = {}) {
   const nk = normKanal(kanal);
   if (!nk || nk.platforma !== 'telegram') throw xato("uslub uchun Telegram kanal nomi kerak (Railway'da USLUB_KANAL=pulatovjurabek)");
   kanal = nk.nom;

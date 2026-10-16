@@ -1,7 +1,8 @@
 import { store } from './store.js';
 import { cfg } from './config.js';
 import { topikdan, topiklar as topiklarEnv } from './mahsulot.js';
-import { TURLAR, YONALISHLAR } from './agents/kontent.js';
+import { TURLAR, yonalishlar } from './agents/kontent.js';
+import { PROFIL } from './mahsulot.js';
 
 // Rahbar bilan Telegram suhbati (n8n bot orqali): har chatning bosqichi eslab qolinadi,
 // tasdiqlash — xabardagi tugmalar, tuzatish — oddiy xabar. Forma yo'q.
@@ -30,7 +31,7 @@ const ro = (v) => (Array.isArray(v) ? v.filter(Boolean).map(x => `  • ${x}`).j
 
 const qisqa = (v, n = 140) => { const x = String(q(v)); return x.length > n ? `${x.slice(0, n - 1)}…` : x; };
 export function tzMatni(t) {
-  const yon = YONALISHLAR[t.mahsulot] || t.mahsulot;
+  const yon = yonalishlar()[t.mahsulot] || t.mahsulot;
   return [
     `💬 ${qisqa(t.taklif, 400)}`,
     `📋 ${t.sarlavha}\n🧩 ${TURLAR[t.kontent_turi]?.nom || t.kontent_turi} · ${yon} · ${qisqa(t.rubrika, 40)}`,
@@ -83,10 +84,10 @@ async function ichki({ chatId: guruh, thread = '', text = '', tugma = '', hodisa
   const chatId = thread ? `${guruh}:${thread}` : guruh;
   const tk = /^topik\s*:\s*(\S+)/.exec(kichik);
   if (tk) {
-    const y = TOPIK_NOM[tk[1]];
+    const y = TOPIK_NOM[tk[1]] || (PROFIL[tk[1]] ? tk[1] : null);
     if (!y || !thread) return { xabarlar: [xab(thread ? "Yo'nalish: ka (Kotib AI) · qa (Qadam AI) · kf (Kontent Fabrika) · brend (shaxsiy brend)" : 'Bu buyruq guruh topigida ishlaydi.')] };
     store.setSetting('suhbat_topiklar', { ...store.setting('suhbat_topiklar', {}), [`${guruh}:${thread}`]: y });
-    return { xabarlar: [xab(`✅ Bu topik — ${YONALISHLAR[y]}. G'oya yozing yoki "goyalar".`)] };
+    return { xabarlar: [xab(`✅ Bu topik — ${yonalishlar()[y]}. G'oya yozing yoki "goyalar".`)] };
   }
   const yon = yonalish(guruh, thread);
   if (!yon && !hodisa) return { xabarlar: [xab("Bu topik qaysi yo'nalish uchun? Yozing: topik: ka · qa · kf · brend")] };
@@ -94,6 +95,8 @@ async function ichki({ chatId: guruh, thread = '', text = '', tugma = '', hodisa
 
   // Buyruqlar — istalgan bosqichda
   if (kichik === '/start' || kichik === 'yordam') return { xabarlar: [xab(YORDAM)] };
+  // Boshqa /buyruqlar va "g'oya: ..." — Fabrika botiga tegishli (bir topikda ikki bot): g'oya deb TZ yozilmaydi
+  if (!tugma && (/^\//.test(kichik) || /^\s*(g'?oya|idea)\s*[:\-—]/.test(kichik))) return { xabarlar: [] };
   if (kichik === 'bekor' || tugma === 'stop') {
     saqla(chatId, { bosqich: 'bosh' });
     return { xabarlar: [xab("🛑 To'xtatildi. Yangi g'oya yozing yoki \"goyalar\".")] };

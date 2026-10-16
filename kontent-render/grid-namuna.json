@@ -1,0 +1,21 @@
+{
+  "nik": "@pulatovjurabek",
+  "sahnalar": [
+    { "tur": "kartalar", "soniya": 3, "subtitr": "Kuniga *200 ta* xabar",
+      "kartalar": [ { "ikon": "instagram", "nom": "INSTAGRAM", "badge": "99+" }, { "ikon": "telegram", "nom": "TELEGRAM", "badge": "87" }, { "ikon": "whatsapp", "nom": "WHATSAPP", "badge": "34" } ] },
+    { "tur": "kartalar", "soniya": 3.2, "silkinish": true, "soat": "23:47", "subtitr": "Kechasi javob bermasangiz — *mijoz ketadi*",
+      "kartalar": [ { "ikon": "instagram", "nom": "INSTAGRAM", "badge": "99+" }, { "ikon": "telegram", "nom": "TELEGRAM", "badge": "99+" }, { "ikon": "whatsapp", "nom": "WHATSAPP", "badge": "99+" } ] },
+    { "tur": "obyekt", "soniya": 2.8, "subtitr": "Buni hammasiga — *bitta yechim*" },
+    { "tur": "oqim", "soniya": 4.2, "markaz": "Kotib AI", "subtitr": "Kotib AI hammasiga *3 soniyada* javob beradi" },
+    { "tur": "chat", "soniya": 6, "nom": "Kotib AI", "toast": "✅ Yangi lid: Aziz", "subtitr": "Ehtiyojni aniqlaydi, *raqamni oladi*",
+      "xabarlar": [ { "kim": "mijoz", "matn": "Assalomu alaykum, narxi qancha?" }, { "kim": "bot", "matn": "Va alaykum assalom! Qaysi xizmat kerak: sayt yoki reklama?" },
+                    { "kim": "mijoz", "matn": "Reklama" }, { "kim": "bot", "matn": "Zo'r! Ismingiz va raqamingizni qoldiring — menejer 5 daqiqada bog'lanadi" },
+                    { "kim": "mijoz", "matn": "Aziz, +998 90 123 45 67" } ] },
+    { "tur": "crm", "soniya": 5, "subtitr": "Hammasi CRM'da — *birorta mijoz* yo'qolmaydi",
+      "lidlar": [ { "ism": "Aziz", "izoh": "reklama", "yol": [ { "t": 0.4, "col": 0 }, { "t": 1.4, "col": 1 }, { "t": 3.0, "col": 2 } ] },
+                  { "ism": "Malika", "izoh": "sayt", "yol": [ { "t": 0.6, "col": 0 }, { "t": 2.2, "col": 1 } ] },
+                  { "ism": "Sardor", "izoh": "narx", "yol": [ { "t": 0.8, "col": 0 } ] },
+                  { "ism": "Dilnoza", "izoh": "reklama", "yol": [ { "t": 1.0, "col": 0 }, { "t": 3.6, "col": 2 } ] } ] },
+    { "tur": "cta", "soniya": 3.8, "tugma": "KOTIB", "subtitr": "Direct'ga *KOTIB* deb yozing" }
+  ]
+}

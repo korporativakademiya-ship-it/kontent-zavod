@@ -3,6 +3,9 @@
 Tadqiqot → strategiya → kopirayting → rahbar tekshiruvi → Telegram'da tasdiqlash → kanalga avtomatik post.
 
 ## Ishga tushirish
+Boshqa mijoz (yoki yangi soha) uchun: botga `/sozla` — 6 ta savol (ism va imzo, soha, auditoriya, mahsulotlar, g'oya manbalari,
+o'z kanali). Agent brend profilini tuzadi, ✅ bosilsa agentlar shu brend bilan yozadi, kanallar kuzatuvga qo'shiladi, uslub o'rganiladi.
+
 1. @BotFather'dan bot oching, tokenni oling.
 2. Botni virtual ofis guruhiga (topiklar yoqilgan) va kanalga **admin** qilib qo'shing.
 3. Guruhda "Tasdiqlash" va "Jarayon" topiklarini oching, har birida `/id` yozing — ID'larni oling.
@@ -22,6 +25,8 @@ Tadqiqot → strategiya → kopirayting → rahbar tekshiruvi → Telegram'da ta
 ## Max obuna bilan ishlatish
 Kompyuteringizda (Claude Code o'rnatilgan): `claude setup-token` → chiqqan tokenni `.env` dagi
 `CLAUDE_CODE_OAUTH_TOKEN` ga qo'ying, `LLM_MODE=max`. API'ga o'tish: `LLM_MODE=api` + `ANTHROPIC_API_KEY`.
+Mijozlarga xizmat sifatida ishlatish uchun — API kaliti (`LLM_MODE=api`): obuna tokeni shaxsiy foydalanish uchun.
+API rejimida standart model `claude-opus-5-5` (arzonroq: `MODEL=claude-sonnet-5-5`); xavfsizlik rad etsa, so'rov o'zi tavsiya etilgan modelda qayta ishlaydi.
 
 ## Railway
 GitHub'ga yuklang → Railway'da New Project → repo'ni tanlang → Variables'ga `.env` qiymatlarini kiriting.
@@ -127,7 +132,7 @@ Rahbar bilan suhbat — `src/suhbat.js` (`POST /api/suhbat`): har chatning bosqi
 `kanallar`, `uslub` (rahbar kanalidan — `USLUB_KANAL` — postlarni o'qib uslubni qayta o'rganadi), `bekor`.
 Odamdek yozish qoidalari (AI iboralari taqiqi) — `src/tabiiy.js`, kopirayter, maqola va ssenariychida.
 Kuzatiladigan kanallar: n8n botga `kanal: @nom — nima uchun`, `kanallar`, `kanal o'chir: @nom`. Telegram ochiq kanallari `t.me/s/<nom>`
-dan o'qiladi; Instagram ro'yxatda saqlanadi, Meta Business Discovery ulanganda o'qiladi.
+dan o'qiladi; Instagram profillari — `IG_ACCESS_TOKEN` va `IG_USER_ID` (Meta Business Discovery) berilsa o'qiladi (oxirgi 2 hafta, layk+komment bo'yicha), aks holda ro'yxatda turadi.
 
 ## Instagram reels liniyasi (n8n doska uchun API)
 Miya — shu bot (uslub, qoidalar, mahsulot profillari, rubrikalar, rahbar tanlovlari); doska — n8n.
@@ -144,7 +149,7 @@ Miya — shu bot (uslub, qoidalar, mahsulot profillari, rubrikalar, rahbar tanlo
   Instagram matni, heshteglar, muqova, birinchi izoh. Qoralama `status: 'reels'` bilan saqlanadi (kalendarda ko'rinmaydi, CTA kodi band).
 - `POST /api/reels/baho` `{sarlavha, mahsulot, ball: 1–5, sabab?}` — rahbar bahosi tanlovlar xotirasiga (4–5 ijobiy).
 - `GET /api/health`
-Reels rubrikalari: `src/reels/rubrikalar.js`. n8n workflow va video renderer: `korporativakademiya-ship-it/kotibim` → `kontent-render/`.
+Reels rubrikalari: `src/reels/rubrikalar.js`. n8n workflow va video renderer: shu repodagi `kontent-render/` (n8n — `kontent-render/n8n/`).
 
 ## Kotibim CRM'dagi kontent kalendari
 `KOTIBIM_URL` va `KONTENT_API_KALIT` (Kotibim'dagi bilan bir xil) berilsa, bot har daqiqada Kotibim CRM'ga
