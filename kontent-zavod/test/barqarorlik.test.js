@@ -60,3 +60,15 @@ test('tozalash: eski qoralamalar va fayllari o\'chadi, navbatdagilar va yangilar
   assert.ok(store.get(navbat.id), 'navbatdagi qoralama tegilmaydi');
   assert.ok(store.get(yangi.id));
 });
+
+test("AVTO_REJIM: Railway sozlamasi avto rejimni bir marta yoqadi, rahbarning /avto off tanlovi saqlanadi", async () => {
+  const { avtoEnvQolla, autoMode } = await import('../src/weekly.js');
+  assert.equal(avtoEnvQolla({}), null);
+  assert.equal(avtoEnvQolla({ AVTO_REJIM: 'on' }), true);
+  assert.equal(autoMode(), true);
+  store.setSetting('avto', false); // rahbar /avto off
+  assert.equal(avtoEnvQolla({ AVTO_REJIM: 'on' }), null, 'qayta ishga tushishda ustidan yozilmaydi');
+  assert.equal(autoMode(), false);
+  assert.equal(avtoEnvQolla({ AVTO_REJIM: 'OFF' }), false);
+  assert.equal(avtoEnvQolla({ AVTO_REJIM: 'ha' }), null, "noma'lum qiymat e'tiborsiz");
+});
