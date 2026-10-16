@@ -26,6 +26,15 @@ export const rubrics = () => store.rubrics() || (joriy() ? [] : DEFAULT_RUBRICS)
 // Mahsulotning haftalik chiqish jadvali
 export const jadval = () => store.mSetting('jadval', STANDART_JADVAL[joriy()] || []);
 export const autoMode = () => store.setting('avto', false);
+// AVTO_REJIM=on|off (Railway sozlamasi) — avto rejimni Telegram'siz yoqish/o'chirish. Har qiymat bir marta qo'llanadi:
+// keyin rahbar /avto bilan o'zgartirsa, uning tanlovi qoladi (har qayta ishga tushishda ustidan yozilmaydi)
+export function avtoEnvQolla(env = process.env) {
+  const v = String(env.AVTO_REJIM || '').trim().toLowerCase();
+  if (!['on', 'off'].includes(v) || store.setting('avto_env', '') === v) return null;
+  store.setSetting('avto', v === 'on');
+  store.setSetting('avto_env', v);
+  return v === 'on';
+}
 const planDays = () => (process.env.PLAN_DAYS || '1,2,3,4,5,6').split(',').map(Number).filter(n => n >= 0 && n <= 6);
 
 // Toshkent sanasi (YYYY-MM-DD) va hafta kuni; kunlar ertadan boshlab

@@ -5,6 +5,7 @@ import { kalendarEnabled, syncKalendar } from './kalendar.js';
 import { publishDue } from './publisher.js';
 import { apiYarat } from './api.js';
 import { store } from './store.js';
+import { avtoEnvQolla } from './weekly.js';
 import { tozala } from './tozalash.js';
 import * as reels from './agents/reels.js';
 import * as kontent from './agents/kontent.js';
@@ -60,7 +61,13 @@ const server = apiYarat({ agentlar: { ...reels, tanlov, kontent, kuzatuv, suhbat
 bot.start({
   // Kanal reaksiyalari standart yangilanishlarga kirmaydi — alohida so'raladi
   allowed_updates: ['message', 'callback_query', 'message_reaction_count'],
-  onStart: () => { console.log('Kontent zavod ishga tushdi'); if (!process.env.PRODUCT_TOPICS) log('🟢 Kontent zavod ishga tushdi'); salomlash().catch(e => console.error('Salom:', e.message)); } });
+  onStart: (info) => {
+    console.log(`Kontent zavod ishga tushdi: @${info?.username || '?'}`);
+    if (!process.env.PRODUCT_TOPICS) log('🟢 Kontent zavod ishga tushdi');
+    const avto = avtoEnvQolla();
+    if (avto !== null) { console.log(`Avto rejim (AVTO_REJIM): ${avto ? 'yoqildi' : "o'chirildi"}`); log(avto ? "🤖 Avto rejim yoqildi: haftalik reja o'zi tuziladi va tasdiqlanadi, postlar o'z vaqtida o'zi chiqadi. O'chirish: /avto off" : "✋ Avto rejim o'chirildi: har post tasdiqlashga keladi."); }
+    salomlash().catch(e => console.error('Salom:', e.message));
+  } });
 // Toza to'xtash: bot va API yopiladi, cron'lar jarayonni ushlab turmaydi
 const toxta = async () => {
   await bot.stop().catch(() => {});
