@@ -84,8 +84,10 @@ function mediaItems(draft) {
   return items.slice(0, 10);
 }
 
-// Media (video, rasmlar, audio) + matn. Izoh (caption) 1024 belgigacha — sig'sa bitta xabar, sig'masa media, keyin matn
-export async function sendMediaPost(api, chatId, draft, extra = {}) {
+// Media (video, rasmlar, audio) + matn. Izoh (caption) 1024 belgigacha — sig'sa bitta xabar, sig'masa media, keyin matn.
+// qism — kanalga chiqarishda: media alohida chiqib, matn xato bersa, qayta urinishda media takror yuborilmasin
+//   { mediaBor: avval chiqqan media xabarlari, onMedia(xabarlar) — media chiqqanda chaqiriladi }
+export async function sendMediaPost(api, chatId, draft, extra = {}, qism = {}) {
   const { reply_markup, ...base } = extra;
   const text = cleanHtml(draft.post_html);
   const fits = plainLen(text) <= 1024;
@@ -103,15 +105,21 @@ export async function sendMediaPost(api, chatId, draft, extra = {}) {
   };
   if (n) {
     // Albomga tugma qo'yib bo'lmaydi: tugmali xabar kerak bo'lsa (tasdiqlash), matn alohida ketadi
-    const oneMsg = fits && (n === 1 || !reply_markup);
+    const oneMsg = fits && (n === 1 || !reply_markup) && !qism.mediaBor;
     if (oneMsg) {
       try { msg = await sendMedia(text); } catch { /* HTML xatosi — media va matn alohida */ }
     }
-    if (!msg) { await sendMedia(null); msg = await sendSafe(api, chatId, draft.post_html, extra); }
+    if (!msg) {
+      let media = qism.mediaBor;
+      if (!media) { media = await sendMedia(null); await qism.onMedia?.(media); }
+      msg = [media, await sendSafe(api, chatId, draft.post_html, extra)].flat();
+    }
   } else {
     msg = await sendSafe(api, chatId, draft.post_html, extra);
   }
-  if (hasAudio(draft)) await api.sendVoice(chatId, new InputFile(draft.audio_path), { ...base, duration: Math.round(draft.audio_duration || 0) || undefined });
+  // Ovoz — qo'shimcha: u chiqmasa ham post chiqqan hisoblanadi (aks holda qayta urinishda butun post takrorlanardi)
+  if (hasAudio(draft)) await api.sendVoice(chatId, new InputFile(draft.audio_path), { ...base, duration: Math.round(draft.audio_duration || 0) || undefined })
+    .catch(e => console.error(`Ovoz yuborilmadi (${draft.title}):`, e.message));
   return msg;
 }
 
@@ -135,7 +143,9 @@ export async function publish(api, draft) {
 async function publishIchki(api, draft) {
   let fallback, msg;
   if (isRich(draft)) ({ fallback, msg } = await sendRich(api, cfg.channelId, draft));
-  else if (hasVideo(draft) || imagePaths(draft).length || hasAudio(draft)) msg = await sendMediaPost(api, cfg.channelId, draft);
+  else if (hasVideo(draft) || imagePaths(draft).length || hasAudio(draft)) msg = await sendMediaPost(api, cfg.channelId, draft, {}, {
+    mediaBor: draft.qisman_media, onMedia: (m) => store.update(draft.id, { qisman_media: [m].flat().map(x => ({ message_id: x?.message_id, chat: x?.chat })) })
+  });
   else msg = await sendSafe(api, cfg.channelId, draft.post_html);
   // Kanaldagi xabar ID'lari — reaksiyalarni postga bog'lash uchun
   const channel_msg_ids = [msg].flat().map(m => m?.message_id).filter(Boolean);
