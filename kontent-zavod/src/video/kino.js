@@ -5,6 +5,7 @@ import { store } from '../store.js';
 import { synth, ttsEnabled } from '../tts.js';
 import { mediaDuration } from './ffmpeg.js';
 import { makeVideo } from './make.js';
+import { heygenVideo, heygenYoqilgan } from './heygen.js';
 import { kinoReja } from '../agents/kino.js';
 import { reelsTz } from '../agents/kontent.js';
 import * as reels from '../agents/reels.js';
@@ -51,8 +52,13 @@ export async function kinoVideo(d, { fetchFn = fetch } = {}) {
   return { file, duration: await mediaDuration(file), data: { kino: tayyor.map(({ audio, ...x }) => x) }, voiced: tayyor.some(x => x.audio) };
 }
 
-// Bitta kirish: kino servisi ulangan va TZ bor bo'lsa — kino, aks holda (yoki xato bo'lsa) — ichki GSAP shabloni
+// Bitta kirish. VIDEO_TURI=avatar (HeyGen sozlangan) — avatar; aks holda kino servisi ulangan va TZ bor bo'lsa — kino;
+// qolgan hollarda (yoki xato bo'lsa) — ichki GSAP shabloni
 export async function videoYasa(d, { log = async () => {} } = {}) {
+  if (process.env.VIDEO_TURI === 'avatar' && heygenYoqilgan()) {
+    try { return await heygenVideo(d); }
+    catch (e) { await log(`⚠️ Avatar video chiqmadi (${d.title}): ${e.message} — boshqa usul bilan yasayman`); }
+  }
   if (kinoYoqilgan() && d.tz) {
     try { return await kinoVideo(d); }
     catch (e) { await log(`⚠️ Kino video chiqmadi (${d.title}): ${e.message} — oddiy shablon bilan yasayman`); }
