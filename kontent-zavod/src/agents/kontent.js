@@ -395,6 +395,22 @@ JSON: {"rasm_prompt":"..."}`,
   return p;
 }
 
+// Dizayner (kalitsiz rassom): post uchun bitta tipografik kartochka — muqova, raqam yoki iqtibos.
+// Chizish — src/muqova.js (karusel shabloni, brend ranglari). Gemini kaliti kerak emas.
+export async function muqovaMatni(d) {
+  return askJSON({
+    maxTokens: 800,
+    system: `Sen Telegram kanal uchun grafik dizaynersan: postga bitta tipografik kartochka (4:5) matnini tanlaysan. Kartochka lentada ko'zni to'xtatsin va postni o'qishga undasin. Til — o'zbek (lotin).`,
+    prompt: `POST: ${toza(d.post_html).slice(0, 1500)}
+${d.tz?.ilmoq ? `ILMOQ (TZ): ${d.tz.ilmoq}\n` : ''}${d.tz?.asosiy_fikr ? `ASOSIY FIKR (TZ): ${d.tz.asosiy_fikr}\n` : ''}
+Uch turdan postga eng mosini tanla:
+- cover — ilmoq sarlavha: {"type":"cover","kicker":"1–2 so'z mavzu","title":"≤ 60 belgi, kuchli ilmoq","accent":"≤ 35 belgi, sarlavhani davom ettiruvchi zarba"}
+- stat — postda ANIQ raqam bo'lsa: {"type":"stat","num":"≤ 5 belgi, masalan 78% yoki 3×","label":"1–2 so'z","text":"≤ 100 belgi izoh"}
+- quote — postda yodda qoladigan bitta jumla bo'lsa: {"type":"quote","text":"≤ 90 belgi","by":"kim aytgani"}
+Raqam va faktlarni o'ylab topma — faqat postda borini ishlat. Post matnini so'zma-so'z takrorlama, qisqa va kuchli yoz.`,
+  });
+}
+
 // Ishlab chiqarish rejasi: reels — rejissyor + prompt muhandisi; matn+rasm — bitta rasm prompti
 // kino — n8n doskasi /kino shablonlarini biladi (eski doskaga eski slayd-shou yo'li qoladi)
 export async function ishlabChiqarish({ draft_id, variant = 0, kino = false }) {
