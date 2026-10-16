@@ -22,3 +22,17 @@ test('publishDue: parallel chaqiruv ikki marta joylamaydi; xato 3 marta — fail
   assert.equal(bildirish.length, 2);
   assert.match(bildirish[1], /3 marta urinildi/);
 });
+
+test("eskirgan navbat: bot uzoq o'chiq turgan bo'lsa eski post chiqmaydi, navbatdan olinadi", async () => {
+  const eski = store.addDraft({ title: 'Eski', format: 'post', post_html: 'x', status: 'approved', scheduledAt: new Date(Date.now() - 4 * 864e5).toISOString() });
+  const yangi = store.addDraft({ title: 'Yaqin', format: 'post', post_html: 'y', status: 'approved', scheduledAt: new Date(Date.now() - 10 * 60e3).toISOString() });
+  let yuborildi = 0;
+  const api = { sendMessage: async () => { yuborildi++; return { message_id: 9, chat: { id: 1 } }; } };
+  const xabar = [];
+  await publishDue(api, async (m) => xabar.push(m));
+  assert.equal(yuborildi, 1);
+  assert.equal(store.get(eski.id).status, 'pending');
+  assert.equal(store.get(eski.id).scheduledAt, null);
+  assert.equal(store.get(yangi.id).status, 'published');
+  assert.ok(xabar.some(m => /⏸ "Eski".*navbatdan olindi/.test(m)));
+});

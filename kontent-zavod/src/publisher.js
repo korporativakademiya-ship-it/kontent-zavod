@@ -146,6 +146,8 @@ async function publishIchki(api, draft) {
 // Bir vaqtda ikki marta ishlamasin (oldingi chaqiruv hali tugamagan bo'lsa — o'tkazib yuboriladi);
 // xato bergan post har daqiqada qayta urinib, xabar bilan to'ldirmasin — MAX_URINISH dan keyin "failed"
 const MAX_URINISH = 3;
+// Vaqti ko'p o'tib ketgan post (bot uzoq o'chiq turgan) qayta yoqilganda birdan chiqib ketmasin — navbatdan olinadi
+const ESKI_MS = (Number(process.env.ESKI_SOAT) || 6) * H;
 let ishlayapti = false;
 export async function publishDue(api, notify) {
   if (ishlayapti) return;
@@ -153,6 +155,11 @@ export async function publishDue(api, notify) {
   try {
     const due = store.byStatus('approved').filter(d => new Date(d.scheduledAt).getTime() <= Date.now());
     for (const d of due) {
+      if (Date.now() - new Date(d.scheduledAt).getTime() > ESKI_MS) {
+        store.update(d.id, { status: 'pending', scheduledAt: null, eskirgan: d.scheduledAt });
+        await notify(`⏸ "${d.title}" ${fmtTime(d.scheduledAt)} da chiqishi kerak edi, vaqti ancha o'tib ketgan — navbatdan olindi. Kerak bo'lsa qayta tasdiqlang.`).catch(() => {});
+        continue;
+      }
       try {
         const fb = await publish(api, d);
         await notify(`📢 Kanalga chiqdi: ${d.title}${fb ? `\n⚠️ Maqola formati o'tmadi, oddiy post bo'lib chiqdi: ${fb}` : ''}`).catch(() => {});
