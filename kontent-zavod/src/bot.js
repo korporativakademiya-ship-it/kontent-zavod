@@ -689,6 +689,18 @@ async function saveTelegramFile(fileId, draftId) {
   return file;
 }
 
+// Kanaldagi post havolasi: ochiq kanal — t.me/<nom>/<id>, yopiq kanal — t.me/c/<id>/<id> (a'zolarga ochiladi)
+let kanalMalumot = null;
+async function postHavolasi(d) {
+  const msgId = d?.channel_msg_ids?.[0];
+  if (!msgId) return '';
+  if (!kanalMalumot) kanalMalumot = await bot.api.getChat(d.channel_chat || cfg.channelId).catch(() => null);
+  if (kanalMalumot?.username) return `https://t.me/${kanalMalumot.username}/${msgId}`;
+  const id = String(kanalMalumot?.id || d.channel_chat || '').replace(/^-100/, '');
+  return /^\d+$/.test(id) ? `https://t.me/c/${id}/${msgId}` : '';
+}
+const kanalNomi = () => (kanalMalumot?.title ? `"${kanalMalumot.title}"` : 'Telegram');
+
 bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx => {
   if (!isAdmin(ctx)) return ctx.answerCallbackQuery({ text: 'Faqat rahbar tasdiqlaydi' });
   const [, act, id] = ctx.match;
@@ -696,7 +708,11 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
   if (!d) return ctx.answerCallbackQuery({ text: 'Qoralama topilmadi' });
   const mark = (t) => ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text(t, 'noop') }).catch(() => {});
 
-  if (d.status === 'published' && act !== 'scr') return ctx.answerCallbackQuery({ text: 'Bu post allaqachon chiqqan' });
+  if (d.status === 'published' && act !== 'scr') {
+    await ctx.answerCallbackQuery({ text: 'Bu post allaqachon chiqqan' });
+    const h = await postHavolasi(d);
+    return ctx.reply(`📢 "${d.title}" ${d.publishedAt ? `${fmtTime(d.publishedAt)} da ` : ''}${kanalNomi()} kanaliga chiqqan.${h ? `\n${h}` : ''}`);
+  }
   // ✏️ Tahrirdan keyin eski versiya xabaridagi tugmalar ishlamasin — aks holda eski matn ham kanalga chiqib ketardi
   if (d.status === 'revised' && act !== 'scr') return ctx.answerCallbackQuery({ text: "Bu eski versiya — tahrirlangan yangi qoralamadagi tugmalardan foydalaning", show_alert: true });
 
@@ -713,7 +729,9 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
       const fb = await publish(bot.api, d);
       if (d.status !== 'approved') store.addChoice(d, true);
       await mark('📢 Chiqdi');
-      await log(`📢 Kanalga chiqdi: ${d.title}`);
+      const h = await postHavolasi(store.get(d.id));
+      await log(`📢 Kanalga chiqdi: ${d.title}${h ? ` — ${h}` : ''}`);
+      if (h) await ctx.reply(`📢 ${kanalNomi()} kanaliga chiqdi: ${h}`);
       if (fb) await log(`⚠️ "${d.title}" maqola formatida chiqmadi, oddiy post bo'lib chiqdi: ${fb}`);
     } catch (e) {
       if (e instanceof AllaqachonChiqqan) return mark('📢 Chiqdi');
