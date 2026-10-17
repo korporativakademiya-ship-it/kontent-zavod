@@ -12,7 +12,8 @@ export const cfg = {
   // Bitta Claude chaqiruviga vaqt chegarasi (daqiqa): qotib qolsa — bekor qilinadi, zavod keyingi ishga o'tadi
   llmVaqtMin: Number(process.env.LLM_VAQT_MIN) || 15,
   botToken: req('BOT_TOKEN'),
-  admins: (process.env.ADMIN_IDS || '').split(',').map(s => Number(s.trim())).filter(Boolean),
+  // Rahbarlar: ADMIN_IDS + ADMIN_IDS_QOSHIMCHA (asosiy ro'yxatga tegmasdan yangi rahbar qo'shish uchun)
+  admins: [...new Set([process.env.ADMIN_IDS, process.env.ADMIN_IDS_QOSHIMCHA].join(',').split(',').map(s => Number(s.trim())).filter(Boolean))],
   groupId: process.env.GROUP_ID || '',
   approvalTopic: Number(process.env.APPROVAL_TOPIC_ID) || undefined,
   logTopic: Number(process.env.LOG_TOPIC_ID) || undefined,
