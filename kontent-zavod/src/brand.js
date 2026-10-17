@@ -1,7 +1,7 @@
 // Nisha profili — hamma agentlar shunga tayanadi. Standart — muallifning o'z brendi; boshqa mijoz uchun
 // /sozla (onboarding) bazadagi "brend" sozlamasini yozadi va u shu matn o'rniga ishlatiladi (kod o'zgarmaydi).
 import { store } from './store.js';
-import { PROFIL } from './mahsulot.js';
+import { PROFIL, joriy } from './mahsulot.js';
 
 export const STANDART_BRAND = `
 MUALLIF: Joʻrabek — biznesni tizimlashtirish, boshqaruv va AI-avtomatlashtirish bo'yicha amaliyotchi va konsultant (O'zbekiston).
@@ -33,3 +33,19 @@ export const imzo = () => ({ ...STANDART_IMZO, ...(sozlama().imzo || {}) });
 export const muallif = () => sozlama().muallif || 'Joʻrabek';
 export const yonalish = () => sozlama().yonalish || 'biznesni tizimlashtirish, boshqaruv, xodimlar, AI';
 export const mahsulotNomlari = () => Object.values(PROFIL).map(p => p.nom).join(', ');
+
+// Kartochka va karusel uslubi: mahsulot postida — mahsulotning o'z rangi va nomi; mahsulotsiz — muallif brendi.
+// /sozla bilan qo'shilgan mahsulotda rang bo'lmasa — zaxira ranglardan biri (tartibi bo'yicha)
+export const STANDART_RANG = { fon: '#17325C', urgu: '#F3C94B' };
+const ZAXIRA_RANGLAR = [
+  { fon: '#0E3B43', urgu: '#5EEAD4' }, { fon: '#2A1B5C', urgu: '#FFB547' },
+  { fon: '#1C1C1E', urgu: '#FF6B3D' }, { fon: '#123524', urgu: '#B5E655' },
+];
+const hex = (s) => /^#[0-9a-f]{6}$/i.test(String(s || ''));
+export function vizual(m = joriy()) {
+  const p = m && PROFIL[m];
+  if (!p) return { signature: imzo(), theme: STANDART_RANG };
+  const zaxira = ZAXIRA_RANGLAR[Math.max(0, Object.keys(PROFIL).indexOf(m)) % ZAXIRA_RANGLAR.length];
+  const theme = hex(p.rang?.fon) && hex(p.rang?.urgu) ? { fon: p.rang.fon, urgu: p.rang.urgu } : zaxira;
+  return { signature: { name: p.nom, role: p.shior || muallif() }, theme };
+}

@@ -12,7 +12,7 @@ import { prodyuser, rasmPrompti } from './agents/kontent.js';
 import { rasmYoqilgan, rasmYasa } from './rasm.js';
 import { muqovaYasa } from './muqova.js';
 import { joriy } from './mahsulot.js';
-import { imzo } from './brand.js';
+import { vizual } from './brand.js';
 import { uniqueCode, ensureCode, ensureLink } from './cta.js';
 import { topish } from './kontentReja.js';
 import { factCheck, applyFixes, factSummary } from './agents/factcheck.js';
@@ -23,7 +23,7 @@ export const RICH_FORMATS = ['maqola', 'karusel'];
 export async function renderDraftSlides(draft) {
   if (!draft.slides?.length) return store.update(draft.id, { slide_paths: [] });
   const dir = path.join(cfg.dataDir, 'slides', draft.id);
-  const files = await renderSlides({ signature: imzo(), slides: draft.slides }, dir);
+  const files = await renderSlides({ ...vizual(draft.mahsulot || joriy()), slides: draft.slides }, dir);
   return store.update(draft.id, { slide_paths: files });
 }
 

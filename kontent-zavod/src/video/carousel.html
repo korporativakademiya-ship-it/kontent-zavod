@@ -73,6 +73,10 @@ const DEMO = {
 };
 const RENDER = !!window.__DATA__;
 const DATA = window.__DATA__ || DEMO;
+// Mahsulot ranglari: fon — slayd foni va urg'u ustidagi matn, urgu — sariq o'rnidagi urg'u rangi
+const HEX = /^#[0-9a-f]{6}$/i;
+if (HEX.test(DATA.theme?.fon || '')) for (const v of ['--bp', '--ink']) document.documentElement.style.setProperty(v, DATA.theme.fon);
+if (HEX.test(DATA.theme?.urgu || '')) document.documentElement.style.setProperty('--paper', DATA.theme.urgu);
 if (RENDER) document.body.classList.add('render');
 
 function el(tag, cls, text, parent) {
