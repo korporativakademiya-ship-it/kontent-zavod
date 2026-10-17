@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { cfg } from './config.js';
-import { imzo, muallif } from './brand.js';
+import { muallif, vizual } from './brand.js';
+import { joriy } from './mahsulot.js';
 import { renderSlides } from './video/slides.js';
 import { muqovaMatni } from './agents/kontent.js';
 
@@ -33,6 +34,6 @@ export async function muqovaYasa(d) {
   let j = null;
   try { j = await ichki.matn(d); } catch { /* sarlavhali muqova */ }
   const slayd = muqovaSlayd(j, d);
-  const [file] = await ichki.render({ signature: imzo(), slides: [slayd] }, path.join(cfg.dataDir, 'images', d.id, `muqova-${Date.now()}`));
+  const [file] = await ichki.render({ ...vizual(d.mahsulot || joriy()), slides: [slayd] }, path.join(cfg.dataDir, 'images', d.id, `muqova-${Date.now()}`));
   return { file, slayd };
 }

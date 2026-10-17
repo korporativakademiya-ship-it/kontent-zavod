@@ -6,7 +6,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 const STANDART_PROFIL = {
   ka: {
-    nom: 'Kotib AI', belgi: '🤖',
+    nom: 'Kotib AI', belgi: '🤖', shior: 'Mijozlarga 24/7 javob beradi',
+    rang: { fon: '#0E3B43', urgu: '#5EEAD4' }, // chuqur feruza + yalpiz: tez javob, AI
     profil: `Kotib AI — Telegram va Instagram'da mijozlarga 24/7 darhol javob beradigan AI sotuvchi-kotib.
 Biznes ma'lumotidan gapiradi, ehtiyojni aniqlaydi, ism va telefonni olib egasiga "yangi lid" yuboradi, ovoz va rasmni tushunadi,
 har yozishma CRM'da. Egasiga: eslatma, vazifa, kalendar, hujjat.
@@ -17,7 +18,8 @@ MAVZULAR: tez javob va sotuv, lid yo'qotish, AI sotuvchi qanday ishlaydi, CRM va
 CTA: botni o'zi sinab ko'rish yoki bepul konsultatsiya.`,
   },
   qa: {
-    nom: 'Qadam AI', belgi: '🎓',
+    nom: 'Qadam AI', belgi: '🎓', shior: "Xodimlarni o'qitish platformasi",
+    rang: { fon: '#2A1B5C', urgu: '#FFB547' }, // chuqur indigo + qahrabo: ta'lim, o'sish
     profil: `Qadam AI — xodimlarni o'qitish va onboarding platformasi: lavozim bo'yicha o'qish yo'li, video darslar, testlar,
 rahbar paneli, sertifikat; telefondan ishlaydi; kurslarni biz tayyorlab beramiz.
 AUDITORIYA: 10–100 xodimli kompaniyalar va filialli tarmoqlar rahbarlari, HR.
@@ -28,7 +30,8 @@ Boshqa kompaniya nomlari va ularning kurslarini tilga olma.
 CTA: bepul diagnostika yoki demo.`,
   },
   kf: {
-    nom: 'Kontent Fabrika', belgi: '✍️',
+    nom: 'Kontent Fabrika', belgi: '✍️', shior: 'Kanal uchun AI kontent jamoasi',
+    rang: { fon: '#1C1C1E', urgu: '#FF6B3D' }, // grafit + zavod olovrang: ishlab chiqarish
     profil: `Kontent Fabrika — Telegram kanal uchun kontentni AI agentlar jamoasi tayyorlaydi: tadqiqot, haftalik reja, matn,
 fakt tekshiruvi; egasining uslubini o'rganadi; har post egasi tasdig'idan o'tadi; karusel va reels ham.
 AUDITORIYA: ekspertlar, kouchlar, konsultantlar, o'z kanalini yuritadigan biznes egalari.

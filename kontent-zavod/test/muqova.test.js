@@ -32,3 +32,12 @@ test("Claude javob bermasa ham kartochka chiziladi (sarlavha bilan)", async () =
   assert.ok(berildi.signature.name);
   assert.match(r.file, /images\/m1\/muqova-\d+\/01\.png$/);
 });
+
+test("mahsulot posti kartochkasi mahsulot rangida va nomi bilan chiziladi", async () => {
+  ichki.matn = async () => ({ type: 'quote', text: 'Tezlik yetarli emas.' });
+  let berildi;
+  ichki.render = async (data, dir) => { berildi = data; return [`${dir}/01.png`]; };
+  await muqovaYasa({ ...d, id: 'm2', mahsulot: 'qa' });
+  assert.equal(berildi.signature.name, 'Qadam AI');
+  assert.deepEqual(berildi.theme, { fon: '#2A1B5C', urgu: '#FFB547' });
+});

@@ -28,3 +28,17 @@ test('boshqa mijoz: brend, imzo va mahsulotlar bazadan — kod o\'zgarmaydi', ()
   assert.deepEqual(Object.keys(PROFIL), ['ka', 'qa', 'kf']);
   assert.equal(brendMatni(), STANDART_BRAND);
 });
+
+test("kartochka ranglari: har mahsulotning o'z rangi va nomi, mahsulotsiz — muallif brendi", async () => {
+  const { vizual, STANDART_RANG } = await import('../src/brand.js');
+  assert.deepEqual(vizual('ka'), { signature: { name: 'Kotib AI', role: 'Mijozlarga 24/7 javob beradi' }, theme: { fon: '#0E3B43', urgu: '#5EEAD4' } });
+  assert.notDeepEqual(vizual('qa').theme, vizual('kf').theme);
+  assert.deepEqual(vizual(null), { signature: { name: 'Joʻrabek', role: 'Biznesni tizimga solaman' }, theme: STANDART_RANG });
+  // /sozla bilan qo'shilgan mahsulot: rang yo'q — zaxira rang; noto'g'ri rang (CSS emas, hex kerak) — zaxira rang
+  store.setSetting('mahsulotlar', { tk: { nom: 'Tish oqartirish' }, ok: { nom: 'Ortodontiya', rang: { fon: 'red;x', urgu: '#FFFFFF' } } });
+  assert.equal(vizual('tk').signature.name, 'Tish oqartirish');
+  assert.match(vizual('tk').theme.fon, /^#[0-9A-F]{6}$/i);
+  assert.match(vizual('ok').theme.fon, /^#[0-9A-F]{6}$/i);
+  assert.notDeepEqual(vizual('tk').theme, vizual('ok').theme);
+  store.setSetting('mahsulotlar', null);
+});
