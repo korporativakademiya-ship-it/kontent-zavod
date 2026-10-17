@@ -706,9 +706,26 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     videoRun(d); // fonda — bot bloklanmaydi
     return;
   }
+  // ⚡ Hozir va ✅ Tasdiqlash: darhol kanalga
+  const chiqar = async () => {
+    await ctx.answerCallbackQuery({ text: 'Kanalga chiqarilyapti…' });
+    try {
+      const fb = await publish(bot.api, d);
+      if (d.status !== 'approved') store.addChoice(d, true);
+      await mark('📢 Chiqdi');
+      await log(`📢 Kanalga chiqdi: ${d.title}`);
+      if (fb) await log(`⚠️ "${d.title}" maqola formatida chiqmadi, oddiy post bo'lib chiqdi: ${fb}`);
+    } catch (e) {
+      if (e instanceof AllaqachonChiqqan) return mark('📢 Chiqdi');
+      await log(`❌ "${d.title}" kanalga chiqmadi: ${e.message}`);
+    }
+  };
   if (act === 'ok') {
-    if (d.status !== 'approved') store.addChoice(d, true);
+    // Tasdiqlangan zahoti kanalga chiqadi (keyinroq kerak bo'lsa — 🕒 Vaqt belgilash).
+    // Haftalik rejadan yozilgan post — reja vaqtida (kalendar buzilmasin)
     const planned = d.plannedAt && new Date(d.plannedAt).getTime() > Date.now() + 60e3 ? d.plannedAt : null;
+    if (!planned && d.status !== 'approved') return chiqar();
+    if (d.status !== 'approved') store.addChoice(d, true);
     const nd = store.update(id, { status: 'approved', publish_attempts: 0, scheduledAt: d.status === 'approved' ? d.scheduledAt : planned || nextSlot() });
     await ctx.editMessageReplyMarkup({ reply_markup: schedKb(nd) }).catch(() => {});
     return ctx.answerCallbackQuery({ text: `Rejalashtirildi: ${fmtTime(nd.scheduledAt)}` });
@@ -737,19 +754,7 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     await ctx.editMessageReplyMarkup({ reply_markup: kb(id) }).catch(() => {});
     return ctx.answerCallbackQuery({ text: 'Navbatdan olindi' });
   }
-  if (act === 'now') {
-    await ctx.answerCallbackQuery({ text: 'Kanalga chiqarilyapti…' });
-    try {
-      const fb = await publish(bot.api, d);
-      if (d.status !== 'approved') store.addChoice(d, true);
-      await mark('📢 Chiqdi');
-      if (fb) await log(`⚠️ "${d.title}" maqola formatida chiqmadi, oddiy post bo'lib chiqdi: ${fb}`);
-    } catch (e) {
-      if (e instanceof AllaqachonChiqqan) return mark('📢 Chiqdi');
-      await log(`❌ "${d.title}" kanalga chiqmadi: ${e.message}`);
-    }
-    return;
-  }
+  if (act === 'now') return chiqar();
   if (act === 'no') {
     store.update(id, { status: 'rejected' });
     store.addChoice(d, false);
