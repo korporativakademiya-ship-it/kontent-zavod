@@ -39,11 +39,17 @@ bot.use((ctx, next) => {
   if (!m && id) m = store.get(id)?.mahsulot || store.allPlans().find(p => p.id === id)?.mahsulot || null;
   return bilan(m, next);
 });
+// Shaxsiy chatda guruh topiklari yo'q — topik raqami bilan yuborilsa Telegram rad etadi
+export const shaxsiyTopiksiz = (payload) => {
+  if (payload?.message_thread_id === undefined || !(Number(payload.chat_id) > 0)) return payload;
+  const { message_thread_id, ...qolgan } = payload;
+  return qolgan;
+};
 // Guruhga ketayotgan xabar topiksiz bo'lsa — joriy mahsulot topigiga (ctx.reply ham shu yerga tushadi)
 bot.api.config.use((prev, method, payload, signal) => {
   if (payload && rejim() && joriy() && String(payload.chat_id) === String(cfg.groupId) && payload.message_thread_id === undefined && /^(send|copy)/.test(method))
     payload = { ...payload, message_thread_id: topigi(joriy()) };
-  return prev(method, payload, signal);
+  return prev(method, shaxsiyTopiksiz(payload), signal);
 });
 // Tasdiqlash va jarayon joyi: mahsulot rejimida — mahsulotning o'z topigi (alohida chat yo'q)
 const tema = (m = joriy()) => (rejim() ? topigi(m) ?? topigi(kodlar()[0]) : cfg.approvalTopic);
@@ -95,30 +101,35 @@ export const log = async (text) => {
   if (r && !muhim) jarayon.set(m, { id: r.message_id, lines: [text], at: Date.now() });
 };
 
+// Qoralama qayerda ko'rinadi: shaxsiy chatdan boshlangan bo'lsa — o'sha chatda, aks holda guruhdagi mahsulot xonasida
+const joyi = (d) => (d.chat ? [d.chat, {}] : [cfg.groupId, { message_thread_id: tema(d.mahsulot || joriy()) }]);
+
 export async function sendForApproval(d) {
-  const extra = { message_thread_id: tema(d.mahsulot || joriy()), reply_markup: kb(d.id) };
+  const [chatId, joy] = joyi(d);
+  const extra = { ...joy, reply_markup: kb(d.id) };
   if (d.status === 'approved') extra.reply_markup = schedKb(d);
   if (isRich(d)) {
-    const { fallback } = await sendRich(bot.api, cfg.groupId, d, extra, { prefix: approvalPrefix(d) });
+    const { fallback } = await sendRich(bot.api, chatId, d, extra, { prefix: approvalPrefix(d) });
     if (fallback) await log(`⚠️ "${d.title}" maqola formatida ko'rsatilmadi, oddiy ko'rinishda yuborildi: ${fallback}`);
     return;
   }
   const head = `<b>📝 Qoralama</b>${PROFIL[d.mahsulot] ? ` · ${PROFIL[d.mahsulot].belgi} ${PROFIL[d.mahsulot].nom}` : ''} | ${d.format} | baho: ${d.score ?? '-'}/10\n${d.plannedAt ? `🗓 Reja: ${fmtTime(d.plannedAt)}${d.rubric ? ` · ${esc(d.rubric)}` : ''}\n` : ''}<i>${esc(d.notes)}</i>\n${d.source_url ? `Manba: ${esc(d.source_url)}\n` : ''}━━━━━━━━━━\n\n`;
-  await sendMediaPost(bot.api, cfg.groupId, { ...d, post_html: head + d.post_html }, extra);
+  await sendMediaPost(bot.api, chatId, { ...d, post_html: head + d.post_html }, extra);
 }
 
 // Qoralama uchun reels video yasaydi va tasdiqlash topigiga yuboradi
 async function videoRun(d) {
-  const reply = (t) => bot.api.sendMessage(cfg.groupId, t, { message_thread_id: tema(d.mahsulot || joriy()) }).catch(() => {});
+  const [chatId, joy] = joyi(d);
+  const reply = (t) => bot.api.sendMessage(chatId, t, joy).catch(() => {});
   videoBusy = true;
   try {
     await reply(`🎥 "${d.title}" — video yasalmoqda (1–3 daqiqa)...`);
     const v = await videoYasa(d, { log: reply });
     const nd = store.update(d.id, { video_path: v.file, video_duration: v.duration, motion: v.data });
     const cap = `<b>🎥 Video</b> | ${esc(d.title)} | ${Math.round(v.duration)} s${v.voiced ? ' | 🎙 dublyaj' : ''}\n<i>${isRich(d) ? 'Tasdiqlansa, video maqola ichida chiqadi.' : 'Tasdiqlansa, kanalga shu video post matni bilan chiqadi.'}</i>`;
-    await bot.api.sendVideo(cfg.groupId, new InputFile(v.file), {
+    await bot.api.sendVideo(chatId, new InputFile(v.file), {
       caption: cap, parse_mode: 'HTML', supports_streaming: true, width: 1080, height: 1920,
-      duration: Math.round(v.duration), message_thread_id: tema(d.mahsulot || joriy()), reply_markup: nd.status === 'approved' ? schedKb(nd) : kb(nd.id)
+      duration: Math.round(v.duration), ...joy, reply_markup: nd.status === 'approved' ? schedKb(nd) : kb(nd.id)
     });
   } catch (e) {
     await reply(`⚠️ Video yasalmadi (${d.title}): ${e.message}`);
@@ -127,7 +138,8 @@ async function videoRun(d) {
 
 // Postning audio varianti (ovozli xabar) — tasdiqlansa post bilan birga chiqadi
 async function audioRun(d) {
-  const reply = (t) => bot.api.sendMessage(cfg.groupId, t, { message_thread_id: tema(d.mahsulot || joriy()) }).catch(() => {});
+  const [chatId, joy] = joyi(d);
+  const reply = (t) => bot.api.sendMessage(chatId, t, joy).catch(() => {});
   try {
     await reply(`🎙 "${d.title}" — ovoz yozilmoqda...`);
     const dir = path.join(cfg.dataDir, 'audio');
@@ -135,24 +147,55 @@ async function audioRun(d) {
     await synth(speechText(d.post_html), mp3);
     const dur = await toVoiceNote(mp3, ogg);
     const nd = store.update(d.id, { audio_path: ogg, audio_duration: dur });
-    await bot.api.sendVoice(cfg.groupId, new InputFile(ogg), {
+    await bot.api.sendVoice(chatId, new InputFile(ogg), {
       caption: `🎙 Audio variant | ${esc(d.title)} | ${Math.round(dur)} s\n<i>Tasdiqlansa, post bilan birga chiqadi.</i>`,
-      parse_mode: 'HTML', duration: Math.round(dur), message_thread_id: tema(d.mahsulot || joriy()), reply_markup: nd.status === 'approved' ? schedKb(nd) : kb(nd.id)
+      parse_mode: 'HTML', duration: Math.round(dur), ...joy, reply_markup: nd.status === 'approved' ? schedKb(nd) : kb(nd.id)
     });
   } catch (e) {
     await reply(`⚠️ Ovoz yozilmadi (${d.title}): ${e.message}`);
   }
 }
 
+// Mahsulot rejimida buyruq mahsulot xonasidan tashqarida (shaxsiy chat, guruhning umumiy qismi) yozilsa — mahsulot tugma bilan tanlanadi
+const tanlovlar = new Map();
+const mahsulotKb = (key) => {
+  const k = new InlineKeyboard();
+  for (const m of kodlar()) k.text(`${PROFIL[m].belgi} ${PROFIL[m].nom}`, `tanla:${m}:${key}`).row();
+  return k;
+};
+
 async function startRun(ctx, topic, format = null) {
+  if (rejim() && !joriy()) {
+    const key = Date.now().toString(36);
+    tanlovlar.set(key, { topic, format });
+    if (tanlovlar.size > 50) tanlovlar.delete(tanlovlar.keys().next().value);
+    return ctx.reply('Qaysi mahsulot uchun?', { reply_markup: mahsulotKb(key) });
+  }
   if (busy) return ctx.reply('⏳ Hozir ishlayapman, tugashini kuting.');
   busy = true;
-  if (rejim() && !joriy()) { busy = false; return ctx.reply("Qaysi mahsulot uchun? Buyruqni o'sha mahsulot xonasida yozing (🤖 Kotib AI, 🎓 Qadam AI, ✍️ Kontent Fabrika)."); }
-  await ctx.reply(rejim() ? '🚀 Boshladim. Jarayon va qoralama shu yerda chiqadi.' : '🚀 Boshladim. Jarayonni log topigida kuzating.');
-  runPipeline({ topic, format, count: topic ? 1 : cfg.dailyPosts, log, onDraft: sendForApproval })
-    .catch(e => log(`❌ Xato: ${e.message}`))
+  // Shaxsiy chatdan boshlansa — qoralama shu chatga keladi (guruhda bo'lmasangiz ham ko'rasiz)
+  const chat = ctx.chat?.type === 'private' ? ctx.chat.id : null;
+  const m = joriy();
+  await ctx.reply(chat ? `🚀 Boshladim${m ? ` (${PROFIL[m].belgi} ${PROFIL[m].nom})` : ''}. 3–5 daqiqada qoralama shu yerga keladi.`
+    : rejim() ? '🚀 Boshladim. Jarayon va qoralama shu yerda chiqadi.' : '🚀 Boshladim. Jarayonni log topigida kuzating.');
+  runPipeline({ topic, format, count: topic ? 1 : cfg.dailyPosts, log, onDraft: (d) => sendForApproval(chat ? store.update(d.id, { chat }) : d) })
+    .catch(e => { log(`❌ Xato: ${e.message}`); if (chat) bot.api.sendMessage(chat, `❌ Xato: ${e.message}`).catch(() => {}); })
     .finally(() => { busy = false; });
 }
+
+bot.callbackQuery(/^tanla:([a-z]{2}):(\w+)$/, async ctx => {
+  if (!isAdmin(ctx)) return ctx.answerCallbackQuery({ text: 'Faqat rahbar' });
+  const [, m, key] = ctx.match;
+  const t = tanlovlar.get(key);
+  if (!t || !PROFIL[m]) return ctx.answerCallbackQuery({ text: "Bu so'rov eskirgan — buyruqni qayta yozing", show_alert: true });
+  tanlovlar.delete(key);
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageText(`${PROFIL[m].belgi} ${PROFIL[m].nom} tanlandi.`).catch(() => {});
+  return bilan(m, () => startRun(ctx, t.topic, t.format));
+});
+
+// Mavzusiz /goya, /maqola, /karusel — mavzu reply bilan so'raladi
+const mavzuSora = (ctx, format, misol) => ask(ctx, `Qaysi mavzuda? Shu xabarga javob (reply) qilib yozing.\nMasalan: <i>${misol}</i>`, { kind: 'mavzu', format });
 
 // Kunlik ish bot band paytiga to'g'ri kelsa — tashlab ketilmaydi, soatlik tekshiruv (rejaYetibOl) bo'shaganda bajaradi
 let kunlikKutyapti = false;
@@ -269,7 +312,7 @@ bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
 bot.command('goya', ctx => {
   if (!isAdmin(ctx)) return;
   const topic = ctx.match?.trim();
-  if (!topic) return ctx.reply('Mavzuni yozing: /goya xodimlar kechikishi');
+  if (!topic) return mavzuSora(ctx, null, 'xodimlar kechikishi');
   startRun(ctx, topic);
 });
 
@@ -277,7 +320,7 @@ for (const [cmd, format, example] of [['maqola', 'maqola', 'xodimni ishga olish 
   bot.command(cmd, ctx => {
     if (!isAdmin(ctx)) return;
     const topic = ctx.match?.trim();
-    if (!topic) return ctx.reply(`Mavzuni yozing: /${cmd} ${example}`);
+    if (!topic) return mavzuSora(ctx, format, example);
     startRun(ctx, topic, format);
   });
 }
@@ -727,6 +770,9 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
 });
 bot.callbackQuery('noop', ctx => ctx.answerCallbackQuery());
 
+const QISQA_YORDAM = "Tushunmadim. Asosiy buyruqlar:\n/yangi — yangi post (mahsulotni tugma bilan tanlaysiz)\n/goya — berilgan mavzuda post\n" +
+  "/navbat — navbatdagi postlar\n/reja — haftalik reja\n/avto on | off — avto rejim\n\"g'oya: ...\" — g'oyani bankka saqlash\nHammasi: /start";
+
 // "g'oya: ..." — g'oyalar bankiga (istalgan chatda, rahbar yozsa). Javob kutish handleridan oldin turishi shart
 const IDEA_RE = /^\s*(g['ʻ‘’`]?oya|goya|idea)\s*[:\-—]\s*/i;
 bot.on('message:text', async (ctx, next) => {
@@ -753,8 +799,11 @@ bot.on('message', async (ctx, next) => {
 bot.on('message:text', async ctx => {
   const replyTo = ctx.message.reply_to_message?.message_id;
   const w = replyTo && store.peekWait(replyTo);
-  if (!w || !isAdmin(ctx)) return;
+  if (!isAdmin(ctx)) return;
+  // Shaxsiy chatda tushunilmagan xabar — jim qolinmaydi
+  if (!w) return ctx.chat.type === 'private' ? ctx.reply(QISQA_YORDAM) : undefined;
   if (w.kind === 'sozla') { store.takeWait(replyTo); return sozlaJavob(ctx); }
+  if (w.kind === 'mavzu') { store.takeWait(replyTo); return startRun(ctx, ctx.message.text.trim().slice(0, 300), w.format || null); }
   const opt = { message_thread_id: tema() };
   if (w.kind === 'plan') {
     store.takeWait(replyTo);
