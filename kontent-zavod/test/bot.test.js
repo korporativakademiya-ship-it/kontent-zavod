@@ -94,3 +94,44 @@ test("avto rejim: tasdiq kutayotgan amaldagi reja o'zi tasdiqlanadi (eski reja j
   assert.equal(weekly.currentPlan().id, 'kutilgan1');
   store.setSetting('avto', false);
 });
+
+test("shaxsiy chat: /yangi — mahsulot tugma bilan tanlanadi, tushunilmagan xabarga yo'riqnoma, mavzusiz /goya — mavzu so'raladi", async () => {
+  process.env.PRODUCT_TOPICS = 'ka:11,qa:12,kf:13';
+  chaqiruvlar.length = 0;
+  await xabar('/yangi');
+  const s = qayerga('sendMessage').at(-1);
+  assert.match(s.payload.text, /Qaysi mahsulot uchun\?/);
+  const tugmalar = s.payload.reply_markup.inline_keyboard.flat();
+  assert.deepEqual(tugmalar.map(b => b.text), ['🤖 Kotib AI', '🎓 Qadam AI', '✍️ Kontent Fabrika']);
+  assert.match(tugmalar[0].callback_data, /^tanla:ka:\w+$/);
+  await tugma('tanla:ka:yoq');
+  assert.match(qayerga('answerCallbackQuery').at(-1).payload.text, /eskirgan/);
+
+  chaqiruvlar.length = 0;
+  await xabar('kotib ai');
+  assert.match(qayerga('sendMessage').at(-1).payload.text, /Tushunmadim\. Asosiy buyruqlar/);
+
+  chaqiruvlar.length = 0;
+  await xabar('/goya');
+  const so = qayerga('sendMessage').at(-1);
+  assert.match(so.payload.text, /Qaysi mavzuda\?/);
+  assert.ok(so.payload.reply_markup.force_reply);
+  const { shaxsiyTopiksiz } = await import('../src/bot.js');
+  assert.deepEqual(shaxsiyTopiksiz({ chat_id: 42, message_thread_id: 11, text: 'x' }), { chat_id: 42, text: 'x' }, "shaxsiy chatga guruh topik raqami ketmaydi");
+  assert.deepEqual(shaxsiyTopiksiz({ chat_id: '-1001', message_thread_id: 11 }), { chat_id: '-1001', message_thread_id: 11 });
+  delete process.env.PRODUCT_TOPICS;
+});
+
+test("shaxsiy chatdan boshlangan qoralama o'sha chatga keladi, guruhdagilari — mahsulot xonasiga", async () => {
+  const { sendForApproval } = await import('../src/bot.js');
+  process.env.PRODUCT_TOPICS = 'ka:11,qa:12,kf:13';
+  chaqiruvlar.length = 0;
+  await sendForApproval(store.addDraft({ title: 'Shaxsiy', format: 'post', post_html: 'a', mahsulot: 'ka', chat: 42 }));
+  await sendForApproval(store.addDraft({ title: 'Guruh', format: 'post', post_html: 'b', mahsulot: 'qa' }));
+  const [birinchi, ikkinchi] = qayerga('sendMessage');
+  assert.equal(birinchi.payload.chat_id, 42);
+  assert.equal(birinchi.payload.message_thread_id, undefined);
+  assert.equal(String(ikkinchi.payload.chat_id), '-1001');
+  assert.equal(ikkinchi.payload.message_thread_id, 12);
+  delete process.env.PRODUCT_TOPICS;
+});
