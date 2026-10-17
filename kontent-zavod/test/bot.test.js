@@ -13,7 +13,8 @@ bot.api.config.use(async (prev, method, payload) => {
   chaqiruvlar.push({ method, payload });
   await new Promise(r => setTimeout(r, 5)); // tarmoq kechikishi — parallel bosishlar uchun
   const natija = /^send/.test(method) ? { message_id: ++msgId, date: 0, chat: { id: payload.chat_id }, text: payload.text }
-    : method === 'getChat' ? { id: -1001234567, type: 'channel', title: 'Biznes tizimi', username: 'biznes_tizimi' } : true;
+    : method === 'getChat' ? { id: -1001234567, type: 'channel', title: 'Biznes tizimi', username: 'biznes_tizimi' }
+    : method === 'getChatMember' ? { status: 'administrator', can_post_messages: true, user: { id: 7, is_bot: true, first_name: 'Fabrika' } } : true;
   return { ok: true, result: natija };
 });
 const qayerga = (m) => chaqiruvlar.filter(c => c.method === m);
@@ -144,4 +145,13 @@ test("shaxsiy chatdan boshlangan qoralama o'sha chatga keladi, guruhdagilari —
   assert.equal(String(ikkinchi.payload.chat_id), '-1001');
   assert.equal(ikkinchi.payload.message_thread_id, 12);
   delete process.env.PRODUCT_TOPICS;
+});
+
+test("/kanal — postlar qaysi kanalga chiqishi va bot u yerda post yoza olishi", async () => {
+  chaqiruvlar.length = 0;
+  await xabar('/kanal');
+  const t = qayerga('sendMessage').at(-1).payload.text;
+  assert.match(t, /Postlar shu kanalga chiqadi:\nBiznes tizimi \(@biznes_tizimi\)\nhttps:\/\/t\.me\/biznes_tizimi/);
+  assert.match(t, /✅ admin, post yoza oladi/);
+  assert.equal(qayerga('getChat')[0].payload.chat_id, '@kanal');
 });
