@@ -12,7 +12,8 @@ bot.botInfo = { id: 7, is_bot: true, first_name: 'Fabrika', username: 'fabrika_b
 bot.api.config.use(async (prev, method, payload) => {
   chaqiruvlar.push({ method, payload });
   await new Promise(r => setTimeout(r, 5)); // tarmoq kechikishi — parallel bosishlar uchun
-  const natija = /^send/.test(method) ? { message_id: ++msgId, date: 0, chat: { id: payload.chat_id }, text: payload.text } : true;
+  const natija = /^send/.test(method) ? { message_id: ++msgId, date: 0, chat: { id: payload.chat_id }, text: payload.text }
+    : method === 'getChat' ? { id: -1001234567, type: 'channel', title: 'Biznes tizimi', username: 'biznes_tizimi' } : true;
   return { ok: true, result: natija };
 });
 const qayerga = (m) => chaqiruvlar.filter(c => c.method === m);
@@ -31,8 +32,11 @@ test('⚡ Hozir: ikki marta tez bosilsa ham kanalga bir marta chiqadi', async ()
   await Promise.all([tugma(`now:${d.id}`), tugma(`now:${d.id}`)]);
   assert.equal(qayerga('sendMessage').filter(c => c.payload.chat_id === '@kanal').length, 1);
   assert.equal(store.get(d.id).status, 'published');
+  assert.ok(qayerga('sendMessage').some(c => /"Biznes tizimi" kanaliga chiqdi: https:\/\/t\.me\/biznes_tizimi\/\d+/.test(c.payload.text)), 'chiqqan post havolasi beriladi');
+  chaqiruvlar.length = 0;
   await tugma(`now:${d.id}`);
-  assert.equal(qayerga('sendMessage').filter(c => c.payload.chat_id === '@kanal').length, 1, 'chiqqan post qayta chiqmaydi');
+  assert.equal(qayerga('sendMessage').filter(c => c.payload.chat_id === '@kanal').length, 0, 'chiqqan post qayta chiqmaydi');
+  assert.match(qayerga('sendMessage').at(-1).payload.text, /"Tez post" .*"Biznes tizimi" kanaliga chiqqan\.\nhttps:\/\/t\.me\/biznes_tizimi\/\d+/, 'qachon va qayerga chiqqani aytiladi');
 });
 
 test('eski (tahrirlangan) versiya va begona odam tugmalari ishlamaydi', async () => {
