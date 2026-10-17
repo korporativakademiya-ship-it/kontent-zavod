@@ -301,12 +301,25 @@ bot.command('reja_bankka', ctx => {
 // Sozlash uchun: chat va topik ID'sini ko'rsatadi
 bot.command('id', ctx => (rejim() && ctx.chat.type !== 'private') ? undefined : ctx.reply(`chat_id: ${ctx.chat.id}\ntopic_id: ${ctx.message?.message_thread_id ?? '-'}\nsizning id: ${ctx.from.id}`));
 
+// /kanal — postlar qaysi kanalga chiqadi va bot u yerda post yoza oladimi
+bot.command('kanal', async ctx => {
+  if (!isAdmin(ctx)) return;
+  if (!cfg.channelId) return ctx.reply("Kanal sozlanmagan: Railway → kontent-bot → Variables → CHANNEL_ID ga kanal manzilini yozing (masalan, @kanal_nomi).");
+  const ch = await bot.api.getChat(cfg.channelId).catch(e => ({ xato: e.description || e.message }));
+  if (ch.xato) return ctx.reply(`⚠️ CHANNEL_ID dagi kanalni bot topa olmadi: ${ch.xato}\nBot kanalga admin qilib qo'shilganini va manzil to'g'riligini tekshiring.`);
+  const a = await bot.api.getChatMember(ch.id, bot.botInfo.id).catch(() => null);
+  const holat = a?.status === 'administrator' ? (a.can_post_messages === false ? "⚠️ admin, lekin post yozish huquqi yo'q — postlar chiqmaydi" : '✅ admin, post yoza oladi')
+    : "❌ admin emas — postlar chiqmaydi";
+  return ctx.reply(`📢 Postlar shu kanalga chiqadi:\n${ch.title || ''}${ch.username ? ` (@${ch.username})` : ''}\n` +
+    `${ch.username ? `https://t.me/${ch.username}` : "Yopiq kanal — ochiq havolasi yo'q"}\nID: ${ch.id}\nBot: ${holat}`);
+});
+
 bot.command('start', ctx => ctx.reply(
   'Kontent zavod ishlayapti.\n/yangi — hozir g\'oya izlash va qoralama yozish\n/goya <mavzu> — berilgan mavzu bo\'yicha post\n' +
   '/maqola <mavzu> — Telegram maqolasi (sarlavha, ro\'yxat, jadval)\n/karusel <mavzu> — slaydli karusel\n' +
   '/rejalar [ka|qa|kf] — tayyor kontent reja (150 ta) · /reja_post qa07 — shu bo\'yicha post · /reja_bankka — g\'oyalar bankiga\n' +
   (rejim() ? "Mahsulot rejimi: har mahsulot o'z xonasida — reja, qoralama, jarayon shu yerda. /jadval — chiqish kunlari\n" : '') +
-  '/sozla — soha, auditoriya, mahsulotlar va manbalarni sozlash\n/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n\"g\'oya: ...\" — g\'oyalar bankiga · /goyalar\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/id — chat va topik ID'));
+  '/sozla — soha, auditoriya, mahsulotlar va manbalarni sozlash\n/reja — haftalik reja · /reja_yangi · /rubrikalar · /avto\n\"g\'oya: ...\" — g\'oyalar bankiga · /goyalar\n/navbat — rejalashtirilgan postlar\n/hisobot [kun] — natijalar (reaksiyalar, formatlar)\n/uslub — uslubingizni o\'rgatish · /qoidalar — doimiy qoidalar\n/kanal — postlar qaysi kanalga chiqadi\n/id — chat va topik ID'));
 
 bot.command('yangi', ctx => isAdmin(ctx) && startRun(ctx, null));
 bot.command('goya', ctx => {
@@ -794,7 +807,7 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
 bot.callbackQuery('noop', ctx => ctx.answerCallbackQuery());
 
 const QISQA_YORDAM = "Tushunmadim. Asosiy buyruqlar:\n/yangi — yangi post (mahsulotni tugma bilan tanlaysiz)\n/goya — berilgan mavzuda post\n" +
-  "/navbat — navbatdagi postlar\n/reja — haftalik reja\n/avto on | off — avto rejim\n\"g'oya: ...\" — g'oyani bankka saqlash\nHammasi: /start";
+  "/navbat — navbatdagi postlar\n/reja — haftalik reja\n/avto on | off — avto rejim\n/kanal — postlar qaysi kanalga chiqadi\n\"g'oya: ...\" — g'oyani bankka saqlash\nHammasi: /start";
 
 // "g'oya: ..." — g'oyalar bankiga (istalgan chatda, rahbar yozsa). Javob kutish handleridan oldin turishi shart
 const IDEA_RE = /^\s*(g['ʻ‘’`]?oya|goya|idea)\s*[:\-—]\s*/i;
