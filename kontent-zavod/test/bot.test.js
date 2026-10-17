@@ -47,11 +47,17 @@ test('eski (tahrirlangan) versiya va begona odam tugmalari ishlamaydi', async ()
   assert.equal(store.get(y.id).status, 'pending');
 });
 
-test('✅ Tasdiqlash — keyingi bo\'sh vaqtga navbat; /navbat begona odamga ko\'rinmaydi', async () => {
-  const d = store.addDraft({ title: 'Navbat posti', format: 'post', post_html: 'z' });
+test('✅ Tasdiqlash — post darhol kanalga chiqadi, haftalik rejadagisi reja vaqtida; /navbat begona odamga ko\'rinmaydi', async () => {
+  const d = store.addDraft({ title: 'Darhol', format: 'post', post_html: 'z' });
+  chaqiruvlar.length = 0;
   await tugma(`ok:${d.id}`);
-  assert.equal(store.get(d.id).status, 'approved');
-  assert.ok(new Date(store.get(d.id).scheduledAt).getTime() > Date.now());
+  assert.equal(store.get(d.id).status, 'published');
+  assert.equal(qayerga('sendMessage').filter(c => c.payload.chat_id === '@kanal').length, 1);
+  const kelajak = new Date(Date.now() + 2 * 864e5).toISOString();
+  const r = store.addDraft({ title: 'Rejadagi', format: 'post', post_html: 'r', plannedAt: kelajak });
+  await tugma(`ok:${r.id}`);
+  assert.equal(store.get(r.id).status, 'approved');
+  assert.equal(store.get(r.id).scheduledAt, kelajak);
   chaqiruvlar.length = 0;
   await xabar('/navbat', { from: 99, chat: { id: 99, type: 'private' } });
   assert.equal(qayerga('sendMessage').length, 1);
