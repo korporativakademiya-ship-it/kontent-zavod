@@ -4,6 +4,7 @@ delete process.env.PRODUCT_TOPICS;
 import test from 'node:test';
 import assert from 'node:assert/strict';
 const { bot } = await import('../src/bot.js');
+const { fmtTime } = await import('../src/publisher.js');
 const { store } = await import('../src/store.js');
 
 const chaqiruvlar = [];
@@ -118,6 +119,8 @@ test("shaxsiy chat: /yangi — mahsulot tugma bilan tanlanadi, tushunilmagan xab
   await tugma('tanla:ka:yoq');
   assert.match(qayerga('answerCallbackQuery').at(-1).payload.text, /eskirgan/);
 
+  // Oldingi testdan /sozla savoli ochiq qolgan — u yopilmasa, oddiy xabar o'sha savolga javob hisoblanadi
+  for (let k; (k = store.ochiqWait({ chat: 42, thr: null, kim: 42 }, 1e12));) store.takeWait(k);
   chaqiruvlar.length = 0;
   await xabar('kotib ai');
   assert.match(qayerga('sendMessage').at(-1).payload.text, /Tushunmadim\. Asosiy buyruqlar/);
@@ -154,4 +157,123 @@ test("/kanal — postlar qaysi kanalga chiqishi va bot u yerda post yoza olishi"
   assert.match(t, /Postlar shu kanalga chiqadi:\nBiznes tizimi \(@biznes_tizimi\)\nhttps:\/\/t\.me\/biznes_tizimi/);
   assert.match(t, /✅ admin, post yoza oladi/);
   assert.equal(qayerga('getChat')[0].payload.chat_id, '@kanal');
+});
+
+// Forum topigidagi (mahsulot xonasi) tugma va oddiy xabar — reply qilinmagan
+const topikTugma = (data, thr = 11) => bot.handleUpdate({ update_id: upd++, callback_query: { id: String(upd), from: kim(42), chat_instance: 'x', data,
+  message: { message_id: 5, date: 0, chat: { id: -1001, type: 'supergroup', is_forum: true }, message_thread_id: thr, is_topic_message: true, text: 'qoralama' } } });
+const topikXabar = (text, thr = 11) => bot.handleUpdate({ update_id: upd++, message: { message_id: ++msgId, date: 0,
+  chat: { id: -1001, type: 'supergroup', is_forum: true }, message_thread_id: thr, is_topic_message: true, from: kim(42), text,
+  reply_to_message: { message_id: thr, date: 0, chat: { id: -1001, type: 'supergroup' }, forum_topic_created: { name: 'x', icon_color: 1 } } } });
+
+test("🕒 Vaqt belgilash: bo'sh vaqtlar tugmasi, guruhda reply'siz yozilgan vaqt ham qabul qilinadi — kanalga chiqib ketmaydi", async () => {
+  process.env.PRODUCT_TOPICS = 'ka:11,qa:12,kf:13';
+  const d = store.addDraft({ title: 'Vaqtli', format: 'post', post_html: 'v', mahsulot: 'ka' });
+  chaqiruvlar.length = 0;
+  await topikTugma(`time:${d.id}`);
+  const savol = qayerga('sendMessage').at(-1);
+  assert.match(savol.payload.text, /qachon chiqsin\?/);
+  assert.equal(savol.payload.message_thread_id, 11);
+  const vaqtlar = savol.payload.reply_markup.inline_keyboard.flat();
+  assert.equal(vaqtlar.length, 3);
+  assert.match(vaqtlar[0].callback_data, new RegExp(`^tset:${d.id}:[0-9a-z]+$`));
+  // Reply qilmasdan, shu topikka oddiy xabar
+  chaqiruvlar.length = 0;
+  await topikXabar('ertaga 10:30');
+  assert.equal(store.get(d.id).status, 'approved');
+  assert.match(fmtTime(store.get(d.id).scheduledAt), /10:30$/);
+  assert.equal(qayerga('sendMessage').filter(c => c.payload.chat_id === '@kanal').length, 0, 'kanalga chiqmaydi');
+  assert.match(qayerga('sendMessage').at(-1).payload.text, /10:30 da chiqadi/);
+  // Savol yopildi: keyingi oddiy gap vaqt deb olinmaydi
+  chaqiruvlar.length = 0;
+  await topikXabar('ertaga 18:00');
+  assert.match(fmtTime(store.get(d.id).scheduledAt), /10:30$/);
+
+  // Tugma bilan tanlash
+  const e = store.addDraft({ title: 'Tugmali', format: 'post', post_html: 't', mahsulot: 'ka' });
+  chaqiruvlar.length = 0;
+  await topikTugma(`time:${e.id}`);
+  const tanlov = qayerga('sendMessage').at(-1).payload.reply_markup.inline_keyboard.flat()[0];
+  await topikTugma(tanlov.callback_data);
+  assert.equal(store.get(e.id).status, 'approved');
+  assert.equal(fmtTime(store.get(e.id).scheduledAt), tanlov.text.replace('🕒 ', ''));
+  assert.equal(qayerga('sendMessage').filter(c => c.payload.chat_id === '@kanal').length, 0);
+  assert.match(qayerga('editMessageText').at(-1).payload.text, /da chiqadi/);
+  // Begona gap (raqamsiz) vaqt savoliga javob deb olinmaydi
+  const f = store.addDraft({ title: 'Gap', format: 'post', post_html: 'g', mahsulot: 'ka' });
+  await topikTugma(`time:${f.id}`);
+  chaqiruvlar.length = 0;
+  await topikXabar('rahmat, keyin qarayman');
+  assert.equal(store.get(f.id).status, 'pending');
+  assert.equal(qayerga('sendMessage').length, 0);
+  delete process.env.PRODUCT_TOPICS;
+});
+
+test("🎥 Video: qanday video kerakligi so'raladi, chiqqan postga ham ishlaydi; video kanalga alohida chiqadi", async () => {
+  const fs = await import('node:fs');
+  const d = store.addDraft({ title: 'Chiqqan', format: 'post', post_html: 'c', status: 'published', channel_msg_ids: [77], cta_kod: 'KOTIB' });
+  chaqiruvlar.length = 0;
+  await tugma(`vid:${d.id}`);
+  const savol = qayerga('sendMessage').at(-1);
+  assert.match(savol.payload.text, /qanday video bo'lsin\?/);
+  assert.deepEqual(savol.payload.reply_markup.inline_keyboard.flat().map(b => b.callback_data), [`vauto:${d.id}`]);
+  assert.doesNotMatch(qayerga('answerCallbackQuery').at(-1).payload.text || '', /allaqachon/);
+  // Yasalgan video: 📢 tugmasi bilan kanalga alohida, asl postga javob bo'lib chiqadi
+  const fayl = `${process.env.DATA_DIR}/v-${d.id}.mp4`;
+  fs.writeFileSync(fayl, 'video');
+  store.update(d.id, { video_path: fayl, video_duration: 30 });
+  chaqiruvlar.length = 0;
+  await tugma(`vpub:${d.id}`);
+  const v = qayerga('sendVideo');
+  assert.equal(v.length, 1);
+  assert.equal(v[0].payload.chat_id, '@kanal');
+  assert.equal(v[0].payload.reply_parameters.message_id, 77);
+  assert.match(v[0].payload.caption, /Direktga <b>KOTIB<\/b>/);
+  assert.ok(store.get(d.id).video_msg_id);
+  assert.match(qayerga('sendMessage').at(-1).payload.text, /Video "Biznes tizimi" kanaliga chiqdi/);
+  chaqiruvlar.length = 0;
+  await tugma(`vpub:${d.id}`);
+  assert.equal(qayerga('sendVideo').length, 0, 'video ikki marta chiqmaydi');
+});
+
+test("🖼 Rasm: tavsif yozilsa — dizayner shu tavsif bo'yicha chizadi; TZ siz postda ham 🎬 ssenariy yozadi", async () => {
+  const { ichki } = await import('../src/muqova.js');
+  let berilgan = null;
+  ichki.matn = async (_d, { izoh } = {}) => { berilgan = izoh; return { type: 'cover', title: 'Sarlavha' }; };
+  ichki.render = async () => [`${process.env.DATA_DIR}/m.png`];
+  const d = store.addDraft({ title: 'Rasmli', format: 'post', post_html: 'r' });
+  chaqiruvlar.length = 0;
+  await tugma(`img:${d.id}`);
+  const savol = qayerga('sendMessage').at(-1);
+  assert.match(savol.payload.text, /Qanday rasm kerakligini yozing/);
+  assert.equal(savol.payload.reply_markup.inline_keyboard.flat()[0].callback_data, `imuq:${d.id}`);
+  await xabar('katta sarlavha "3 ta xato", sariq fon', { chat: { id: -1001, type: 'supergroup' } });
+  assert.equal(berilgan, 'katta sarlavha "3 ta xato", sariq fon');
+  assert.equal(store.get(d.id).image_paths.length, 1);
+  // TZ siz postga ham ssenariy yoziladi (TZ post matnidan tuziladi); bu yerda LLM yo'q — xato aytiladi, jim qolinmaydi
+  chaqiruvlar.length = 0;
+  await tugma(`scr:${d.id}`);
+  assert.match(qayerga('sendMessage')[0].payload.text, /Ssenariy yozilyapti/);
+  assert.match(qayerga('sendMessage').at(-1).payload.text, /Ssenariy yozilmadi/);
+});
+
+test("/zaxira va /tiklash ishlaydi (matn handleri buyruqni yutib yubormaydi); noma'lum buyruqqa yo'riqnoma", async () => {
+  chaqiruvlar.length = 0;
+  await xabar('/zaxira');
+  assert.equal(qayerga('sendDocument').length, 1);
+  assert.match(qayerga('sendDocument')[0].payload.caption, /Kontent Fabrika zaxirasi/);
+  chaqiruvlar.length = 0;
+  await xabar('/tiklash');
+  assert.match(qayerga('sendMessage').at(-1).payload.text, /Zaxira fayliga .* reply qilib \/tiklash/);
+  chaqiruvlar.length = 0;
+  await xabar('/nomalum');
+  assert.match(qayerga('sendMessage').at(-1).payload.text, /Tushunmadim\. Asosiy buyruqlar/);
+});
+
+test("🎙 Ovoz tugmasi faqat ovoz sozlanganda ko'rinadi", async () => {
+  const { sendForApproval } = await import('../src/bot.js');
+  chaqiruvlar.length = 0;
+  await sendForApproval(store.addDraft({ title: 'Ovozsiz', format: 'post', post_html: 'o' }));
+  const tugmalar = qayerga('sendMessage').at(-1).payload.reply_markup.inline_keyboard.flat().map(b => b.callback_data.split(':')[0]);
+  assert.deepEqual(tugmalar, ['ok', 'time', 'now', 'edit', 'scr', 'img', 'vid', 'no']);
 });

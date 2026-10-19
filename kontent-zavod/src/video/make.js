@@ -34,8 +34,8 @@ export function makeVideo(draft, opts) {
 }
 
 // Qoralamadan reels video: motion agent sahnalarni yozadi → (ovoz) → shablon kadrma-kadr MP4 ga render qilinadi
-async function makeVideoIchki(draft, { voice = ttsEnabled() } = {}) {
-  const data = await storyboard(draft);
+async function makeVideoIchki(draft, { voice = ttsEnabled(), izoh = '' } = {}) {
+  const data = await storyboard(draft, { izoh });
   const dir = path.join(cfg.dataDir, 'videos');
   const file = path.join(dir, `${draft.id}.mp4`);
   const parts = voice ? voiceParts(data) : [];

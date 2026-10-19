@@ -109,7 +109,8 @@ export function kinoTozala(r) {
 }
 
 // tz — reels TZ (davomiylik bilan), ssenariy — rahbar tasdiqlagan variant
-export async function kinoReja(tz, ssenariy) {
+// izoh — rahbar tavsifi (shablon, uslub, sahnalar, uzunlik): qoidalardan ustun turadi
+export async function kinoReja(tz, ssenariy, { izoh = '' } = {}) {
   const soniya = Number(tz.davomiylik) || 35, uzun = soniya > 50;
   const r = await askJSON({
     maxTokens: uzun ? 9000 : 6000,
@@ -129,6 +130,7 @@ QOIDALAR:
 ${brand()}`,
     prompt: `TZ:\n${JSON.stringify(tz)}\n\nSSENARIY:\n${JSON.stringify(ssenariy)}\n
 Taxminiy davomiylik: ${soniya} soniya.${tz.cta?.kod ? ` CTA kodi: ${tz.cta.kod}.` : ''}
+${izoh ? `RAHBAR XOHISHI (albatta bajar — shablon, uslub, sahnalar va tartib bo'yicha yuqoridagi qoidalardan ustun; faqat mavjud shablon va sahna turlaridan foydalan): ${izoh}\n` : ''}
 JSON: {"sahnalar":[{"shablon":"...","tur":"...", ...maydonlar, "ovoz":"...","rejissura":"...","subtitr":"...","bob":"...","soniya":4}],
 "smm":{"post_matni":"video ostiga 2–4 gap, oxirida CTA","heshteglar":["#..."],"muqova_matni":"≤ 5 so'z"}}`,
   });

@@ -29,10 +29,10 @@ export function muqovaSlayd(j, d) {
   return oddiy;
 }
 
-// Qaytaradi: { file, slayd }. Claude javob bermasa ham sarlavhali muqova chiqadi.
-export async function muqovaYasa(d) {
+// Qaytaradi: { file, slayd }. Claude javob bermasa ham sarlavhali muqova chiqadi. izoh — rahbar tavsifi
+export async function muqovaYasa(d, { izoh = '' } = {}) {
   let j = null;
-  try { j = await ichki.matn(d); } catch { /* sarlavhali muqova */ }
+  try { j = await ichki.matn(d, { izoh }); } catch { /* sarlavhali muqova */ }
   const slayd = muqovaSlayd(j, d);
   const [file] = await ichki.render({ ...vizual(d.mahsulot || joriy()), slides: [slayd] }, path.join(cfg.dataDir, 'images', d.id, `muqova-${Date.now()}`));
   return { file, slayd };

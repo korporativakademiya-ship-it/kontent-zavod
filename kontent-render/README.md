@@ -22,7 +22,7 @@ Tashqi domeni yo'q — faqat Railway ichki tarmog'ida: `http://kontent-render.ra
 }
 ```
 
-`*so'z*` — ajratib ko'rsatiladi. Rasm bo'lmasa — rangli fon. Chegaralar: 12 sahna, 90 soniya, rasm 8 MB.
+`*so'z*` — ajratib ko'rsatiladi. Rasm bo'lmasa — rangli fon. Chegaralar: 12 sahna, 90 soniya (diktor ovozi bilan — 120), rasm 8 MB.
 
 ### `POST /kino` — shablonli video (asosiy yo'l)
 
