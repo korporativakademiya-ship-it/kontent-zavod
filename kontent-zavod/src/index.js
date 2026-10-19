@@ -11,13 +11,16 @@ import * as reels from './agents/reels.js';
 import * as kontent from './agents/kontent.js';
 import * as kuzatuv from './kuzatuv.js';
 import { suhbat, kunlikTarqat } from './suhbat.js';
+import { bilan } from './mahsulot.js';
 
 // Har kuni g'oya izlash
-cron.schedule(cfg.dailyCron, dailyRun, { timezone: cfg.tz });
+// node-cron vazifaga o'z kontekstini argument qilib beradi — funksiyalar argumentsiz chaqiriladi
+// (aks holda weeklyPlanRun uni mahsulotlar ro'yxati deb oladi: "mlar is not iterable" va reja tuzilmaydi)
+cron.schedule(cfg.dailyCron, () => dailyRun(), { timezone: cfg.tz });
 // Har soat: qoldirilgan kunlik ish va rejadagi yozilmagan yaqin postlar (qayta ishga tushish, band payt)
 cron.schedule('20 * * * *', () => rejaYetibOl().catch(e => log(`⚠️ Rejadan yozishda xato: ${e.message}`)), { timezone: cfg.tz });
 // Haftalik reja (standart: yakshanba 18:00) — tasdiqlangach har kuni ertalab (DAILY_CRON) rejadagi postlar yoziladi
-cron.schedule(cfg.planCron, weeklyPlanRun, { timezone: cfg.tz });
+cron.schedule(cfg.planCron, () => weeklyPlanRun().catch(e => log(`⚠️ Haftalik reja tuzilmadi: ${e.message}`)), { timezone: cfg.tz });
 // Haftalik hisobot (standart: dushanba 09:00)
 cron.schedule(cfg.reportCron, () => weeklyReport(7).catch(e => log(`⚠️ Hisobot xatosi: ${e.message}`)), { timezone: cfg.tz });
 // Kunlik zaxira (Toshkent 03:15) — egasiga shaxsiy chatda jim fayl
@@ -40,7 +43,8 @@ if (kalendarEnabled()) cron.schedule('* * * * *', async () => {
   }
 }, { timezone: cfg.tz });
 // Har daqiqada vaqti kelgan postlarni kanalga chiqarish
-cron.schedule('* * * * *', () => publishDue(bot.api, log), { timezone: cfg.tz });
+// Xabar o'sha post mahsulotining xonasiga tushadi (birinchi mahsulot xonasiga emas)
+cron.schedule('* * * * *', () => publishDue(bot.api, (t, d) => bilan(d?.mahsulot || null, () => log(t))), { timezone: cfg.tz });
 
 // n8n doska uchun API (reels liniyasi). Railway domeni PORT ga yo'naltirilgan
 // Rahbarning ssenariy izohlari ham tahrir izohlari kabi yig'iladi va doimiy qoidalarga aylanadi
@@ -58,6 +62,16 @@ const suhbatQoida = async (b) => {
 const server = apiYarat({ agentlar: { ...reels, tanlov, kontent, kuzatuv, suhbat: suhbatQoida, kunlikTarqat: () => kunlikTarqat({ ...kontent, ...kuzatuv }) }, log: (t) => log(t).catch(() => {}) })
   .listen(Number(process.env.PORT) || 8080, () => console.log('API tayyor'));
 
+// Volume ulanmagan Railway'da DATA_DIR konteyner ichida — har deployda qoralamalar, uslub va rejalar o'chadi
+if (process.env.RAILWAY_ENVIRONMENT && !process.env.RAILWAY_VOLUME_MOUNT_PATH)
+  console.error(`DIQQAT: Railway'da volume ulanmagan — ma'lumotlar (${cfg.dataDir}) har deployda o'chadi. Volume qo'shing (/data) va DATA_DIR=/data qiling.`);
+
+// Telegram ulanishi uzilsa (masalan deploy paytida ikki nusxa: 409) — sababi logga yoziladi, jarayon to'xtaydi va Railway uni qayta ishga tushiradi
+const botXato = (e) => {
+  console.error('Bot to\'xtadi:', e?.description || e?.message || e);
+  setTimeout(() => process.exit(1), 5000).unref();
+};
+
 bot.start({
   // Kanal reaksiyalari standart yangilanishlarga kirmaydi — alohida so'raladi
   allowed_updates: ['message', 'callback_query', 'message_reaction_count'],
@@ -69,7 +83,7 @@ bot.start({
     salomlash().catch(e => console.error('Salom:', e.message));
     // Qayta ishga tushganda soatlik tekshiruvni kutmasdan: o'tkazib yuborilgan ish va avto reja bir daqiqadan keyin
     setTimeout(() => rejaYetibOl().catch(e => log(`⚠️ Rejadan yozishda xato: ${e.message}`)), 60e3);
-  } });
+  } }).catch(botXato);
 // Toza to'xtash: bot va API yopiladi, cron'lar jarayonni ushlab turmaydi
 const toxta = async () => {
   await bot.stop().catch(() => {});

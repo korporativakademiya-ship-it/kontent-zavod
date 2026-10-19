@@ -8,6 +8,8 @@ const TEMPLATE = fileURLToPath(new URL('./carousel.html', import.meta.url));
 // Karusel slaydlarini 1080×1350 PNG qilib saqlaydi, fayl yo'llarini qaytaradi
 export async function renderSlides(data, outDir) {
   fs.mkdirSync(outDir, { recursive: true });
+  // Oldingi chizilgan slaydlar o'chiriladi: qayta yozilgan karuselda slayd kamroq bo'lsa, eskisi kollajga tushmasin
+  for (const f of fs.readdirSync(outDir)) if (/^\d{2}\.png$/.test(f)) fs.rmSync(path.join(outDir, f), { force: true });
   const { browser, page } = await openTemplate(TEMPLATE, data, { width: 540, height: 675 });
   try {
     const n = await page.evaluate(() => window.__ready);

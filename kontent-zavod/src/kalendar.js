@@ -101,7 +101,9 @@ export function applyAction(a, now = Date.now()) {
     }
   }
   if (ref.startsWith('p:')) {
-    const [, planId, itemId] = ref.split(':');
+    // Haftalik reja bandi id'sida ham ':' bor ("2026-10-20-09:00") — reja id'sidan keyingi hammasi band id'si
+    const [, planId, ...qolgan] = ref.split(':');
+    const itemId = qolgan.join(':');
     const { p, it } = findPlanItem(planId, itemId);
     if (!it) return { ok: false, natija: 'Reja bandi topilmadi' };
     if (it.draftId) return applyAction({ ...a, malumot: { ...m, ref: `d:${it.draftId}` } }, now); // allaqachon yozilgan

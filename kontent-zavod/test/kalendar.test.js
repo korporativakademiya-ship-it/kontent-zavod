@@ -54,3 +54,15 @@ test('kochir / olib_tashla on drafts and plan items; published posts are protect
   store.update(pub.id, { status: 'published', publishedAt: iso(-2) });
   assert.equal(applyAction({ tur: 'kochir', malumot: { ref: `d:${pub.id}`, at: iso(5) } }).ok, false);
 });
+
+test("haftalik reja bandi (id'sida ':' bor) CRM'dan ko'chiriladi va olib tashlanadi", () => {
+  const at = iso(80), at2 = iso(90);
+  const pid = `kalreja${Date.now().toString(36)}`; // test bazasi ishga tushirishlar orasida saqlanadi
+  const p = bilan('qa', () => store.addPlan({ id: pid, status: 'approved', from: at.slice(0, 10), to: at.slice(0, 10), slots: [],
+    items: [{ id: '2026-10-20-09:00', title: 'Kal: haftalik band', at, draftId: null }] }));
+  const ref = `p:${p.id}:2026-10-20-09:00`;
+  const r = applyAction({ tur: 'kochir', malumot: { ref, at: at2 } });
+  assert.equal(r.ok, true, r.natija);
+  assert.equal(store.allPlans().find(x => x.id === pid).items[0].at, at2);
+  assert.equal(applyAction({ tur: 'olib_tashla', malumot: { ref } }).ok, true);
+});
