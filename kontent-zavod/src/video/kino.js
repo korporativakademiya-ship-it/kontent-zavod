@@ -24,17 +24,30 @@ export function soniyaIzohdan(izoh = '') {
   return n ? Math.max(10, Math.min(300, Math.round(n))) : 0;
 }
 
-// izoh — rahbar 🎥 bosganda yozgan tavsif ("doska uslubida, 40 soniya, 3 ta qadam"): ssenariy shunga qayta yoziladi
-export async function kinoVideo(d, { fetchFn = fetch, izoh = '' } = {}) {
-  if (!d.tz) throw new Error('kino uchun prodyuser TZ kerak');
-  const rt = reelsTz({ ...d.tz, davomiylik: soniyaIzohdan(izoh) || Number(d.tz.davomiylik) || 35 });
+// Prodyuser TZ si yo'q qoralama (qo'lda yozilgan, eski yoki TZ xato bergan) — TZ post matnidan tuziladi,
+// shunda ssenariy va kino video har qanday postga ishlaydi
+const matnOl = (h = '') => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+export function tzQoralamadan(d) {
+  if (d.tz) return d.tz;
+  const matn = matnOl(d.post_html || d.article_html);
+  return { sarlavha: d.title, mahsulot: d.mahsulot, ilmoq: d.title, asosiy_fikr: matn.slice(0, 400), taklif: '', tuzilma: [],
+    ...(d.cta_kod ? { cta: { maqsad: 'direkt', kod: d.cta_kod } } : {}) };
+}
+
+// izoh — rahbar 🎥 bosganda yozgan tavsif ("doska uslubida, 40 soniya, 3 ta qadam"): ssenariy shunga qayta yoziladi.
+// bosqich — rahbarga jarayon (ssenariy → rejissyor → yig'ish): video bir necha daqiqa oladi, jim turmasin
+export async function kinoVideo(d, { fetchFn = fetch, izoh = '', bosqich = async () => {} } = {}) {
+  const tz = tzQoralamadan(d);
+  const rt = reelsTz({ ...tz, davomiylik: soniyaIzohdan(izoh) || Number(tz.davomiylik) || 35 });
   // Ssenariy: rahbar tanlagan variant bo'lsa — o'sha, aks holda ssenariychi yozadi; tavsif berilsa — shunga qayta yoziladi
   let ss = d.reels?.variantlar?.[d.reels?.tanlangan || 0]?.ssenariy || d.reels?.ssenariy;
   if (!ss || izoh) {
+    await bosqich("✍️ Ssenariy yozilmoqda (diktor matni va ekran yozuvlari)...");
     const r = await reels.ssenariy(rt, izoh ? { izoh, asos: ss || null } : {});
     ss = r.ssenariy;
     store.update(d.id, { reels: r });
   }
+  await bosqich("🎬 Rejissyor sahnalarni tuzmoqda (shablon, kadrlar)...");
   const { sahnalar } = await kinoReja(rt, ss, { izoh });
   const dir = path.join(cfg.dataDir, 'videos', d.id);
   fs.mkdirSync(dir, { recursive: true });
@@ -50,6 +63,7 @@ export async function kinoVideo(d, { fetchFn = fetch, izoh = '' } = {}) {
     }
     tayyor.push(sahna);
   }
+  await bosqich(`🎞 Video yig'ilmoqda: ${sahnalar.length} ta sahna (≈1–2 daqiqa)...`);
   const url = process.env.KONTENT_RENDER_URL.replace(/\/+$/, '') + '/kino';
   const res = await fetchFn(url, {
     method: 'POST', headers: { 'content-type': 'application/json' },
@@ -65,23 +79,25 @@ export async function kinoVideo(d, { fetchFn = fetch, izoh = '' } = {}) {
 // Bitta kirish. VIDEO_TURI=avatar (HeyGen sozlangan) — avatar; aks holda kino servisi ulangan va TZ bor bo'lsa — kino;
 // qolgan hollarda (yoki xato bo'lsa) — ichki GSAP shabloni
 // izoh — rahbar tavsifi: avatar so'ralsa (HeyGen sozlangan bo'lsa) — avatar, aks holda tavsif rejissyor va ssenariychiga beriladi.
-// Tayyor video Telegram chegarasiga (50 MB) sig'diriladi.
-export async function videoYasa(d, { log = async () => {}, izoh = '' } = {}) {
-  const v = await videoTanla(d, { log, izoh: String(izoh || '').trim().slice(0, 600) });
+// Tayyor video Telegram chegarasiga (50 MB) sig'diriladi. bosqich — jarayon holati (rahbarga ko'rinadi)
+export async function videoYasa(d, { log = async () => {}, izoh = '', bosqich = async () => {} } = {}) {
+  const v = await videoTanla(d, { log, izoh: String(izoh || '').trim().slice(0, 600), bosqich });
+  await bosqich('📦 Video tayyorlanmoqda (Telegram uchun)...');
   await telegramgaSigdir(v.file);
   return v;
 }
 
-async function videoTanla(d, { log, izoh }) {
+async function videoTanla(d, { log, izoh, bosqich }) {
   const avatarSorandi = /avatar/i.test(izoh);
   if (avatarSorandi && !heygenYoqilgan()) await log("⚠️ Avatar video sozlanmagan (HEYGEN_API_KEY, HEYGEN_AVATAR_ID) — shablon video yasayman");
   if ((avatarSorandi || (process.env.VIDEO_TURI === 'avatar' && !izoh)) && heygenYoqilgan()) {
     try { return await heygenVideo(d); }
     catch (e) { await log(`⚠️ Avatar video chiqmadi (${d.title}): ${e.message} — boshqa usul bilan yasayman`); }
   }
-  if (kinoYoqilgan() && d.tz) {
-    try { return await kinoVideo(d, { izoh }); }
+  if (kinoYoqilgan()) {
+    try { return await kinoVideo(d, { izoh, bosqich }); }
     catch (e) { await log(`⚠️ Kino video chiqmadi (${d.title}): ${e.message} — oddiy shablon bilan yasayman`); }
   }
+  await bosqich('🎞 Video chizilmoqda (≈1–3 daqiqa)...');
   return makeVideo(store.get(d.id) || d, { izoh });
 }

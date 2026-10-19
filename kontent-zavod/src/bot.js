@@ -9,7 +9,7 @@ import { revise } from './agents/copywriter.js';
 import { writeArticle } from './agents/article.js';
 import { isRich, sendRich, approvalPrefix } from './rich.js';
 import { nextSlot, nextSlots, fmtTime, parseTime, publish, videoniChiqar, sendMediaPost, sendSafe, imagePaths, AllaqachonChiqqan } from './publisher.js';
-import { videoYasa } from './video/kino.js';
+import { videoYasa, tzQoralamadan } from './video/kino.js';
 import { heygenYoqilgan } from './video/heygen.js';
 import * as reels from './agents/reels.js';
 import { ttsEnabled, TTS_SETUP, synth, speechText, toVoiceNote } from './tts.js';
@@ -66,11 +66,15 @@ bot.use(async (ctx, next) => {
   return ctx.reply(`⛔ Bu buyruq faqat rahbar uchun. Sizning Telegram ID: ${ctx.from?.id}\n` +
     "Siz rahbar bo'lsangiz, bot egasi shu raqamni ADMIN_IDS sozlamasiga qo'shishi kerak (bir nechta bo'lsa vergul bilan).");
 });
-const kb = (id) => new InlineKeyboard()
-  .text('✅ Tasdiqlash', `ok:${id}`).text('🕒 Vaqt belgilash', `time:${id}`).row()
-  .text('⚡ Hozir', `now:${id}`).text('✏️ Tahrir', `edit:${id}`).text('🎬 Ssenariy', `scr:${id}`).row()
-  .text('🖼 Rasm', `img:${id}`).text('🎥 Video', `vid:${id}`).text('🎙 Ovoz', `aud:${id}`).row()
-  .text('❌ Rad', `no:${id}`);
+// 🎙 Ovoz — faqat ovoz provayderi (TTS_PROVIDER) sozlangan bo'lsa: aks holda tugma bosilganda faqat xato chiqardi
+const kb = (id) => {
+  const k = new InlineKeyboard()
+    .text('✅ Tasdiqlash', `ok:${id}`).text('🕒 Vaqt belgilash', `time:${id}`).row()
+    .text('⚡ Hozir', `now:${id}`).text('✏️ Tahrir', `edit:${id}`).text('🎬 Ssenariy', `scr:${id}`).row()
+    .text('🖼 Rasm', `img:${id}`).text('🎥 Video', `vid:${id}`);
+  if (ttsEnabled()) k.text('🎙 Ovoz', `aud:${id}`);
+  return k.row().text('❌ Rad', `no:${id}`);
+};
 // Rejalashtirilgan qoralama tugmalari: holat + vaqtni o'zgartirish
 const schedKb = (d) => new InlineKeyboard()
   .text(`✅ ${fmtTime(d.scheduledAt)} da chiqadi`, 'noop').row()
@@ -147,8 +151,12 @@ async function videoRun(d, { izoh = '' } = {}) {
   const reply = (t) => bot.api.sendMessage(chatId, t, joy).catch(() => {});
   videoBusy = true;
   try {
-    await reply(`🎥 "${d.title}" — video yasalmoqda (1–3 daqiqa)${izoh ? `\nTavsifingiz: ${izoh.slice(0, 200)}` : ''}...`);
-    const v = await videoYasa(d, { log: reply, izoh });
+    // Video 3–6 daqiqa oladi (ssenariy, rejissyor, yig'ish) — bitta xabar bosqichma-bosqich yangilanadi, rahbar jim kutmaydi
+    const bosh = `🎥 "${d.title}" — video yasalmoqda (3–6 daqiqa)${izoh ? `\nTavsifingiz: ${izoh.slice(0, 200)}` : ''}`;
+    const holat = await bot.api.sendMessage(chatId, `${bosh}\n⏳ Boshlandi...`, joy).catch(() => null);
+    const bosqich = async (t) => { if (holat) await bot.api.editMessageText(chatId, holat.message_id, `${bosh}\n${t}`).catch(() => {}); };
+    const v = await videoYasa(d, { log: reply, izoh, bosqich });
+    await bosqich('✅ Tayyor — video pastda.');
     const nd = store.update(d.id, { video_path: v.file, video_duration: v.duration, motion: v.data, video_izoh: izoh || null, video_msg_id: null });
     const chiqqan = nd.status === 'published';
     const cap = `<b>🎥 Video</b> | ${esc(d.title)} | ${Math.round(v.duration)} s${v.voiced ? ' | 🎙 dublyaj' : ''}\n<i>${
@@ -815,7 +823,7 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|vauto|vpub|img|imuq|iai|idel|a
     await ctx.answerCallbackQuery();
     return ask(ctx, `🎥 "${esc(d.title)}" — qanday video bo'lsin?\nShu yerga yozing: uslub (doska, plakat, chat yozishma, grid kartochkalar${heygenYoqilgan() ? ', avatar' : ''}), ` +
       `uzunligi, nimani ko'rsatish, oxirida nima deyish.\n<i>Masalan: doska uslubida, 40 soniya, 3 ta xato va yechimi, oxirida Direktga yozing</i>\n` +
-      `Yoki 🤖 bosing — agentlar o'zi tanlaydi.`, { kind: 'video', id }, new InlineKeyboard().text('🤖 O\'zing tanla', `vauto:${id}`));
+      `Yoki 🤖 bosing — agentlar o'zi tanlaydi.`, { kind: 'video', id, muddat: 10 * 60e3 }, new InlineKeyboard().text('🤖 O\'zing tanla', `vauto:${id}`));
   }
   if (act === 'vauto') {
     if (videoBusy) return ctx.answerCallbackQuery({ text: 'Boshqa video yasalmoqda, biroz kuting' });
@@ -887,7 +895,7 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|vauto|vpub|img|imuq|iai|idel|a
     return ask(ctx, `🖼 "${esc(d.title)}" uchun rasm.\n• Rasm yuboring — postga qo'shaman (bir nechta bo'lsa, albom bo'ladi)\n` +
       `• Qanday rasm kerakligini yozing — shunday ${rasmYoqilgan() ? 'chizaman (AI rasm)' : 'kartochka chizaman (AI rasm uchun GEMINI_API_KEY kerak)'}. ` +
       `<i>Masalan: ${rasmYoqilgan() ? 'ofisda charchagan rahbar, kechki chiroq, iliq ranglar' : 'katta sarlavha "3 ta xato", ostida "rahbar vaqtini yeydi"'}</i>\n` +
-      `• Yoki tugmani bosing — dizayner o'zi tanlaydi` + (has ? `\nHozir ${has} ta rasm bor.` : ''), { kind: 'image', id }, rasmKb(d));
+      `• Yoki tugmani bosing — dizayner o'zi tanlaydi` + (has ? `\nHozir ${has} ta rasm bor.` : ''), { kind: 'image', id, muddat: 10 * 60e3 }, rasmKb(d));
   }
   if (act === 'imuq' || act === 'iai' || act === 'idel') {
     await ctx.answerCallbackQuery();
@@ -913,10 +921,10 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|vauto|vpub|img|imuq|iai|idel|a
     await ctx.answerCallbackQuery();
     const opt = { parse_mode: 'HTML', message_thread_id: tema() };
     if (d.reels_script) return ctx.reply(`🎬 <b>Reels ssenariy</b>\n\n${esc(d.reels_script)}`, opt);
-    if (!d.tz) return ctx.reply("🎬 Bu postga ssenariy yozilmagan (prodyuser TZ yo'q). 🎥 Video bosilsa, ssenariy video bilan birga yoziladi.", opt);
     await ctx.reply('🎬 Ssenariy yozilyapti (1–2 daqiqa)...', opt);
     try {
-      const r = await reels.ssenariy(reelsTz({ ...d.tz, davomiylik: Number(d.tz.davomiylik) || 35 }));
+      const tz = tzQoralamadan(d);
+      const r = await reels.ssenariy(reelsTz({ ...tz, davomiylik: Number(tz.davomiylik) || 35 }));
       const nd = store.update(id, { reels: r, reels_script: ssenariyMatni(r.ssenariy) });
       return ctx.reply(`🎬 <b>Reels ssenariy</b>\n\n${esc(nd.reels_script)}\n\n<i>🎥 Video shu ssenariy bo'yicha yasaladi.</i>`, opt);
     } catch (e) { return ctx.reply(`⚠️ Ssenariy yozilmadi: ${e.message}`, opt); }

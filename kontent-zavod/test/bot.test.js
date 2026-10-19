@@ -236,7 +236,7 @@ test("🎥 Video: qanday video kerakligi so'raladi, chiqqan postga ham ishlaydi;
   assert.equal(qayerga('sendVideo').length, 0, 'video ikki marta chiqmaydi');
 });
 
-test("🖼 Rasm: tavsif yozilsa — dizayner shu tavsif bo'yicha chizadi; ssenariysiz postda 🎬 sababini aytadi", async () => {
+test("🖼 Rasm: tavsif yozilsa — dizayner shu tavsif bo'yicha chizadi; TZ siz postda ham 🎬 ssenariy yozadi", async () => {
   const { ichki } = await import('../src/muqova.js');
   let berilgan = null;
   ichki.matn = async (_d, { izoh } = {}) => { berilgan = izoh; return { type: 'cover', title: 'Sarlavha' }; };
@@ -250,9 +250,11 @@ test("🖼 Rasm: tavsif yozilsa — dizayner shu tavsif bo'yicha chizadi; ssenar
   await xabar('katta sarlavha "3 ta xato", sariq fon', { chat: { id: -1001, type: 'supergroup' } });
   assert.equal(berilgan, 'katta sarlavha "3 ta xato", sariq fon');
   assert.equal(store.get(d.id).image_paths.length, 1);
+  // TZ siz postga ham ssenariy yoziladi (TZ post matnidan tuziladi); bu yerda LLM yo'q — xato aytiladi, jim qolinmaydi
   chaqiruvlar.length = 0;
   await tugma(`scr:${d.id}`);
-  assert.match(qayerga('sendMessage').at(-1).payload.text, /ssenariy yozilmagan/);
+  assert.match(qayerga('sendMessage')[0].payload.text, /Ssenariy yozilyapti/);
+  assert.match(qayerga('sendMessage').at(-1).payload.text, /Ssenariy yozilmadi/);
 });
 
 test("/zaxira va /tiklash ishlaydi (matn handleri buyruqni yutib yubormaydi); noma'lum buyruqqa yo'riqnoma", async () => {
@@ -266,4 +268,12 @@ test("/zaxira va /tiklash ishlaydi (matn handleri buyruqni yutib yubormaydi); no
   chaqiruvlar.length = 0;
   await xabar('/nomalum');
   assert.match(qayerga('sendMessage').at(-1).payload.text, /Tushunmadim\. Asosiy buyruqlar/);
+});
+
+test("🎙 Ovoz tugmasi faqat ovoz sozlanganda ko'rinadi", async () => {
+  const { sendForApproval } = await import('../src/bot.js');
+  chaqiruvlar.length = 0;
+  await sendForApproval(store.addDraft({ title: 'Ovozsiz', format: 'post', post_html: 'o' }));
+  const tugmalar = qayerga('sendMessage').at(-1).payload.reply_markup.inline_keyboard.flat().map(b => b.callback_data.split(':')[0]);
+  assert.deepEqual(tugmalar, ['ok', 'time', 'now', 'edit', 'scr', 'img', 'vid', 'no']);
 });

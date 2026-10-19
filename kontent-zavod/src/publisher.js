@@ -144,10 +144,10 @@ export async function publish(api, draft) {
   try { return await publishIchki(api, joriy); } finally { chiqyapti.delete(draft.id); }
 }
 
-// Telegram qaytargan rich xabarda video bloki bormi (Video obyekti — file_id bilan)
+// Telegram qaytargan rich xabarda video bloki bormi (ovozsiz MP4 ni Telegram animatsiya qilib saqlashi mumkin)
 export function richdaVideo(v, chuqur = 0) {
   if (!v || typeof v !== 'object' || chuqur > 12) return false;
-  if (v.video && typeof v.video === 'object' && v.video.file_id) return true;
+  if (['video', 'animation'].some(k => v[k] && typeof v[k] === 'object' && v[k].file_id)) return true;
   return Object.values(v).some(x => richdaVideo(x, chuqur + 1));
 }
 
