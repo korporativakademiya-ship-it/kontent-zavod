@@ -85,8 +85,11 @@ Strateg har g'oyaga format tanlaydi: `post`, `maqola`, `karusel` yoki `reels`.
 - **✅ Tasdiqlash** — post darhol kanalga chiqadi (haftalik rejadan yozilgani — reja vaqtida).
 - **⚡ Hozir** — darhol kanalga (rejalashtirilgan post ham).
 - **🕒 Vaqt belgilash / 🕒 Vaqtni o'zgartirish** — keyingi 3 ta bo'sh vaqt (`POST_TIMES`) tugma bo'lib chiqadi; boshqa
-  vaqtni shu chat yoki topikka oddiy xabar qilib yozasiz (reply shart emas): `18:30`, `ertaga 09:00`, `indinga 10:00`,
-  `28.09 19:00` (Toshkent vaqti). Post o'sha vaqtda chiqadi. **↩️ Navbatdan olish** — rejadan chiqaradi.
+  vaqtni shu chat yoki topikka oddiy xabar qilib yozasiz (reply shart emas). Bot erkin yozuvni tushunadi (Toshkent vaqti):
+  `18:30`, `18.30`, `soat 7` (tushdan keyin — 19:00), `7 da`, `kechqurun 8`, `ertaga 9`, `indinga 10:00`, `juma 18:00`,
+  `juma kuni` (o'sha kunning birinchi `POST_TIMES` vaqti), `28.10 19:00`, `20-oktabr 10:00`, `30 daqiqadan keyin`,
+  `1 soatdan keyin`, kirillcha (`ертага соат 9`) va ruscha (`завтра в 10`). Javobda qaysi kun va soatga qo'yilgani yoziladi.
+  Post o'sha vaqtda chiqadi. **↩️ Navbatdan olish** — rejadan chiqaradi.
 - `/navbat` — rejalashtirilganlar ro'yxati; bosib vaqtini o'zgartirasiz.
 - Bot savol bersa (vaqt, tahrir izohi, rasm yoki video tavsifi, rad sababi), javobni reply qilmasdan ham yozish mumkin:
   shu chat/topikdagi keyingi xabaringiz 30 daqiqa ichida javob hisoblanadi.

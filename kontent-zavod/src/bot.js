@@ -8,7 +8,7 @@ import { runPipeline, renderDraftSlides, produceDraft } from './pipeline.js';
 import { revise } from './agents/copywriter.js';
 import { writeArticle } from './agents/article.js';
 import { isRich, sendRich, approvalPrefix } from './rich.js';
-import { nextSlot, nextSlots, fmtTime, parseTime, publish, videoniChiqar, sendMediaPost, sendSafe, imagePaths, AllaqachonChiqqan } from './publisher.js';
+import { nextSlot, nextSlots, fmtTime, parseTime, vaqtgaOxshaydi, publish, videoniChiqar, sendMediaPost, sendSafe, imagePaths, AllaqachonChiqqan } from './publisher.js';
 import { videoYasa, tzQoralamadan } from './video/kino.js';
 import { heygenYoqilgan } from './video/heygen.js';
 import * as reels from './agents/reels.js';
@@ -80,7 +80,8 @@ const schedKb = (d) => new InlineKeyboard()
   .text(`✅ ${fmtTime(d.scheduledAt)} da chiqadi`, 'noop').row()
   .text('🕒 Vaqtni o\'zgartirish', `time:${d.id}`).text('⚡ Hozir', `now:${d.id}`).row()
   .text('↩️ Navbatdan olish', `unq:${d.id}`);
-const TIME_HELP = 'Masalan: <code>18:30</code>, <code>ertaga 09:00</code>, <code>indinga 10:00</code>, <code>28.09 19:00</code> (Toshkent vaqti)';
+const TIME_HELP = 'Masalan: <code>18:30</code>, <code>soat 7</code>, <code>kechqurun 8</code>, <code>ertaga 9</code>, <code>juma 10:00</code>, ' +
+  '<code>20-oktabr 18:00</code>, <code>1 soatdan keyin</code> (Toshkent vaqti)';
 
 // Xabar qaysi topikda (forum mavzusi): oddiy guruh va shaxsiy chatda — null
 const topikIchida = (msg) => (msg?.is_topic_message ? msg.message_thread_id ?? null : null);
@@ -1001,9 +1002,10 @@ bot.on('message:text', async (ctx, next) => {
   if (w.kind === 'time') {
     const at = parseTime(matn);
     if (!at) {
-      // Reply'siz xabarda raqam bo'lmasa — bu vaqt emas, boshqa gap: jim o'tkazib yuboriladi
-      if (!replyBilan && !/\d/.test(matn)) return;
-      return ctx.reply(`Vaqtni tushunmadim yoki u o'tib ketgan. ${TIME_HELP}\nYana yozing yoki yuqoridagi tugmadan tanlang.`, { ...opt, parse_mode: 'HTML' });
+      // Reply'siz xabarda vaqtga oid hech narsa bo'lmasa — bu boshqa gap: jim o'tkazib yuboriladi
+      if (!replyBilan && !vaqtgaOxshaydi(matn)) return;
+      if (/^(hozir|darhol|srazu|seychas)/i.test(matn)) return ctx.reply('Darhol chiqarish uchun qoralamadagi ⚡ Hozir tugmasini bosing.', opt);
+      return ctx.reply(`"${esc(matn.slice(0, 60))}" — vaqtni tushunmadim yoki u o'tib ketgan.\n${TIME_HELP}\nYana yozing yoki yuqoridagi tugmadan tanlang.`, { ...opt, parse_mode: 'HTML' });
     }
     store.takeWait(kalit);
     if (d.status === 'published') return ctx.reply('Bu post allaqachon chiqqan.', opt);

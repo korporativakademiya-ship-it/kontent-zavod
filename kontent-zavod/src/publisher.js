@@ -29,31 +29,118 @@ export function nextSlots(n = 3) {
   return out.length ? out : [new Date(Date.now() + H).toISOString()];
 }
 
-// Rahbar yozgan vaqtni ISO ga aylantiradi (Toshkent vaqti). Tushunmasa yoki o'tib ketgan bo'lsa — null
-// Qabul qiladi: "18:30", "bugun 18:30", "ertaga 9:00", "indinga 10:00", "28.09 18:30", "28.09.2026 18:30"
+// Kirill (o'zbek va rus) → lotin: "ертага соат 9" → "ertaga soat 9", "завтра в 10" → "zavtra v 10"
+const KIRILL = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'j', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p',
+  р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'x', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sh', ъ: "'", ы: 'i', ь: '', э: 'e', ю: 'yu', я: 'ya', ў: "o'", қ: 'q', ғ: "g'", ҳ: 'h' };
+const lotin = (s) => s.replace(/[а-яёўқғҳ]/g, c => KIRILL[c] ?? c);
+
+const HAFTA = [['yakshanba', 0], ['dushanba', 1], ['seshanba', 2], ['chorshanba', 3], ['payshanba', 4], ['juma', 5], ['shanba', 6],
+  ['voskresen', 0], ['ponedel', 1], ['vtornik', 2], ['sred', 3], ['chetverg', 4], ['pyatnits', 5], ['subbot', 6]];
+const OYLAR = ['yan', 'fev', 'mar', 'apr', 'may', 'iyun', 'iyul', 'avg', 'sen', 'okt', 'noy', 'dek'];
+// To'liq oy nomlari (o'zbek va ruscha qo'shimchalar bilan) — "mayli" kabi so'zlar oy deb olinmasin
+const OY_RE = "(yanvar[a-z']*|fevral[a-z']*|mart[a-z']*|aprel[a-z']*|may(?:a|ning|da|ga)?|iyun[a-z']*|iyul[a-z']*|avgust[a-z']*|sent?yabr[a-z']*|sentabr[a-z']*|okt?yabr[a-z']*|oktabr[a-z']*|noyabr[a-z']*|dekabr[a-z']*)(?![a-z])";
+const oyRaqami = (w) => OYLAR.findIndex(o => w.startsWith(o));
+const SOZ = (w) => new RegExp(`(^|[^a-z'])${w}`);
+// Matnda vaqtga oid so'z bormi (reply'siz javobda boshqa gapni vaqt deb olmaslik uchun)
+export const vaqtgaOxshaydi = (text) => /\d/.test(text) || /(bugun|ertaga|indinga|shanba|juma|soat|daqiqa|minut|kechqurun|ertalab|zavtra|segodnya|poslezavtra|cherez)/
+  .test(lotin(String(text).toLowerCase()));
+
+// Rahbar yozgan vaqtni ISO ga aylantiradi (Toshkent vaqti). Tushunmasa yoki o'tib ketgan bo'lsa — null.
+// Qabul qiladi: "18:30", "18.30", "18 30", "soat 7", "7 da", "kechqurun 7", "ertaga 9", "ertaga soat 9:30 da",
+// "indinga 10:00", "dushanba 10:00", "juma kuni", "28.09 18:30", "28.09.2026 18:30", "20-oktabr 10:00", "oktabr 20 soat 9",
+// "30 daqiqadan keyin", "1 soatdan keyin", "yarim soatdan keyin", kirillcha ("ертага соат 9") va ruscha ("завтра в 10").
+// Faqat kun yozilsa ("ertaga", "dushanba") — o'sha kunning birinchi chiqish vaqti (POST_TIMES).
 export function parseTime(text, now = Date.now()) {
-  const s = String(text).trim().toLowerCase().replace(/\s+/g, ' ');
-  const tm = s.match(/(\d{1,2})[:.](\d{2})$/);
-  if (!tm) return null;
-  const h = Number(tm[1]), m = Number(tm[2]);
-  if (h > 23 || m > 59) return null;
-  const local = new Date(now + cfg.tzOffsetH * H);
+  let s = ` ${lotin(String(text).toLowerCase()).replace(/[‘’ʻʼ`´]/g, "'").replace(/\s+/g, ' ').trim()} `;
+  if (!s.trim()) return null;
+  const tz = cfg.tzOffsetH;
+  const local = new Date(now + tz * H);
+
+  // 1) Nisbiy vaqt: "30 daqiqadan keyin", "1 soatdan so'ng", "yarim soatdan keyin", "cherez 2 chasa"
+  const nis = s.match(/(cherez\s+)?(\d+(?:[.,]5)?|yarim|bir|ikki|uch)\s*(daqiqa|minut|min|soat|chas)[a-z']*\s*(dan\s*)?(keyin|so'?ng)?/);
+  if (nis && (nis[1] || nis[5])) {
+    const n = { yarim: 0.5, bir: 1, ikki: 2, uch: 3 }[nis[2]] ?? Number(nis[2].replace(',', '.'));
+    const ms = n * (/^(soat|chas)/.test(nis[3]) ? H : 60e3);
+    return ms >= 60e3 && ms <= 30 * 24 * H ? new Date(Math.ceil((now + ms) / 60e3) * 60e3).toISOString() : null;
+  }
+
+  // 2) Sana: oy nomi bilan ("20-oktabr", "20 oktyabrya", "oktabr 20")
+  let sana = null;
+  const kes = (m) => { s = s.replace(m[0], ' '); };
+  let m = s.match(new RegExp(`(\\d{1,2})\\s*-?\\s*${OY_RE}`)) || s.match(new RegExp(`${OY_RE}\\s*(\\d{1,2})(?![:.\\d])`));
+  if (m) {
+    const [kun, oy] = /^\d/.test(m[1]) ? [m[1], m[2]] : [m[2], m[1]];
+    sana = { d: Number(kun), mo: oyRaqami(oy) };
+    kes(m);
+  }
+  // 3) Soat ikki nuqta bilan — eng ishonchli: "18:30"
+  let h = null, mi = 0;
+  m = s.match(/(\d{1,2})\s*:\s*(\d{2})(?!\d)/);
+  if (m) { h = Number(m[1]); mi = Number(m[2]); kes(m); }
+  // 4) Raqamli sana: "28.09.2026", "28.09", "28/09"; soat hali topilmagan bo'lsa yagona "18.30" — bu soat
+  m = s.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+  if (m && !sana) { sana = { d: Number(m[1]), mo: Number(m[2]) - 1, y: Number(m[3].length === 2 ? '20' + m[3] : m[3]) }; kes(m); }
+  const juftlar = [...s.matchAll(/(\d{1,2})[./-](\d{1,2})(?!\d)/g)];
+  const soatSozi = /soat\s*\d|\d\s*(da|ga|lar|chi)\b|\bv\s*\d/.test(s);
+  if (juftlar.length && !sana && (h !== null || juftlar.length > 1 || soatSozi)) {
+    sana = { d: Number(juftlar[0][1]), mo: Number(juftlar[0][2]) - 1 };
+    kes(juftlar[0]);
+    juftlar.shift();
+  }
+  if (h === null && juftlar.length) { h = Number(juftlar[0][1]); mi = Number(juftlar[0][2]); kes(juftlar[0]); }
+  // 5) "18 30" — ikki son bo'sh joy bilan
+  if (h === null && (m = s.match(/(?:^|[^\d])(\d{1,2}) (\d{2})(?!\d)/)) && Number(m[2]) < 60) { h = Number(m[1]); mi = Number(m[2]); kes(m); }
+  // 6) Faqat soat: "soat 7", "7 da", "7 yarim", "v 10", yoki matndagi yagona son
+  let faqatSoat = false;
+  if (h === null) {
+    faqatSoat = true;
+    m = s.match(/soat\s*(\d{1,2})/) || s.match(/(?:^|[^\d])(\d{1,2})\s*(?:da|ga|lar|larda|chi)\b/) || s.match(/\bv\s*(\d{1,2})\b/);
+    const sonlar = s.match(/\d+/g) || [];
+    if (!m && sonlar.length === 1 && sonlar[0].length <= 2) m = [sonlar[0], sonlar[0]];
+    if (m) { h = Number(m[1]); mi = /yarim/.test(s) ? 30 : 0; }
+  }
+  // Kun qismi: "kechqurun 7" → 19:00, "tushdan keyin 3" → 15:00
+  const kunQismi = /(kechqurun|kechki|kech\b|oqshom|tushdan keyin|vecher|dnya|pm\b|ertalab|tong|utra|am\b)/.test(s);
+  if (h !== null && h < 12 && /(kechqurun|kechki|kech\b|oqshom|tushdan keyin|vecher|dnya|pm\b)/.test(s)) h += 12;
+  if (h === 12 && /(ertalab|tong|utra|am\b)/.test(s)) h = 0;
+
+  // 7) Kun: bugun / ertaga / indinga / hafta kuni
+  let siljish = null, haftaKuni = null;
+  if (/(^|[^a-z])(bugun|segodnya)/.test(s)) siljish = 0;
+  if (/(^|[^a-z])(ertaga|zavtra)/.test(s)) siljish = 1;
+  if (/(^|[^a-z])(indinga|poslezavtra)/.test(s)) siljish = 2;
+  for (const [w, n] of HAFTA) if (SOZ(w).test(s)) { haftaKuni = n; break; }
+  const kunBor = sana || siljish !== null || haftaKuni !== null;
+  if (h === null && !kunBor) return null;
+  // "soat 3", "7 da" (daqiqasiz, ertalab/kechqurun aytilmagan): 1–5 — kunduzi (15:00); 6–9 — kun aytilmagan bo'lsa
+  // eng yaqin kelgusi (tushdan keyin "soat 7" — bugun 19:00, ertalab "soat 9" — bugun 09:00)
+  if (faqatSoat && h !== null && !kunQismi && h >= 1 && h <= 5) h += 12;
+  const yaqiniTanlansin = faqatSoat && h !== null && !kunQismi && !kunBor && h >= 6 && h <= 9;
+
   let y = local.getUTCFullYear(), mo = local.getUTCMonth(), d = local.getUTCDate();
-  const rest = s.slice(0, tm.index).trim();
-  const date = rest.match(/^(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?$/);
-  let explicitDay = true;
-  if (date) {
-    d = Number(date[1]); mo = Number(date[2]) - 1;
-    if (date[3]) y = Number(date[3].length === 2 ? '20' + date[3] : date[3]);
-    if (mo > 11 || d < 1 || d > 31) return null;
-  } else if (rest === 'ertaga') d += 1;
-  else if (rest === 'indinga') d += 2;
-  else if (rest === '' ) explicitDay = false;
-  else if (rest !== 'bugun') return null;
-  let utc = Date.UTC(y, mo, d, h - cfg.tzOffsetH, m);
-  if (date && !date[3] && utc < now - 60e3) utc = Date.UTC(y + 1, mo, d, h - cfg.tzOffsetH, m); // yil ko'rsatilmagan va o'tgan — keyingi yil
-  if (!explicitDay && utc <= now) utc += 24 * H; // faqat soat yozilgan va bugun o'tgan — ertaga
-  return utc > now ? new Date(utc).toISOString() : null;
+  if (sana) {
+    if (sana.mo < 0 || sana.mo > 11 || sana.d < 1 || sana.d > 31) return null;
+    ({ d, mo } = sana); if (sana.y) y = sana.y;
+  } else if (siljish !== null) d += siljish;
+  else if (haftaKuni !== null) d += (haftaKuni - local.getUTCDay() + 7) % 7;
+
+  if (yaqiniTanlansin) {
+    const nomzod = [h, h + 12].map(hh => { const u = Date.UTC(y, mo, d, hh - tz, mi); return u > now ? u : u + 24 * H; });
+    return new Date(Math.min(...nomzod)).toISOString();
+  }
+  // Soat yozilmagan — o'sha kunning birinchi kelgusi chiqish vaqti (POST_TIMES)
+  const vaqtlar = h === null ? cfg.postTimes.map(t => t.split(':').map(Number)) : [[h, mi]];
+  for (const [hh, mm] of vaqtlar) {
+    if (!(hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59)) return null;
+    let utc = Date.UTC(y, mo, d, hh - tz, mm);
+    // 31.02 kabi yo'q sana — rad
+    if (sana && new Date(utc + tz * H).getUTCDate() !== sana.d) return null;
+    if (sana && !sana.y && utc < now - 60e3) utc = Date.UTC(y + 1, mo, d, hh - tz, mm); // yil yozilmagan va o'tgan — keyingi yil
+    if (!kunBor && utc <= now) utc += 24 * H;             // faqat soat yozilgan va bugun o'tgan — ertaga
+    if (haftaKuni !== null && !sana && siljish === null && utc <= now) utc += 7 * 24 * H; // shu hafta kuni o'tgan — keyingi hafta
+    if (utc > now) return new Date(utc).toISOString();
+  }
+  return null;
 }
 
 export function fmtTime(iso) {

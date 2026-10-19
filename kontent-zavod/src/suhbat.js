@@ -207,7 +207,7 @@ async function ichki({ chatId: guruh, thread = '', text = '', tugma = '', hodisa
       saqla(chatId, { bosqich: 'bosh' });
       return { xabarlar: [xab(`📅 Tayyor! ${r.kanal} kanaliga ${r.vaqt} da chiqadi.`)] };
     }
-    if (tugma === 'j_vaqt') { saqla(chatId, { ...h, bosqich: 'joyla_vaqt' }); return { xabarlar: [xab("🕒 Qachon? Masalan: 19:00, ertaga 09:00, 03.10 18:30")] }; }
+    if (tugma === 'j_vaqt') { saqla(chatId, { ...h, bosqich: 'joyla_vaqt' }); return { xabarlar: [xab("🕒 Qachon? Masalan: 19:00, soat 7, ertaga 9, juma 10:00, 20-oktabr 18:00, 1 soatdan keyin")] }; }
     if (tugma === 'j_no') { saqla(chatId, { bosqich: 'bosh' }); return { xabarlar: [xab('🗂 Joylanmadi, post Fabrikada saqlanib qoldi.')] }; }
     return { xabarlar: [xab("Noma'lum tugma.")] };
   }
@@ -245,7 +245,7 @@ async function ichki({ chatId: guruh, thread = '', text = '', tugma = '', hodisa
     let r;
     try { r = k.joyla({ draft_id: h.draft_id, vaqt: t, qatiy: true }); }
     catch (e) {
-      if (e.vaqtXato) return { xabarlar: [xab(`🕒 ${e.message}. Masalan: 19:00, ertaga 09:00, 03.10 18:30`, 'joyla')] };
+      if (e.vaqtXato) return { xabarlar: [xab(`🕒 ${e.message}. Masalan: 19:00, soat 7, ertaga 9, juma 10:00, 20-oktabr 18:00, 1 soatdan keyin`, 'joyla')] };
       saqla(chatId, { bosqich: 'bosh' }); // allaqachon chiqqan / topilmadi — suhbat boshiga
       throw e;
     }
