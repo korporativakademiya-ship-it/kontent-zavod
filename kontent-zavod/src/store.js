@@ -39,6 +39,17 @@ export const store = {
     save();
   },
   peekWait: (msgId) => db.waits[msgId],
+  // Reply qilinmagan javob: shu chat/topikda shu rahbarga so'nggi 30 daqiqada berilgan savol (eng yangisi).
+  // Guruhda Telegram reply oynasini o'zi ochmaydi — rahbar vaqt yoki izohni oddiy xabar qilib yozadi.
+  ochiqWait({ chat, thr = null, kim }, maxMs = 30 * 60e3) {
+    let topildi = null;
+    for (const [k, w] of Object.entries(db.waits)) {
+      if (w.chat == null || String(w.chat) !== String(chat) || (w.thr ?? null) !== (thr ?? null) || w.kim !== kim) continue;
+      if (Date.now() - w.at > (w.muddat || maxMs) || (topildi && db.waits[topildi].at > w.at)) continue;
+      topildi = k;
+    }
+    return topildi;
+  },
   // Uslub xotirasi: namuna postlar, uslub tavsifi, tahrirlardan chiqqan qoidalar
   style() {
     db.style = { samples: [], guide: '', rules: [], feedback: [], ...db.style };
@@ -107,5 +118,12 @@ export const store = {
     profillarniQollash(db.settings?.mahsulotlar);
     return { drafts: db.drafts.length, ideas: db.ideas.length, plans: db.plans.length, rules: db.style?.rules?.length || 0, samples: db.style?.samples?.length || 0 };
   },
-  takeWait(msgId) { const w = db.waits[msgId]; if (w) { delete db.waits[msgId]; save(); } return w; }
+  takeWait(msgId) { const w = db.waits[msgId]; if (w) { delete db.waits[msgId]; save(); } return w; },
+  // Qoralamaga tegishli hamma ochiq savollar (vaqt tugma bilan tanlansa — "qachon chiqsin?" savoli yopiladi)
+  dropWaits(id, kind) {
+    let n = 0;
+    for (const [k, w] of Object.entries(db.waits)) if (w.id === id && (!kind || w.kind === kind)) { delete db.waits[k]; n++; }
+    if (n) save();
+    return n;
+  }
 };

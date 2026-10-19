@@ -7,22 +7,26 @@ import { isRich, sendRich } from './rich.js';
 const H = 3600e3;
 
 // Keyingi bo'sh vaqt (Toshkent vaqti bo'yicha POST_TIMES dan)
-export function nextSlot() {
+export const nextSlot = () => nextSlots(1)[0];
+
+// Keyingi n ta bo'sh vaqt — 🕒 Vaqt belgilash tugmalari uchun
+export function nextSlots(n = 3) {
   const taken = new Set(store.byStatus('approved').map(d => d.scheduledAt));
   // Tasdiqlangan haftalik rejadagi hali yozilmagan postlar vaqti ham band
   for (const p of store.allPlans().filter(x => x.status === 'approved')) for (const it of p.items) if (!it.draftId) taken.add(it.at);
   // Rejadan yozilgan, lekin hali tasdiqlanmagan qoralamalarning reja vaqti ham band
   for (const d of store.byStatus('pending')) if (d.plannedAt) taken.add(d.plannedAt);
   const nowT = new Date(Date.now() + cfg.tzOffsetH * H);
-  for (let day = 0; day < 30; day++) {
+  const out = [];
+  for (let day = 0; day < 30 && out.length < n; day++) {
     for (const t of cfg.postTimes) {
       const [h, m] = t.split(':').map(Number);
       const utc = Date.UTC(nowT.getUTCFullYear(), nowT.getUTCMonth(), nowT.getUTCDate() + day, h - cfg.tzOffsetH, m);
       const iso = new Date(utc).toISOString();
-      if (utc > Date.now() + 60e3 && !taken.has(iso)) return iso;
+      if (utc > Date.now() + 60e3 && !taken.has(iso) && out.length < n) out.push(iso);
     }
   }
-  return new Date(Date.now() + H).toISOString();
+  return out.length ? out : [new Date(Date.now() + H).toISOString()];
 }
 
 // Rahbar yozgan vaqtni ISO ga aylantiradi (Toshkent vaqti). Tushunmasa yoki o'tib ketgan bo'lsa — null
@@ -140,10 +144,44 @@ export async function publish(api, draft) {
   try { return await publishIchki(api, joriy); } finally { chiqyapti.delete(draft.id); }
 }
 
+// Telegram qaytargan rich xabarda video bloki bormi (Video obyekti — file_id bilan)
+export function richdaVideo(v, chuqur = 0) {
+  if (!v || typeof v !== 'object' || chuqur > 12) return false;
+  if (v.video && typeof v.video === 'object' && v.video.file_id) return true;
+  return Object.values(v).some(x => richdaVideo(x, chuqur + 1));
+}
+
+const videoKanalda = new Set();
+// Videoni kanalga alohida post qilib chiqaradi (post allaqachon chiqqan bo'lsa — o'sha postga javob bo'lib)
+export async function videoniChiqar(api, draft) {
+  const d = store.get(draft.id) || draft;
+  if (!hasVideo(d)) throw new Error("video fayli topilmadi — 🎥 Video bilan qayta yasang");
+  if (d.video_msg_id || videoKanalda.has(d.id)) throw new AllaqachonChiqqan('video allaqachon kanalga chiqqan');
+  videoKanalda.add(d.id);
+  try {
+    const javob = d.channel_msg_ids?.[0] ? { reply_parameters: { message_id: d.channel_msg_ids[0], allow_sending_without_reply: true } } : {};
+    const izoh = `<b>${String(d.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>${d.cta_kod ? `\n\n👉 Direktga <b>${d.cta_kod}</b> deb yozing` : ''}`;
+    const msg = await api.sendVideo(cfg.channelId, new InputFile(d.video_path), {
+      caption: izoh, parse_mode: 'HTML', supports_streaming: true, width: 1080, height: 1920,
+      duration: Math.round(d.video_duration || 0) || undefined, ...javob
+    });
+    store.update(d.id, { video_msg_id: msg?.message_id, channel_chat: d.channel_chat || msg?.chat?.id });
+    return msg;
+  } finally { videoKanalda.delete(d.id); }
+}
+
 async function publishIchki(api, draft) {
   let fallback, msg;
-  if (isRich(draft)) ({ fallback, msg } = await sendRich(api, cfg.channelId, draft));
-  else if (hasVideo(draft) || imagePaths(draft).length || hasAudio(draft)) msg = await sendMediaPost(api, cfg.channelId, draft, {}, {
+  if (isRich(draft)) {
+    ({ fallback, msg } = await sendRich(api, cfg.channelId, draft));
+    // Telegram maqolani qabul qilib, videoni tashlab yuborgan bo'lsa — video maqoladan keyin alohida chiqadi
+    if (!fallback && hasVideo(draft) && msg?.rich_message && !richdaVideo(msg.rich_message)) {
+      const v = await api.sendVideo(cfg.channelId, new InputFile(draft.video_path), {
+        supports_streaming: true, width: 1080, height: 1920, duration: Math.round(draft.video_duration || 0) || undefined
+      }).catch(e => { console.error(`Maqola videosi chiqmadi (${draft.title}):`, e.message); return null; });
+      if (v) store.update(draft.id, { video_msg_id: v.message_id });
+    }
+  } else if (hasVideo(draft) || imagePaths(draft).length || hasAudio(draft)) msg = await sendMediaPost(api, cfg.channelId, draft, {}, {
     mediaBor: draft.qisman_media, onMedia: (m) => store.update(draft.id, { qisman_media: [m].flat().map(x => ({ message_id: x?.message_id, chat: x?.chat })) })
   });
   else msg = await sendSafe(api, cfg.channelId, draft.post_html);
@@ -167,18 +205,18 @@ export async function publishDue(api, notify) {
     for (const d of due) {
       if (Date.now() - new Date(d.scheduledAt).getTime() > ESKI_MS) {
         store.update(d.id, { status: 'pending', scheduledAt: null, eskirgan: d.scheduledAt });
-        await notify(`⏸ "${d.title}" ${fmtTime(d.scheduledAt)} da chiqishi kerak edi, vaqti ancha o'tib ketgan — navbatdan olindi. Kerak bo'lsa qayta tasdiqlang.`).catch(() => {});
+        await notify(`⏸ "${d.title}" ${fmtTime(d.scheduledAt)} da chiqishi kerak edi, vaqti ancha o'tib ketgan — navbatdan olindi. Kerak bo'lsa qayta tasdiqlang.`, d).catch(() => {});
         continue;
       }
       try {
         const fb = await publish(api, d);
-        await notify(`📢 Kanalga chiqdi: ${d.title}${fb ? `\n⚠️ Maqola formati o'tmadi, oddiy post bo'lib chiqdi: ${fb}` : ''}`).catch(() => {});
+        await notify(`📢 Kanalga chiqdi: ${d.title}${fb ? `\n⚠️ Maqola formati o'tmadi, oddiy post bo'lib chiqdi: ${fb}` : ''}`, d).catch(() => {});
       } catch (e) {
         if (e instanceof AllaqachonChiqqan) continue;
         const urinish = (d.publish_attempts || 0) + 1;
         const oxirgi = urinish >= MAX_URINISH;
         store.update(d.id, { publish_attempts: urinish, ...(oxirgi ? { status: 'failed', publish_error: String(e.message).slice(0, 300) } : {}) });
-        if (urinish === 1 || oxirgi) await notify(oxirgi ? `❌ Chiqmadi (${d.title}), ${urinish} marta urinildi: ${e.message}` : `⚠️ Chiqmadi (${d.title}): ${e.message} — yana urinaman`).catch(() => {});
+        if (urinish === 1 || oxirgi) await notify(oxirgi ? `❌ Chiqmadi (${d.title}), ${urinish} marta urinildi: ${e.message}` : `⚠️ Chiqmadi (${d.title}): ${e.message} — yana urinaman`, d).catch(() => {});
       }
     }
   } finally { ishlayapti = false; }

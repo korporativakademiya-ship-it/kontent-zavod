@@ -381,13 +381,14 @@ JSON: {"personaj_langari":"ingliz tilida bitta jumla","sahnalar":[{"rasm_prompt"
   };
 }
 
-// Tayyor post uchun bitta rasm prompti (Fabrika botidagi 🖼 → "ai"): TZ bo'lmasa post matnidan
-export async function rasmPrompti(d) {
+// Tayyor post uchun bitta rasm prompti (Fabrika botidagi 🖼 → "ai"): TZ bo'lmasa post matnidan.
+// izoh — rahbar tavsifi ("ofisda charchagan rahbar, kechki chiroq"): rasm aynan shunday bo'ladi
+export async function rasmPrompti(d, { izoh = '' } = {}) {
   const r = await askJSON({
     maxTokens: 1200,
     system: `Sen prompt muhandisisan: post uchun bitta rasm promptini yozasan.\n${PROMPT_SKILL}`,
     prompt: `POST: ${toza(d.post_html).slice(0, 1500)}\n${d.tz?.rasm_tavsif ? `RASM TAVSIFI (TZ): ${d.tz.rasm_tavsif}\n` : ''}${d.tz?.vizual ? `VIZUAL: ${JSON.stringify(d.tz.vizual)}\n` : ''}
-Postning hissiyoti yoki vaziyatini ko'rsatadigan bitta kadr. Kompozitsiya: 4:5 vertikal (vertical 9:16 emas).
+${izoh ? `RAHBAR TAVSIFI (albatta bajar — rasmda aynan shu bo'lsin; post faqat kontekst): ${izoh}\n` : "Postning hissiyoti yoki vaziyatini ko'rsatadigan bitta kadr. "}Kompozitsiya: 4:5 vertikal (vertical 9:16 emas).
 JSON: {"rasm_prompt":"..."}`,
   });
   const p = String(r.rasm_prompt || '').trim();
@@ -397,7 +398,8 @@ JSON: {"rasm_prompt":"..."}`,
 
 // Dizayner (kalitsiz rassom): post uchun bitta tipografik kartochka — muqova, raqam yoki iqtibos.
 // Chizish — src/muqova.js (karusel shabloni, brend ranglari). Gemini kaliti kerak emas.
-export async function muqovaMatni(d) {
+// izoh — rahbar tavsifi (tur, sarlavha, nimani yozish): tanlovdan ustun
+export async function muqovaMatni(d, { izoh = '' } = {}) {
   return askJSON({
     maxTokens: 800,
     system: `Sen Telegram kanal uchun grafik dizaynersan: postga bitta tipografik kartochka (4:5) matnini tanlaysan. Kartochka lentada ko'zni to'xtatsin va postni o'qishga undasin. Til — o'zbek (lotin).`,
@@ -407,7 +409,8 @@ Uch turdan postga eng mosini tanla:
 - cover — ilmoq sarlavha: {"type":"cover","kicker":"1–2 so'z mavzu","title":"≤ 60 belgi, kuchli ilmoq","accent":"≤ 35 belgi, sarlavhani davom ettiruvchi zarba"}
 - stat — postda ANIQ raqam bo'lsa: {"type":"stat","num":"≤ 5 belgi, masalan 78% yoki 3×","label":"1–2 so'z","text":"≤ 100 belgi izoh"}
 - quote — postda yodda qoladigan bitta jumla bo'lsa: {"type":"quote","text":"≤ 90 belgi","by":"kim aytgani"}
-Raqam va faktlarni o'ylab topma — faqat postda borini ishlat. Post matnini so'zma-so'z takrorlama, qisqa va kuchli yoz.`,
+Raqam va faktlarni o'ylab topma — faqat postda borini ishlat. Post matnini so'zma-so'z takrorlama, qisqa va kuchli yoz.
+${izoh ? `RAHBAR TAVSIFI (albatta bajar — tur va matn bo'yicha yuqoridagi tanlovdan ustun, belgi chegaralari saqlansin): ${izoh}` : ''}`,
   });
 }
 

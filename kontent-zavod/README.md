@@ -82,14 +82,20 @@ Strateg har g'oyaga format tanlaydi: `post`, `maqola`, `karusel` yoki `reels`.
 - Qoralamaga video yasalsa, u ham maqola ichiga qo'shiladi.
 
 ## Vaqt belgilash
-- **✅ Tasdiqlash** — keyingi bo'sh vaqtga (`POST_TIMES`) avtomatik qo'yadi.
-- **🕒 Vaqt belgilash / 🕒 Vaqtni o'zgartirish** — vaqtni o'zingiz yozasiz (reply): `18:30`, `ertaga 09:00`,
-  `indinga 10:00`, `28.09 19:00` (Toshkent vaqti). **↩️ Navbatdan olish** — rejadan chiqaradi.
+- **✅ Tasdiqlash** — post darhol kanalga chiqadi (haftalik rejadan yozilgani — reja vaqtida).
+- **⚡ Hozir** — darhol kanalga (rejalashtirilgan post ham).
+- **🕒 Vaqt belgilash / 🕒 Vaqtni o'zgartirish** — keyingi 3 ta bo'sh vaqt (`POST_TIMES`) tugma bo'lib chiqadi; boshqa
+  vaqtni shu chat yoki topikka oddiy xabar qilib yozasiz (reply shart emas): `18:30`, `ertaga 09:00`, `indinga 10:00`,
+  `28.09 19:00` (Toshkent vaqti). Post o'sha vaqtda chiqadi. **↩️ Navbatdan olish** — rejadan chiqaradi.
 - `/navbat` — rejalashtirilganlar ro'yxati; bosib vaqtini o'zgartirasiz.
+- Bot savol bersa (vaqt, tahrir izohi, rasm yoki video tavsifi, rad sababi), javobni reply qilmasdan ham yozish mumkin:
+  shu chat/topikdagi keyingi xabaringiz 30 daqiqa ichida javob hisoblanadi.
 
 ## Rasm (🖼 Rasm tugmasi)
-- O'z rasmingizni yuboring (so'rovga reply) — postga qo'shiladi; bir nechta bo'lsa albom bo'ladi.
-- `muqova` deb yozsangiz — brend uslubida muqova yasaladi. `o'chir` — rasmlarni olib tashlaydi.
+- O'z rasmingizni yuboring — postga qo'shiladi; bir nechta bo'lsa albom bo'ladi.
+- **Qanday rasm kerakligini yozing** — rasm shu tavsif bo'yicha chiziladi: `GEMINI_API_KEY` bo'lsa AI rasm,
+  bo'lmasa brend uslubidagi dizayner kartochka (sarlavha, raqam yoki iqtibos).
+- Tugmalar: 🎨 Muqova / 🤖 AI rasm — dizayner o'zi tanlaydi; 🗑 — rasmlarni olib tashlaydi.
 - Maqolada rasmlar sarlavhadan keyin (bir nechta bo'lsa — kollaj) chiqadi.
 
 ## Ovoz (🎙 Ovoz va video dublyaj)
@@ -101,20 +107,29 @@ Strateg har g'oyaga format tanlaydi: `post`, `maqola`, `karusel` yoki `reels`.
   **ElevenLabs** (o'z ovozingizni klonlab, `ELEVENLABS_VOICE_ID` ga qo'yasiz).
 
 ## Reels video (🎥 Video tugmasi)
-Qoralamadagi **🎥 Video** tugmasi bosilganda:
-1. Motion agent (`src/agents/motion.js`) post va ssenariydan sahnalar yozadi (hook, raqam, qadamlar, xulosa, CTA).
-2. Sahnalar `src/video/template.html` shabloniga (HTML + GSAP) qo'yiladi.
-3. Playwright shablonni kadrma-kadr suratga oladi, ffmpeg 1080×1920 MP4 ga yig'adi (~1–2 daqiqa).
-4. Video tasdiqlash topigiga keladi. Tasdiqlansa, kanalga video + post matni chiqadi.
+Qoralamadagi **🎥 Video** tugmasi bosilganda bot avval **qanday video kerakligini so'raydi**:
+- tavsif yozasiz (uslub — doska, plakat, chat yozishma, grid kartochkalar yoki avatar; uzunligi; nimani ko'rsatish;
+  oxirida nima deyish) — ssenariychi va rejissyor shu tavsif bo'yicha yozadi ("40 soniya", "1 daqiqa" uzunlikka aylanadi);
+- yoki **🤖 O'zing tanla** — agentlar o'zi tanlaydi.
+
+Yo'l: `KONTENT_RENDER_URL` bo'lsa — kino rejissyori (`src/agents/kino.js`) shablonli sahnalar yozadi va `kontent-render`
+`/kino` MP4 yig'adi; bo'lmasa — motion agent (`src/agents/motion.js`) va ichki shablon (`src/video/template.html`, Playwright + ffmpeg).
+Avatar so'ralsa va HeyGen sozlangan bo'lsa (`HEYGEN_*`) — avatar video. 50 MB dan katta video 720p ga siqiladi (Telegram chegarasi).
+Video tasdiqlash joyiga keladi. Tasdiqlansa, kanalga video + post matni chiqadi (maqolada — ichida; Telegram maqoladagi
+videoni olmasa — maqoladan keyin alohida). **Post allaqachon chiqqan bo'lsa ham** 🎥 ishlaydi: video
+**📢 Videoni kanalga chiqarish** tugmasi bilan alohida post bo'lib (asl postga javob sifatida) chiqadi.
 
 Pullik video xizmat kerak emas — faqat Claude so'rovi va server. Dizayn (ranglar, shriftlar) shablonda,
-imzo `src/brand.js` dagi `VIDEO_SIGNATURE` da. Shablonni brauzerda ochsangiz, namuna video o'ynaydi.
+imzo `src/brand.js` dagi `imzo()` da. Shablonni brauzerda ochsangiz, namuna video o'ynaydi.
 Ovoz sozlangan bo'lsa, video dublyaj bilan chiqadi (yuqoriga qarang).
 
 ## Buyruqlar
-Qoralama tugmalari: ✅ Tasdiqlash · 🕒 Vaqt belgilash · ⚡ Hozir · ✏️ Tahrir · 🎬 Ssenariy · 🖼 Rasm · 🎥 Video · 🎙 Ovoz · ❌ Rad
+Qoralama tugmalari: ✅ Tasdiqlash · 🕒 Vaqt belgilash · ⚡ Hozir · ✏️ Tahrir · 🎬 Ssenariy (yo'q bo'lsa — yoziladi) · 🖼 Rasm · 🎥 Video · 🎙 Ovoz · ❌ Rad
 
 `/yangi` — hozir g'oya izlash · `/goya <mavzu>` — mavzu bo'yicha post · `/maqola <mavzu>` · `/karusel <mavzu>` · `/navbat` — rejalashtirilganlar · `/id`
+`/kanal` — postlar qaysi kanalga chiqadi va bot u yerda yoza oladimi · `/rejalar [ka|qa|kf]` — tayyor kontent reja ·
+`/reja_post qa07` — shu banddan post · `/reja_bankka` — reja bandlarini g'oyalar bankiga · `/zaxira` — bazani hozir zaxiralash ·
+`/tiklash` — zaxira fayliga reply qilib (shaxsiy chatda) bazani tiklash
 
 Nisha profili: `src/brand.js` — ohang va auditoriyani shu yerda o'zgartirasiz.
 
@@ -136,7 +151,8 @@ dan o'qiladi; Instagram profillari — `IG_ACCESS_TOKEN` va `IG_USER_ID` (Meta B
 
 ## Instagram reels liniyasi (n8n doska uchun API)
 Miya — shu bot (uslub, qoidalar, mahsulot profillari, rubrikalar, rahbar tanlovlari); doska — n8n.
-`N8N_API_KALIT` berilsa, bot `PORT` (standart 8080) da API ochadi; har so'rovda `x-api-kalit` sarlavhasi shu kalit bo'lishi kerak.
+Bot doim `PORT` (standart 8080) da API ochadi; har so'rovda `x-api-kalit` sarlavhasi `N8N_API_KALIT` bo'lishi kerak
+(kalit bo'sh bo'lsa — hamma so'rov 503, faqat `/api/health` ochiq). Railway domeni shu portga ulangan — kalit uzun bo'lsin.
 - `POST /api/reels/tz` `{goya, mahsulot?}` — **Prodyuser**: xom g'oyani TZ ga aylantiradi (rubrika, format, maqsad, auditoriya,
   3 ta ilmoq, tuzilma, ovoz, vizual uslub va personaj, CTA kodi, "o'zim qo'shdim" ro'yxati).
 - `POST /api/reels/ssenariy` `{tz, izoh?, asos?}` — **Ssenariychi + Tanqidchi**: diktor va ekran matni. Tanqidchi baholaydi va

@@ -8,8 +8,10 @@ import { runPipeline, renderDraftSlides, produceDraft } from './pipeline.js';
 import { revise } from './agents/copywriter.js';
 import { writeArticle } from './agents/article.js';
 import { isRich, sendRich, approvalPrefix } from './rich.js';
-import { nextSlot, fmtTime, parseTime, publish, sendMediaPost, sendSafe, imagePaths, AllaqachonChiqqan } from './publisher.js';
+import { nextSlot, nextSlots, fmtTime, parseTime, publish, videoniChiqar, sendMediaPost, sendSafe, imagePaths, AllaqachonChiqqan } from './publisher.js';
 import { videoYasa } from './video/kino.js';
+import { heygenYoqilgan } from './video/heygen.js';
+import * as reels from './agents/reels.js';
 import { ttsEnabled, TTS_SETUP, synth, speechText, toVoiceNote } from './tts.js';
 import { addSample, addFeedback } from './style.js';
 import { ensureCode, ensureLink } from './cta.js';
@@ -20,7 +22,7 @@ import { analyzeStyle, distillRules } from './agents/stylist.js';
 import { bilan, joriy, rejim, kodlar, topigi, topikdan, PROFIL } from './mahsulot.js';
 import { rasmYoqilgan, rasmYasa } from './rasm.js';
 import { muqovaYasa } from './muqova.js';
-import { rasmPrompti, uslubKanaldan } from './agents/kontent.js';
+import { rasmPrompti, uslubKanaldan, reelsTz } from './agents/kontent.js';
 import * as onboarding from './onboarding.js';
 import { kanalQosh } from './kuzatuv.js';
 
@@ -76,10 +78,29 @@ const schedKb = (d) => new InlineKeyboard()
   .text('↩️ Navbatdan olish', `unq:${d.id}`);
 const TIME_HELP = 'Masalan: <code>18:30</code>, <code>ertaga 09:00</code>, <code>indinga 10:00</code>, <code>28.09 19:00</code> (Toshkent vaqti)';
 
-// Rahbardan javob so'raydi (reply) — javob kelganda message:text/photo handleri ishlaydi
-async function ask(ctx, text, wait) {
-  const m = await ctx.reply(text, { parse_mode: 'HTML', message_thread_id: tema(), reply_markup: { force_reply: true, selective: true } });
-  store.setWait(m.message_id, wait);
+// Xabar qaysi topikda (forum mavzusi): oddiy guruh va shaxsiy chatda — null
+const topikIchida = (msg) => (msg?.is_topic_message ? msg.message_thread_id ?? null : null);
+
+// Rahbardan javob so'raydi — javob kelganda message:text/photo handleri ishlaydi. Reply shart emas: guruhda Telegram
+// reply oynasini o'zi ochmaydi, shuning uchun shu chat/topikdagi keyingi xabari ham javob hisoblanadi (store.ochiqWait).
+// tugmalar — tez tanlov (masalan bo'sh vaqtlar); berilmasa — reply oynasi taklif qilinadi
+async function ask(ctx, text, wait, tugmalar = null) {
+  const thr = tema();
+  const m = await ctx.reply(text, { parse_mode: 'HTML', message_thread_id: thr, reply_markup: tugmalar || { force_reply: true } });
+  const shaxsiy = ctx.chat?.type === 'private';
+  store.setWait(m.message_id, { ...wait, chat: m.chat?.id ?? ctx.chat?.id, thr: shaxsiy ? null : (topikIchida(m) ?? thr ?? null), kim: ctx.from?.id });
+}
+
+// Rahbar xabari qaysi savolga javob: reply qilingan savol yoki shu chat/topikdagi so'nggi ochiq savol.
+// Qaytaradi: [kalit, reply orqalimi]
+function javobKaliti(ctx) {
+  const r = ctx.message?.reply_to_message;
+  const w = r && store.peekWait(r.message_id);
+  if (w && (w.chat == null || String(w.chat) === String(ctx.chat.id))) return [r.message_id, true];
+  // Boshqa odamning xabariga reply — bu javob emas (topik ildizi va botning xabari bundan mustasno)
+  if (r && r.message_id !== ctx.message.message_thread_id && !r.from?.is_bot) return [null, false];
+  const thr = ctx.chat.type === 'private' ? null : topikIchida(ctx.message);
+  return [store.ochiqWait({ chat: ctx.chat.id, thr, kim: ctx.from?.id }), false];
 }
 
 // Jarayon: mahsulot rejimida har mahsulot uchun bitta yangilanib boradigan xabar (topik chalkashmasin);
@@ -117,19 +138,24 @@ export async function sendForApproval(d) {
   await sendMediaPost(bot.api, chatId, { ...d, post_html: head + d.post_html }, extra);
 }
 
-// Qoralama uchun reels video yasaydi va tasdiqlash topigiga yuboradi
-async function videoRun(d) {
+// Post kanalga chiqib bo'lgan bo'lsa — video alohida post bo'lib chiqadi (o'sha postga javob sifatida)
+const videoKb = (id) => new InlineKeyboard().text('📢 Videoni kanalga chiqarish', `vpub:${id}`).row().text('🔄 Boshqa video', `vid:${id}`);
+
+// Qoralama uchun reels video yasaydi va tasdiqlash topigiga yuboradi. izoh — rahbar tavsifi (qanday video bo'lsin)
+async function videoRun(d, { izoh = '' } = {}) {
   const [chatId, joy] = joyi(d);
   const reply = (t) => bot.api.sendMessage(chatId, t, joy).catch(() => {});
   videoBusy = true;
   try {
-    await reply(`🎥 "${d.title}" — video yasalmoqda (1–3 daqiqa)...`);
-    const v = await videoYasa(d, { log: reply });
-    const nd = store.update(d.id, { video_path: v.file, video_duration: v.duration, motion: v.data });
-    const cap = `<b>🎥 Video</b> | ${esc(d.title)} | ${Math.round(v.duration)} s${v.voiced ? ' | 🎙 dublyaj' : ''}\n<i>${isRich(d) ? 'Tasdiqlansa, video maqola ichida chiqadi.' : 'Tasdiqlansa, kanalga shu video post matni bilan chiqadi.'}</i>`;
+    await reply(`🎥 "${d.title}" — video yasalmoqda (1–3 daqiqa)${izoh ? `\nTavsifingiz: ${izoh.slice(0, 200)}` : ''}...`);
+    const v = await videoYasa(d, { log: reply, izoh });
+    const nd = store.update(d.id, { video_path: v.file, video_duration: v.duration, motion: v.data, video_izoh: izoh || null, video_msg_id: null });
+    const chiqqan = nd.status === 'published';
+    const cap = `<b>🎥 Video</b> | ${esc(d.title)} | ${Math.round(v.duration)} s${v.voiced ? ' | 🎙 dublyaj' : ''}\n<i>${
+      chiqqan ? "Post kanalda bor — video alohida post bo'lib chiqadi." : isRich(d) ? 'Tasdiqlansa, video maqola ichida chiqadi.' : 'Tasdiqlansa, kanalga shu video post matni bilan chiqadi.'}</i>`;
     await bot.api.sendVideo(chatId, new InputFile(v.file), {
       caption: cap, parse_mode: 'HTML', supports_streaming: true, width: 1080, height: 1920,
-      duration: Math.round(v.duration), ...joy, reply_markup: nd.status === 'approved' ? schedKb(nd) : kb(nd.id)
+      duration: Math.round(v.duration), ...joy, reply_markup: chiqqan ? videoKb(nd.id) : nd.status === 'approved' ? schedKb(nd) : kb(nd.id)
     });
   } catch (e) {
     await reply(`⚠️ Video yasalmadi (${d.title}): ${e.message}`);
@@ -195,7 +221,7 @@ bot.callbackQuery(/^tanla:([a-z]{2}):(\w+)$/, async ctx => {
 });
 
 // Mavzusiz /goya, /maqola, /karusel — mavzu reply bilan so'raladi
-const mavzuSora = (ctx, format, misol) => ask(ctx, `Qaysi mavzuda? Shu xabarga javob (reply) qilib yozing.\nMasalan: <i>${misol}</i>`, { kind: 'mavzu', format });
+const mavzuSora = (ctx, format, misol) => ask(ctx, `Qaysi mavzuda? Shu yerga yozing.\nMasalan: <i>${misol}</i>`, { kind: 'mavzu', format });
 
 // Kunlik ish bot band paytiga to'g'ri kelsa — tashlab ketilmaydi, soatlik tekshiruv (rejaYetibOl) bo'shaganda bajaradi
 let kunlikKutyapti = false;
@@ -341,12 +367,13 @@ for (const [cmd, format, example] of [['maqola', 'maqola', 'xodimni ishga olish 
 // ---------- /sozla: soha, auditoriya, mahsulotlar, g'oya manbalari va uslubni so'rab olish ----------
 // Javoblar reply orqali; oxirida agent brend profilini tuzadi, rahbar ✅ bosgach sozlamalarga yoziladi
 const sozlaSora = (ctx, matn) => ctx.reply(matn, { parse_mode: 'HTML', ...(ctx.msg?.message_thread_id ? { message_thread_id: ctx.msg.message_thread_id } : {}),
-  reply_markup: { force_reply: true, selective: true } }).then(m => store.setWait(m.message_id, { kind: 'sozla' }));
+  reply_markup: { force_reply: true } }).then(m => store.setWait(m.message_id, { kind: 'sozla', chat: m.chat?.id ?? ctx.chat?.id,
+    thr: ctx.chat?.type === 'private' ? null : (topikIchida(m) ?? topikIchida(ctx.msg)), kim: ctx.from?.id }));
 
 bot.command('sozla', async ctx => {
   if (!isAdmin(ctx)) return;
   store.setSetting('sozla', { qadam: 0, javoblar: {} });
-  await sozlaSora(ctx, `⚙️ <b>Sozlash</b> — agentlar kim uchun va nima haqida yozishini aniqlaymiz (6 ta savol). Har savolga shu xabarga reply qilib javob bering.\n\n${onboarding.SAVOLLAR[0].savol}`);
+  await sozlaSora(ctx, `⚙️ <b>Sozlash</b> — agentlar kim uchun va nima haqida yozishini aniqlaymiz (6 ta savol). Har savolga shu yerga javob yozing.\n\n${onboarding.SAVOLLAR[0].savol}`);
 });
 
 async function sozlaJavob(ctx) {
@@ -378,7 +405,7 @@ bot.callbackQuery(/^sozla:(ok|no)$/, async ctx => {
   await ctx.reply(`✅ Sozlandi. Agentlar endi yangi brend bilan yozadi.` +
     (r.qoshildi.length ? `\n👀 Kuzatuvga qo'shildi: ${r.qoshildi.join(', ')}` : '') +
     (r.xatolar.length ? `\n⚠️ Qo'shilmadi: ${r.xatolar.join('; ')}` : '') + (r.uslubNatija ? `\n${r.uslubNatija}` : '') +
-    `\nKeyingi qadam: /reja_yangi${rejim() ? ' (mahsulot topiklari PRODUCT_TOPICS da yangi kodlar bilan bo\'lishi kerak)' : ''} yoki /avto on.`);
+    `\nKeyingi qadam: /reja_yangi${rejim() ? ' (mahsulot topiklari PRODUCT_TOPICS da yangi kodlar bilan bo\'lishi kerak; har mahsulot xonasida /jadval — chiqish kunlari)' : ''} yoki /avto on.`);
 });
 
 // ---------- Uslub: namuna postlar va doimiy qoidalar ----------
@@ -626,7 +653,7 @@ bot.callbackQuery(/^(pok|pnew|pedit):(.+)$/, async ctx => {
     return weeklyPlanRun();
   }
   await ctx.answerCallbackQuery();
-  return ask(ctx, "✏️ Rejada nimani o'zgartiramiz? Masalan: <i>chorshanbadagi keysni xodim motivatsiyasiga almashtir, reels kamroq bo'lsin</i>. Shu xabarga reply qilib yozing.", { kind: 'plan', id });
+  return ask(ctx, "✏️ Rejada nimani o'zgartiramiz? Masalan: <i>chorshanbadagi keysni xodim motivatsiyasiga almashtir, reels kamroq bo'lsin</i>. Shu yerga yozing.", { kind: 'plan', id });
 });
 
 bot.command('goyalar', ctx => {
@@ -714,14 +741,67 @@ async function postHavolasi(d) {
 }
 const kanalNomi = () => (kanalMalumot?.title ? `"${kanalMalumot.title}"` : 'Telegram');
 
-bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx => {
+// Vaqt belgilash: rahbar tugmadan tanlasa yoki yozsa — post o'sha vaqtda chiqadi (tasdiqlangan hisoblanadi)
+function vaqtQoy(d, at) {
+  const busyAt = store.byStatus('approved').find(x => x.id !== d.id && x.scheduledAt === at);
+  if (d.status !== 'approved') store.addChoice(d, true);
+  store.dropWaits(d.id, 'time');
+  const nd = store.update(d.id, { status: 'approved', scheduledAt: at, publish_attempts: 0 });
+  return { nd, matn: `✅ "${d.title}" — ${fmtTime(at)} da chiqadi.${busyAt ? `\n⚠️ Shu vaqtda "${busyAt.title}" ham bor — ikkalasi ketma-ket chiqadi.` : ''}` };
+}
+const vaqtKodi = (iso) => Math.round(Date.parse(iso) / 60e3).toString(36);
+
+// Reels ssenariysi o'qish uchun: har sahna — diktor gapi va ekrandagi yozuv
+const ssenariyMatni = (s) => [
+  ...(s?.sahnalar || []).map((x, i) => `${i + 1}. 🎙 ${x.ovoz || ''}${x.ekran ? `\n   📺 ${x.ekran}` : ''}`),
+  ...(s?.yakun ? [`🏁 🎙 ${s.yakun.ovoz || ''}${s.yakun.ekran ? `\n   📺 ${s.yakun.ekran}` : ''}${s.yakun.tugma ? `\n   👉 ${s.yakun.tugma}` : ''}`] : []),
+].join('\n');
+
+const rasmKb = (d) => {
+  const k = new InlineKeyboard().text('🎨 Muqova (o\'zing tanla)', `imuq:${d.id}`);
+  if (rasmYoqilgan()) k.text('🤖 AI rasm (o\'zing tanla)', `iai:${d.id}`);
+  if (imagePaths(d).length) k.row().text(`🗑 Rasmlarni olib tashlash (${imagePaths(d).length})`, `idel:${d.id}`);
+  return k;
+};
+
+// Rasm: tur — 'muqova' (dizayner kartochka), 'ai' (Gemini), 'ochir'; izoh — rahbar tavsifi (qanday rasm bo'lsin)
+async function rasmIsh(ctx, d, tur, izoh = '') {
+  const opt = { message_thread_id: tema() };
+  store.dropWaits(d.id, 'image');
+  if (tur === 'ochir') {
+    const nd = store.update(d.id, { image_paths: [] });
+    await ctx.reply('🗑 Rasmlar olib tashlandi. Yangilangan qoralama:', opt);
+    return sendForApproval(nd);
+  }
+  if (tur === 'ai' && rasmYoqilgan()) {
+    await ctx.reply(`🎨 AI rasm chizilyapti (1–2 daqiqa)${izoh ? ' — tavsifingiz bo\'yicha' : ''}...`, opt);
+    try {
+      const file = await rasmYasa(await rasmPrompti(d, { izoh }), path.join(cfg.dataDir, 'images', d.id, `ai-${Date.now()}`));
+      const nd = store.update(d.id, { image_paths: [...(d.image_paths || []), file] });
+      await ctx.reply('🖼 AI rasm tayyor. Yangilangan qoralama:', opt);
+      return sendForApproval(nd);
+    } catch (e) { return ctx.reply(`⚠️ AI rasm chizilmadi: ${e.message}`, opt); }
+  }
+  await ctx.reply(`🎨 Dizayner kartochka chizyapti${izoh ? ' — tavsifingiz bo\'yicha' : ''}...`, opt);
+  try {
+    const { file } = await muqovaYasa(d, { izoh });
+    const nd = store.update(d.id, { image_paths: [...(d.image_paths || []), file] });
+    await ctx.reply('🖼 Muqova tayyor. Yangilangan qoralama:', opt);
+    return sendForApproval(nd);
+  } catch (e) { return ctx.reply(`⚠️ Muqova yasalmadi: ${e.message}`, opt); }
+}
+
+bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|vauto|vpub|img|imuq|iai|idel|aud|no):(.+)$/, async ctx => {
   if (!isAdmin(ctx)) return ctx.answerCallbackQuery({ text: 'Faqat rahbar tasdiqlaydi' });
   const [, act, id] = ctx.match;
   const d = store.get(id);
   if (!d) return ctx.answerCallbackQuery({ text: 'Qoralama topilmadi' });
   const mark = (t) => ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text(t, 'noop') }).catch(() => {});
+  // Xato rahbar tugmani bosgan joyda ham ko'rinsin (mahsulot rejimida log shu topikning o'ziga tushadi)
+  const xatoAyt = (t) => (ctx.chat?.type === 'private' || !rejim() ? ctx.reply(t).catch(() => {}) : undefined);
 
-  if (d.status === 'published' && act !== 'scr') {
+  // Chiqqan postda ham ishlaydi: ssenariy, video yasash va videoni kanalga alohida chiqarish
+  if (d.status === 'published' && !['scr', 'vid', 'vauto', 'vpub'].includes(act)) {
     await ctx.answerCallbackQuery({ text: 'Bu post allaqachon chiqqan' });
     const h = await postHavolasi(d);
     return ctx.reply(`📢 "${d.title}" ${d.publishedAt ? `${fmtTime(d.publishedAt)} da ` : ''}${kanalNomi()} kanaliga chiqqan.${h ? `\n${h}` : ''}`);
@@ -729,11 +809,35 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
   // ✏️ Tahrirdan keyin eski versiya xabaridagi tugmalar ishlamasin — aks holda eski matn ham kanalga chiqib ketardi
   if (d.status === 'revised' && act !== 'scr') return ctx.answerCallbackQuery({ text: "Bu eski versiya — tahrirlangan yangi qoralamadagi tugmalardan foydalaning", show_alert: true });
 
+  // 🎥 Video: avval qanday video kerakligi so'raladi (tavsif yoki 🤖 — agentlar o'zi tanlaydi)
   if (act === 'vid') {
     if (videoBusy) return ctx.answerCallbackQuery({ text: 'Boshqa video yasalmoqda, biroz kuting' });
+    await ctx.answerCallbackQuery();
+    return ask(ctx, `🎥 "${esc(d.title)}" — qanday video bo'lsin?\nShu yerga yozing: uslub (doska, plakat, chat yozishma, grid kartochkalar${heygenYoqilgan() ? ', avatar' : ''}), ` +
+      `uzunligi, nimani ko'rsatish, oxirida nima deyish.\n<i>Masalan: doska uslubida, 40 soniya, 3 ta xato va yechimi, oxirida Direktga yozing</i>\n` +
+      `Yoki 🤖 bosing — agentlar o'zi tanlaydi.`, { kind: 'video', id }, new InlineKeyboard().text('🤖 O\'zing tanla', `vauto:${id}`));
+  }
+  if (act === 'vauto') {
+    if (videoBusy) return ctx.answerCallbackQuery({ text: 'Boshqa video yasalmoqda, biroz kuting' });
+    store.dropWaits(id, 'video');
     await ctx.answerCallbackQuery({ text: 'Video yasash boshlandi' });
+    await mark('🎥 Video yasalmoqda...');
     videoRun(d); // fonda — bot bloklanmaydi
     return;
+  }
+  if (act === 'vpub') {
+    await ctx.answerCallbackQuery({ text: 'Video kanalga chiqarilyapti…' });
+    try {
+      const m = await videoniChiqar(bot.api, d);
+      await mark('📢 Video kanalga chiqdi');
+      const h = await postHavolasi({ channel_msg_ids: [m?.message_id], channel_chat: m?.chat?.id });
+      await log(`📢 Video kanalga chiqdi: ${d.title}${h ? ` — ${h}` : ''}`);
+      return ctx.reply(`📢 Video ${kanalNomi()} kanaliga chiqdi${h ? `: ${h}` : '.'}`);
+    } catch (e) {
+      if (e instanceof AllaqachonChiqqan) return mark('📢 Video kanalga chiqqan');
+      await log(`❌ "${d.title}" videosi kanalga chiqmadi: ${e.message}`);
+      return xatoAyt(`❌ Video kanalga chiqmadi: ${e.message}`);
+    }
   }
   // ⚡ Hozir va ✅ Tasdiqlash: darhol kanalga
   const chiqar = async () => {
@@ -741,6 +845,7 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     try {
       const fb = await publish(bot.api, d);
       if (d.status !== 'approved') store.addChoice(d, true);
+      store.dropWaits(id);
       await mark('📢 Chiqdi');
       const h = await postHavolasi(store.get(d.id));
       await log(`📢 Kanalga chiqdi: ${d.title}${h ? ` — ${h}` : ''}`);
@@ -749,6 +854,7 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     } catch (e) {
       if (e instanceof AllaqachonChiqqan) return mark('📢 Chiqdi');
       await log(`❌ "${d.title}" kanalga chiqmadi: ${e.message}`);
+      await xatoAyt(`❌ Kanalga chiqmadi: ${e.message}\n/kanal — bot kanalda post yoza oladimi, tekshiring.`);
     }
   };
   if (act === 'ok') {
@@ -761,10 +867,13 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
     await ctx.editMessageReplyMarkup({ reply_markup: schedKb(nd) }).catch(() => {});
     return ctx.answerCallbackQuery({ text: `Rejalashtirildi: ${fmtTime(nd.scheduledAt)}` });
   }
+  // 🕒 Vaqt belgilash: bo'sh vaqtlar tugma bo'lib chiqadi, boshqa vaqtni shu yerga yozish mumkin (reply shart emas)
   if (act === 'time') {
     await ctx.answerCallbackQuery();
-    const now = d.status === 'approved' ? `\nHozir: <b>${fmtTime(d.scheduledAt)}</b>` : '';
-    return ask(ctx, `🕒 "${esc(d.title)}" qachon chiqsin?${now}\n${TIME_HELP}\nShu xabarga javob (reply) qilib yozing.`, { kind: 'time', id });
+    const hozir = d.status === 'approved' ? `\nHozir: <b>${fmtTime(d.scheduledAt)}</b>` : '';
+    const k = new InlineKeyboard();
+    for (const at of nextSlots(3)) k.text(`🕒 ${fmtTime(at)}`, `tset:${id}:${vaqtKodi(at)}`).row();
+    return ask(ctx, `🕒 "${esc(d.title)}" qachon chiqsin?${hozir}\nTugmadan tanlang yoki boshqa vaqtni shu yerga yozing.\n${TIME_HELP}`, { kind: 'time', id }, k);
   }
   if (act === 'aud') {
     if (!ttsEnabled()) return ctx.answerCallbackQuery({ text: TTS_SETUP.slice(0, 190), show_alert: true });
@@ -775,10 +884,15 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
   if (act === 'img') {
     await ctx.answerCallbackQuery();
     const has = imagePaths(d).length;
-    return ask(ctx, `🖼 "${esc(d.title)}" uchun rasm.\n• Rasm yuboring (shu xabarga reply qilib) — postga qo'shaman (bir nechta bo'lsa, albom bo'ladi)\n` +
-      `• <code>muqova</code> deb yozing — dizayner post mazmunidan brend uslubida kartochka chizadi (muqova, raqam yoki iqtibos)` +
-      (rasmYoqilgan() ? `\n• <code>ai</code> deb yozing — post mazmuniga mos AI rasm chizaman (Gemini)` : '') +
-      (has ? `\n• <code>o'chir</code> — ${has} ta rasmni olib tashlayman` : ''), { kind: 'image', id });
+    return ask(ctx, `🖼 "${esc(d.title)}" uchun rasm.\n• Rasm yuboring — postga qo'shaman (bir nechta bo'lsa, albom bo'ladi)\n` +
+      `• Qanday rasm kerakligini yozing — shunday ${rasmYoqilgan() ? 'chizaman (AI rasm)' : 'kartochka chizaman (AI rasm uchun GEMINI_API_KEY kerak)'}. ` +
+      `<i>Masalan: ${rasmYoqilgan() ? 'ofisda charchagan rahbar, kechki chiroq, iliq ranglar' : 'katta sarlavha "3 ta xato", ostida "rahbar vaqtini yeydi"'}</i>\n` +
+      `• Yoki tugmani bosing — dizayner o'zi tanlaydi` + (has ? `\nHozir ${has} ta rasm bor.` : ''), { kind: 'image', id }, rasmKb(d));
+  }
+  if (act === 'imuq' || act === 'iai' || act === 'idel') {
+    await ctx.answerCallbackQuery();
+    await mark(act === 'idel' ? '🗑 Olib tashlanmoqda...' : '🎨 Chizilmoqda...');
+    return rasmIsh(ctx, d, { imuq: 'muqova', iai: 'ai', idel: 'ochir' }[act]);
   }
   if (act === 'unq') {
     store.update(id, { status: 'pending', scheduledAt: null });
@@ -789,20 +903,42 @@ bot.callbackQuery(/^(ok|time|unq|now|edit|scr|vid|img|aud|no):(.+)$/, async ctx 
   if (act === 'no') {
     store.update(id, { status: 'rejected' });
     store.addChoice(d, false);
+    store.dropWaits(id);
     await mark('❌ Rad etildi');
     await ctx.answerCallbackQuery();
-    // Sabab ixtiyoriy — yozilsa, tahrir izohi kabi doimiy qoidalarga ham tushadi
-    return ask(ctx, `❌ "${esc(d.title)}" rad etildi. Nega? Bir gap bilan yozing (ixtiyoriy) — keyingi safar shunga qarab yozaman.`, { kind: 'rad', id });
+    // Sabab ixtiyoriy — yozilsa, tahrir izohi kabi doimiy qoidalarga ham tushadi (10 daqiqa kutiladi)
+    return ask(ctx, `❌ "${esc(d.title)}" rad etildi. Nega? Bir gap bilan yozing (ixtiyoriy) — keyingi safar shunga qarab yozaman.`, { kind: 'rad', id, muddat: 10 * 60e3 });
   }
   if (act === 'scr') {
     await ctx.answerCallbackQuery();
-    return ctx.reply(`🎬 <b>Reels ssenariy</b>\n\n${esc(d.reels_script || 'Yo\'q')}`,
-      { parse_mode: 'HTML', message_thread_id: tema() });
+    const opt = { parse_mode: 'HTML', message_thread_id: tema() };
+    if (d.reels_script) return ctx.reply(`🎬 <b>Reels ssenariy</b>\n\n${esc(d.reels_script)}`, opt);
+    if (!d.tz) return ctx.reply("🎬 Bu postga ssenariy yozilmagan (prodyuser TZ yo'q). 🎥 Video bosilsa, ssenariy video bilan birga yoziladi.", opt);
+    await ctx.reply('🎬 Ssenariy yozilyapti (1–2 daqiqa)...', opt);
+    try {
+      const r = await reels.ssenariy(reelsTz({ ...d.tz, davomiylik: Number(d.tz.davomiylik) || 35 }));
+      const nd = store.update(id, { reels: r, reels_script: ssenariyMatni(r.ssenariy) });
+      return ctx.reply(`🎬 <b>Reels ssenariy</b>\n\n${esc(nd.reels_script)}\n\n<i>🎥 Video shu ssenariy bo'yicha yasaladi.</i>`, opt);
+    } catch (e) { return ctx.reply(`⚠️ Ssenariy yozilmadi: ${e.message}`, opt); }
   }
   if (act === 'edit') {
     await ctx.answerCallbackQuery();
-    return ask(ctx, `✏️ "${esc(d.title)}" — nima o'zgartiramiz? Shu xabarga javob (reply) qilib yozing.`, { kind: 'edit', id });
+    return ask(ctx, `✏️ "${esc(d.title)}" — nima o'zgartiramiz? Shu yerga yozing.`, { kind: 'edit', id });
   }
+});
+
+// 🕒 tez tanlov: tugmadagi vaqt (daqiqa, 36-lik) — shu vaqtga rejalashtiriladi
+bot.callbackQuery(/^tset:(\w+):([0-9a-z]+)$/, async ctx => {
+  if (!isAdmin(ctx)) return ctx.answerCallbackQuery({ text: 'Faqat rahbar' });
+  const d = store.get(ctx.match[1]);
+  if (!d) return ctx.answerCallbackQuery({ text: 'Qoralama topilmadi' });
+  if (d.status === 'published') return ctx.answerCallbackQuery({ text: 'Bu post allaqachon chiqqan', show_alert: true });
+  if (d.status === 'revised') return ctx.answerCallbackQuery({ text: "Bu eski versiya — tahrirlangan yangi qoralamadagi tugmalardan foydalaning", show_alert: true });
+  const at = new Date(parseInt(ctx.match[2], 36) * 60e3).toISOString();
+  if (Date.parse(at) <= Date.now() + 60e3) return ctx.answerCallbackQuery({ text: "Bu vaqt o'tib ketdi — boshqasini tanlang yoki vaqtni yozing", show_alert: true });
+  const { nd, matn } = vaqtQoy(d, at);
+  await ctx.answerCallbackQuery({ text: `Rejalashtirildi: ${fmtTime(at)}` });
+  await ctx.editMessageText(matn, { reply_markup: schedKb(nd) }).catch(() => ctx.reply(matn, { reply_markup: schedKb(nd) }));
 });
 bot.callbackQuery('noop', ctx => ctx.answerCallbackQuery());
 
@@ -831,104 +967,104 @@ bot.on('message', async (ctx, next) => {
   await ctx.reply(`✅ Namuna saqlandi (${n} ta)${hint}`);
 });
 
-// Rahbarning javoblari (reply): vaqt, tahrir izohi
-bot.on('message:text', async ctx => {
-  const replyTo = ctx.message.reply_to_message?.message_id;
-  const w = replyTo && store.peekWait(replyTo);
+// Rahbarning javoblari: vaqt, tahrir izohi, rasm va video tavsifi. Reply qilish shart emas — savol berilgan
+// chat/topikdagi keyingi xabar ham javob (guruhda Telegram reply oynasini o'zi ochmaydi)
+bot.on('message:text', async (ctx, next) => {
+  // Buyruqlar o'z handleriga (masalan /zaxira, /tiklash shu handlerdan keyin ro'yxatdan o'tgan)
+  if (ctx.message.text.startsWith('/')) return next();
   if (!isAdmin(ctx)) return;
+  const [kalit, replyBilan] = javobKaliti(ctx);
+  const w = kalit && store.peekWait(kalit);
   // Shaxsiy chatda tushunilmagan xabar — jim qolinmaydi
   if (!w) return ctx.chat.type === 'private' ? ctx.reply(QISQA_YORDAM) : undefined;
-  if (w.kind === 'sozla') { store.takeWait(replyTo); return sozlaJavob(ctx); }
-  if (w.kind === 'mavzu') { store.takeWait(replyTo); return startRun(ctx, ctx.message.text.trim().slice(0, 300), w.format || null); }
+  const matn = ctx.message.text.trim();
+  if (w.kind === 'sozla') { store.takeWait(kalit); return sozlaJavob(ctx); }
+  if (w.kind === 'mavzu') { store.takeWait(kalit); return startRun(ctx, matn.slice(0, 300), w.format || null); }
   const opt = { message_thread_id: tema() };
   if (w.kind === 'plan') {
-    store.takeWait(replyTo);
+    store.takeWait(kalit);
     await ctx.reply('🔄 Rejani qayta yozyapman...', opt);
-    try { return await sendPlan(await weekly.revise(w.id, ctx.message.text)); }
+    try { return await sendPlan(await weekly.revise(w.id, matn)); }
     catch (e) { return ctx.reply(`⚠️ Xato: ${e.message}`, opt); }
   }
   const d = store.get(w.id);
-  if (!d) return store.takeWait(replyTo);
+  if (!d) return store.takeWait(kalit);
 
   if (w.kind === 'time') {
-    const at = parseTime(ctx.message.text);
-    if (!at) return ctx.reply(`Vaqtni tushunmadim yoki u o'tib ketgan. ${TIME_HELP}\nShu savolga yana javob yozing.`, { ...opt, parse_mode: 'HTML' });
-    store.takeWait(replyTo);
+    const at = parseTime(matn);
+    if (!at) {
+      // Reply'siz xabarda raqam bo'lmasa — bu vaqt emas, boshqa gap: jim o'tkazib yuboriladi
+      if (!replyBilan && !/\d/.test(matn)) return;
+      return ctx.reply(`Vaqtni tushunmadim yoki u o'tib ketgan. ${TIME_HELP}\nYana yozing yoki yuqoridagi tugmadan tanlang.`, { ...opt, parse_mode: 'HTML' });
+    }
+    store.takeWait(kalit);
     if (d.status === 'published') return ctx.reply('Bu post allaqachon chiqqan.', opt);
-    const busyAt = store.byStatus('approved').find(x => x.id !== d.id && x.scheduledAt === at);
-    const nd = store.update(d.id, { status: 'approved', scheduledAt: at });
-    return ctx.reply(`✅ "${d.title}" — ${fmtTime(at)} da chiqadi.${busyAt ? `\n⚠️ Shu vaqtda "${busyAt.title}" ham bor — ikkalasi ketma-ket chiqadi.` : ''}`,
-      { ...opt, reply_markup: schedKb(nd) });
+    if (d.status === 'revised') return ctx.reply("Bu eski versiya — tahrirlangan yangi qoralamadagi 🕒 tugmasidan foydalaning.", opt);
+    const { nd, matn: javob } = vaqtQoy(d, at);
+    return ctx.reply(javob, { ...opt, reply_markup: schedKb(nd) });
+  }
+  if (w.kind === 'video') {
+    store.takeWait(kalit);
+    if (videoBusy) return ctx.reply('⏳ Boshqa video yasalmoqda — tugagach 🎥 ni qayta bosing.', opt);
+    videoRun(d, { izoh: matn.slice(0, 600) }); // fonda — bot bloklanmaydi
+    return;
   }
   if (w.kind === 'image') {
-    const t = ctx.message.text.trim().toLowerCase();
-    if (/^o.?chir/.test(t)) {
-      store.takeWait(replyTo);
-      const nd = store.update(d.id, { image_paths: [] });
-      await ctx.reply('🗑 Rasmlar olib tashlandi. Yangilangan qoralama:', opt);
-      return sendForApproval(nd);
-    }
-    if (t === 'ai' && rasmYoqilgan()) {
-      store.takeWait(replyTo);
-      await ctx.reply('🎨 AI rasm chizilyapti (1–2 daqiqa)...', opt);
-      try {
-        const file = await rasmYasa(await rasmPrompti(d), path.join(cfg.dataDir, 'images', d.id, `ai-${Date.now()}`));
-        const nd = store.update(d.id, { image_paths: [...(d.image_paths || []), file] });
-        await ctx.reply('🖼 AI rasm tayyor. Yangilangan qoralama:', opt);
-        return sendForApproval(nd);
-      } catch (e) { return ctx.reply(`⚠️ AI rasm chizilmadi: ${e.message}`, opt); }
-    }
-    if (!t.startsWith('muqova')) return ctx.reply(`Rasm yuboring yoki "muqova"${rasmYoqilgan() ? ' / "ai"' : ''} deb yozing.`, opt);
-    store.takeWait(replyTo);
-    await ctx.reply('🎨 Dizayner kartochka chizyapti...', opt);
-    try {
-      const { file } = await muqovaYasa(d);
-      const nd = store.update(d.id, { image_paths: [...(d.image_paths || []), file] });
-      await ctx.reply('🖼 Muqova tayyor. Yangilangan qoralama:', opt);
-      return sendForApproval(nd);
-    } catch (e) { return ctx.reply(`⚠️ Muqova yasalmadi: ${e.message}`, opt); }
+    const t = matn.toLowerCase();
+    store.takeWait(kalit);
+    if (/^o.?chir/.test(t)) return rasmIsh(ctx, d, 'ochir');
+    if (t === 'ai') return rasmIsh(ctx, d, rasmYoqilgan() ? 'ai' : 'muqova');
+    if (t === 'muqova') return rasmIsh(ctx, d, 'muqova');
+    // Erkin matn — rahbar qanday rasm kerakligini tasvirladi: AI bo'lsa AI rasm, bo'lmasa dizayner kartochka
+    return rasmIsh(ctx, d, rasmYoqilgan() ? 'ai' : 'muqova', matn.slice(0, 600));
   }
   if (w.kind === 'rad') {
-    store.takeWait(replyTo);
+    store.takeWait(kalit);
     const c = store.choices().filter(x => x.title === d.title && !x.ok).at(-1);
-    if (c) { c.sabab = ctx.message.text.slice(0, 300); store.savePlans(); }
-    if (addFeedback(`Rad etildi: ${ctx.message.text}`, d) >= RULES_BATCH) refreshRules().catch(() => {});
+    if (c) { c.sabab = matn.slice(0, 300); store.savePlans(); }
+    if (addFeedback(`Rad etildi: ${matn}`, d) >= RULES_BATCH) refreshRules().catch(() => {});
     return ctx.reply('👍 Tushundim, hisobga olaman.', opt);
   }
   if (w.kind !== 'edit') return;
-  store.takeWait(replyTo);
+  store.takeWait(kalit);
+  if (d.status === 'published') return ctx.reply("Bu post allaqachon chiqqan — tahrirlab bo'lmaydi.", opt);
   // Izoh uslub xotirasiga: yetarlicha yig'ilsa — doimiy qoidalarga aylanadi (fonda)
-  if (addFeedback(ctx.message.text, d) >= RULES_BATCH) {
+  if (addFeedback(matn, d) >= RULES_BATCH) {
     refreshRules()
       .then(r => r && log(`📏 Qoidalar tahrirlaringizdan yangilandi (${r.rules.length} ta).${r.added.length ? `\nYangi:\n• ${r.added.join('\n• ')}` : ''}\n/qoidalar — ko'rish`))
       .catch(e => log(`⚠️ Qoidalar yangilanmadi: ${e.message}`));
   }
   const id = d.id;
-  await ctx.reply('🔄 Qayta yozyapman...', { message_thread_id: tema() });
+  await ctx.reply('🔄 Qayta yozyapman...', opt);
   try {
-    const r = await revise(d, ctx.message.text);
+    const r = await revise(d, matn);
     r.post_html = ensureLink(ensureCode(r.post_html, d.cta_kod), d.plan?.cta_havola, d.plan?.cta_matn);
-    store.update(id, { status: 'revised' });
     // Eski video/slaydlar/ovoz yangi matnga mos emas (rahbar qo'shgan rasmlar qoladi)
     const { video_path, video_duration, motion, slide_paths, audio_path, audio_duration, scheduledAt, ...rest } = d;
-    const art = isRich(d) ? await writeArticle(d.plan || { title: d.title, format: d.format }, { post_html: r.post_html }, ctx.message.text) : null;
+    const art = isRich(d) ? await writeArticle(d.plan || { title: d.title, format: d.format }, { post_html: r.post_html }, matn) : null;
     let nd = store.addDraft({
       ...rest, id: undefined, status: 'pending', post_html: r.post_html, reels_script: r.reels_script || d.reels_script,
       ...(art ? { article_html: art.article_html, slides: art.slides } : {}),
-      notes: `Tahrir: ${ctx.message.text}`, score: d.score
+      notes: `Tahrir: ${matn}`, score: d.score
     });
-    if (art) nd = await renderDraftSlides(nd);
+    if (art) {
+      try { nd = await renderDraftSlides(nd); }
+      catch (e) { await log(`⚠️ Slaydlar chizilmadi (${d.title}): ${e.message}`); }
+    }
+    // Eski versiya faqat yangisi tayyor bo'lgach yopiladi — tahrir xato bersa, eski qoralama tugmalari ishlayveradi
+    store.update(id, { status: 'revised' });
     await sendForApproval(nd);
-  } catch (e) { await ctx.reply(`⚠️ Xato: ${e.message}`); }
+  } catch (e) { await ctx.reply(`⚠️ Qayta yozilmadi: ${e.message}\nEski qoralama o'z holicha qoldi — tugmalari ishlaydi.`, opt); }
 });
 
-// Rahbar yuborgan rasm (🖼 Rasm so'roviga reply)
+// Rahbar yuborgan rasm (🖼 Rasm so'roviga — reply yoki shu chat/topikka oddiy rasm)
 bot.on(['message:photo', 'message:document'], async ctx => {
-  const replyTo = ctx.message.reply_to_message?.message_id;
-  const w = replyTo && store.peekWait(replyTo);
-  if (!w || w.kind !== 'image' || !isAdmin(ctx)) return;
+  if (!isAdmin(ctx)) return;
+  const [kalit] = javobKaliti(ctx);
+  const w = kalit && store.peekWait(kalit);
+  if (!w || w.kind !== 'image') return;
   const d = store.get(w.id);
-  if (!d) return store.takeWait(replyTo);
+  if (!d) return store.takeWait(kalit);
   const opt = { message_thread_id: tema() };
   const doc = ctx.message.document;
   if (doc && !/^image\/(jpeg|png|webp)$/.test(doc.mime_type || '')) return ctx.reply('Faqat rasm (JPG/PNG) yuboring.', opt);
@@ -936,7 +1072,7 @@ bot.on(['message:photo', 'message:document'], async ctx => {
   try {
     const file = await saveTelegramFile(fileId, d.id);
     const nd = store.update(d.id, { image_paths: [...(d.image_paths || []), file] });
-    store.takeWait(replyTo);
+    store.takeWait(kalit);
     await ctx.reply(`🖼 Rasm qo'shildi (jami ${imagePaths(nd).length} ta). Yana qo'shish uchun 🖼 Rasm tugmasini bosing. Yangilangan qoralama:`, opt);
     await sendForApproval(nd);
   } catch (e) { await ctx.reply(`⚠️ Rasm saqlanmadi: ${e.message}`, opt); }
@@ -980,5 +1116,8 @@ bot.command('tiklash', async ctx => {
     await ctx.reply(`✅ Tiklandi: ${r.ideas} ta g'oya, ${r.plans} ta reja, ${r.drafts} ta qoralama, ${r.rules} ta qoida, ${r.samples} ta namuna post.`);
   } catch (e) { await ctx.reply(`⚠️ Tiklanmadi: ${e.message}`); }
 });
+
+// Hech bir handler olmagan buyruq (shaxsiy chatda) — jim qolinmaydi
+bot.on('message:text', ctx => (ctx.chat.type === 'private' && isAdmin(ctx) ? ctx.reply(QISQA_YORDAM) : undefined));
 
 bot.catch(err => console.error('Bot xatosi:', err.error?.message || err));

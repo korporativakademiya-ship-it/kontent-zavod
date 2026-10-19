@@ -12,13 +12,15 @@ Sahna turlari (ketma-ketlik: hook → number (ixtiyoriy) → steps → statement
 {"type":"cta","text":"savol yoki chaqiriq, ≤50 belgi","sub":"≤30 belgi","keyword":"direkt kalit so'z, BITTA SO'Z, katta harf"}
 `;
 
-export async function storyboard(draft) {
+// izoh — rahbar tavsifi (uslub, uzunlik, nimani ko'rsatish)
+export async function storyboard(draft, { izoh = '' } = {}) {
   const data = await askJSON({
     maxTokens: 2500,
     system: `Sen reels uchun motion-dizaynersan. Matnli animatsiya (kinetik tipografiya) sahnalarini yozasan. ${brand()}`,
     prompt: `Post:\n${draft.post_html}\n\nReels ssenariy:\n${draft.reels_script || "yo'q"}
 
 Shu mazmunni 25–45 soniyalik videoga aylantir. ${SCHEMA}
+${izoh ? `RAHBAR XOHISHI (albatta bajar; uzunlik va qaysi sahnalar bo'yicha yuqoridagidan ustun, sahna turlari faqat shu ro'yxatdan): ${izoh}\n` : ''}
 Dublyaj: har sahnaga (steps da esa har bir qadamga, items ichida) "voice" maydoni qo'sh — diktor aytadigan jonli gap,
 1–2 qisqa gap (≤160 belgi), ekrandagi matnni so'zma-so'z takrorlamaydi, balki tushuntiradi. steps sahnasining o'ziga voice kerak emas.
 Qoidalar: steps da 3–8 ta qadam. Belgi chegaralariga qat'iy amal qil — ekranga sig'ishi shart.
